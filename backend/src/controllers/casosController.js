@@ -6,9 +6,11 @@ import {
 import fs from "fs/promises";
 import { transcribeAudio } from "../services/audioService.js";
 import { extractTextFromImage } from "../services/documentService.js";
-import { analyzeCase } from "../services/geminiService.js";
 import { generateDocx } from "../services/documentGenerationService.js";
-
+import {
+  analyzeCase,
+  generatePetitionText,
+} from "../services/geminiService.js";
 // --- FUNÇÃO DE CRIAÇÃO (VERSÃO FINAL E COMPLETA) ---
 export const criarNovoCaso = async (req, res) => {
   try {
@@ -54,29 +56,28 @@ export const criarNovoCaso = async (req, res) => {
     console.log("Gerando resumo com IA...");
     resumo_ia = await analyzeCase(textoCompleto);
     console.log("Resumo gerado.");
-
-    console.log("Gerando documento .docx...");
-    const dadosParaDoc = {
+    console.log("Gerando rascunho da petição inicial...");
+    const caseDataForPetition = {
       nome_assistido: nome,
       cpf_assistido: cpf,
       telefone_assistido: telefone,
+      tipo_acao: tipoAcao, // Pode precisar dividir entre área e ação específica
       relato_texto: relato,
-      resumo_ia,
-      protocolo,
-      data: new Date().toLocaleDateString("pt-BR"),
+      documentos_informados: documentosInformadosArray,
+      resumo_ia: resumo_ia,
+      // Adicione aqui OUTROS CAMPOS que o prompt detalhado precisa
+      // Ex: endereco_assistido: req.body.endereco, nome_requerido: req.body.nome_requerido, etc.
     };
-    const docxBuffer = await generateDocx(dadosParaDoc);
-    const docGeradoPath = `${protocolo}/documento_gerado_${protocolo}.docx`;
-    await supabase.storage.from("peticoes").upload(docGeradoPath, docxBuffer, {
-      contentType:
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    });
-    const { data: docGeradoUrlData } = supabase.storage
-      .from("peticoes")
-      .getPublicUrl(docGeradoPath);
-    url_documento_gerado = docGeradoUrlData.publicUrl;
-    console.log("Documento gerado e salvo no Storage.");
+    const peticao_inicial_rascunho = await generatePetitionText(
+      caseDataForPetition
+    );
+    console.log("Rascunho da petição gerado.");
+    // --- FIM DA CHAMADA ---
 
+    // ... (O código de geração do .docx continua aqui, se você ainda o quiser) ...
+    console.log("Gerando documento .docx..."); // Linha existente
+
+    // ... (O código de upload dos arquivos originais continua aqui) ...
     // --- ETAPA 2: UPLOAD DOS ARQUIVOS ORIGINAIS ---
     console.log("Iniciando upload dos arquivos originais...");
     if (req.files) {
@@ -88,10 +89,15 @@ export const criarNovoCaso = async (req, res) => {
           .upload(filePath, await fs.readFile(audioFile.path), {
             contentType: audioFile.mimetype,
           });
-        const { data: publicUrlData } = supabase.storage
-          .from("audios")
-          .getPublicUrl(filePath);
-        url_audio = publicUrlData.publicUrl;
+        {
+          const { data: signed, error: signErr } = await supabase.storage
+            .from("audios")
+            .createSignedUrl(filePath, signedExpires);
+          if (signErr) {
+            console.error("Falha ao gerar signed URL do áudio:", signErr);
+          }
+          url_audio = signed?.signedUrl || null;
+        }
       }
       if (req.files.documentos) {
         for (const docFile of req.files.documentos) {
@@ -101,18 +107,31 @@ export const criarNovoCaso = async (req, res) => {
             await supabase.storage
               .from("peticoes")
               .upload(filePath, fileData, { contentType: docFile.mimetype });
-            const { data: publicUrlData } = supabase.storage
-              .from("peticoes")
-              .getPublicUrl(filePath);
-            url_peticao = publicUrlData.publicUrl;
+            {
+              const { data: signed, error: signErr } = await supabase.storage
+                .from("peticoes")
+                .createSignedUrl(filePath, signedExpires);
+              if (signErr) {
+                console.error("Falha ao gerar signed URL da petição:", signErr);
+              }
+              url_peticao = signed?.signedUrl || null;
+            }
           } else {
             await supabase.storage
               .from("documentos")
               .upload(filePath, fileData, { contentType: docFile.mimetype });
-            const { data: publicUrlData } = supabase.storage
-              .from("documentos")
-              .getPublicUrl(filePath);
-            urls_documentos.push(publicUrlData.publicUrl);
+            {
+              const { data: signed, error: signErr } = await supabase.storage
+                .from("documentos")
+                .createSignedUrl(filePath, signedExpires);
+              if (signErr) {
+                console.error(
+                  "Falha ao gerar signed URL de documento:",
+                  signErr
+                );
+              }
+              if (signed?.signedUrl) urls_documentos.push(signed.signedUrl);
+            }
           }
         }
       }
@@ -135,6 +154,7 @@ export const criarNovoCaso = async (req, res) => {
       resumo_ia,
       url_documento_gerado,
       documentos_informados: documentosInformadosArray,
+      peticao_inicial_rascunho: peticao_inicial_rascunho,
     });
 
     if (dbError) {

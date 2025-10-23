@@ -38,6 +38,9 @@ export const registrarDefensor = async (req, res) => {
     });
   } catch (err) {
     console.error("Erro ao registrar defensor:", err);
+    if (err && err.cause) {
+      console.error("Causa raiz:", err.cause);
+    }
     res.status(500).json({ error: "Falha ao registrar defensor." });
   }
 };

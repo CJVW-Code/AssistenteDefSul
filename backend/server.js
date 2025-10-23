@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import statusRoutes from "./src/routes/status.js";
 import casosRoutes from "./src/routes/casos.js";
 import defensoresRoutes from "./src/routes/defensores.js";
+import debugRoutes from "./src/routes/debug.js";
 
 dotenv.config();
 
@@ -23,6 +24,7 @@ app.use("/api/casos", casosRoutes);
 
 // Rota para consultar status
 app.use("/api/status", statusRoutes);
+app.use("/api/debug", debugRoutes);
 
 // Rota de "saúde" do sistema
 app.get("/health", (req, res) => {
