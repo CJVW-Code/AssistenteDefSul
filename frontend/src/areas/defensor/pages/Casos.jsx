@@ -15,7 +15,8 @@ export const Casos = () => {
     const fetchCasos = async () => {
       try {
         // A rota do backend é a mesma que usamos no Dashboard
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/casos`, {
+        const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8001/api";
+        const response = await fetch(`${API_BASE}/casos`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },

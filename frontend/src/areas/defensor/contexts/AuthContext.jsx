@@ -8,8 +8,9 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, senha) => {
     try {
+      const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8001/api";
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/defensores/login`,
+        `${API_BASE}/defensores/login`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -22,7 +23,6 @@ export const AuthProvider = ({ children }) => {
         throw new Error(data.error || "Email ou senha inválidos");
       }
 
-      // Salva o token no estado e no localStorage
       setToken(data.token);
       localStorage.setItem("defensorToken", data.token);
       return true;

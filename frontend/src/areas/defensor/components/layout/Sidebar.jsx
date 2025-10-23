@@ -1,12 +1,6 @@
 import React from "react";
 import { NavLink } from "react-router-dom";
-import {
-  LayoutDashboard,
-  FolderKanban,
-  Calendar,
-  Settings,
-  BarChart,
-} from "lucide-react";
+import { LayoutDashboard, FolderKanban } from "lucide-react";
 
 export const Sidebar = () => {
   // CORREÇÃO: Adicionamos o prefixo '/painel' em todas as rotas

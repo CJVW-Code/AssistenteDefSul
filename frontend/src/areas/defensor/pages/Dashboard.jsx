@@ -8,25 +8,26 @@ export const Dashboard = () => {
   const [casos, setCasos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const { token, logout } = useAuth();
+  const { token } = useAuth();
   const [defensor, setDefensor] = useState(null);
+
   useEffect(() => {
     if (token) {
       const decoded = jwtDecode(token);
       setDefensor(decoded);
     }
   }, [token]);
+
   useEffect(() => {
     const fetchCasos = async () => {
+      const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8001/api";
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/casos`, {
+        const response = await fetch(`${API_BASE}/casos`, {
           headers: {
-            Authorization: `Bearer ${token}`, // Envia o token para autorização
+            Authorization: `Bearer ${token}`,
           },
         });
-        if (!response.ok) {
-          throw new Error("Falha ao buscar os casos.");
-        }
+        if (!response.ok) throw new Error("Falha ao buscar os casos.");
         const data = await response.json();
         setCasos(data);
       } catch (err) {
@@ -35,10 +36,7 @@ export const Dashboard = () => {
         setLoading(false);
       }
     };
-
-    if (token) {
-      fetchCasos();
-    }
+    if (token) fetchCasos();
   }, [token]);
 
   if (loading) return <p className="text-center p-8">Carregando casos...</p>;
@@ -56,21 +54,14 @@ export const Dashboard = () => {
             )}
           </div>
         </div>
-
-        {/* ... (o resto do seu dashboard com a lista de casos) ... */}
       </div>
       <div className="grid gap-4">
         {casos.length === 0 ? (
           <p className="text-[#dae2db]">Nenhum caso pendente no momento.</p>
         ) : (
           casos.map((caso) => (
-            // Futuramente, este Link levará para a página de detalhes do caso
             <Link to={`/painel/casos/${caso.id}`} key={caso.id}>
-              <div
-                key={caso.id}
-                s
-                className="bg-slate-500/50 p-6 rounded-xl border border-green-800 hover:border-amber-500/50 transition-colors"
-              >
+              <div className="bg-slate-500/50 p-6 rounded-xl border border-green-800 hover:border-amber-500/50 transition-colors">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     <FileText className="w-6 h-6 text-amber-500" />
@@ -85,9 +76,7 @@ export const Dashboard = () => {
                   </div>
                   <div className="flex items-center gap-2 text-[#dae2db] text-sm">
                     <Clock className="w-4 h-4" />
-                    <span>
-                      {new Date(caso.created_at).toLocaleDateString()}
-                    </span>
+                    <span>{new Date(caso.created_at).toLocaleDateString()}</span>
                   </div>
                 </div>
               </div>
@@ -98,3 +87,4 @@ export const Dashboard = () => {
     </div>
   );
 };
+

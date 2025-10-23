@@ -64,7 +64,7 @@ export const Login = () => {
             <p className="text-center text-sm text-white">
               Não tem uma conta?
               <Link
-                to="/cadastro"
+                to="/painel/cadastro"
                 className="font-semibold text-amber-500 hover:underline"
               >
                 Cadastre-se

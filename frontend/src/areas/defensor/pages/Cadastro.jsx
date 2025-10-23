@@ -25,14 +25,13 @@ export const Cadastro = () => {
 
     setLoading(true);
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/defensores/register`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ nome, email, senha }),
-        }
-      );
+      const API_BASE =
+        import.meta.env.VITE_API_URL || "http://localhost:8001/api";
+      const response = await fetch(`${API_BASE}/defensores/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nome, email, senha }),
+      });
       const data = await response.json();
 
       if (!response.ok) {
@@ -42,7 +41,7 @@ export const Cadastro = () => {
       setSuccess(
         "Cadastro realizado com sucesso! Você será redirecionado para o login."
       );
-      setTimeout(() => navigate("/login"), 2000);
+      setTimeout(() => navigate("/painel/login"), 1500);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -102,11 +101,16 @@ export const Cadastro = () => {
             <p className="text-center text-sm text-white">
               Já tem uma conta?{" "}
               <Link
-                to="/login"
+                to="/painel/login"
                 className="font-semibold text-amber-500 hover:underline"
               >
                 Faça o login
               </Link>
+            </p>
+            <p className="text-center rounded-3xl py-2 bg-amber-700 text-sm text-amber-100">
+              Apenas emails{" "}
+              <span className="font-bold">@defensoria.ba.def.br</span> são
+              permitidos.
             </p>
           </form>
         </div>

@@ -12,12 +12,11 @@ export const DetalhesCaso = () => {
   useEffect(() => {
     const fetchDetalhes = async () => {
       try {
-        const response = await fetch(
-          `${import.meta.env.VITE_API_URL}/casos/${id}`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
+        const API_BASE =
+          import.meta.env.VITE_API_URL || "http://localhost:8001/api";
+        const response = await fetch(`${API_BASE}/casos/${id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         if (!response.ok) throw new Error("Falha ao carregar o caso.");
         const data = await response.json();
         setCaso(data);
@@ -36,17 +35,16 @@ export const DetalhesCaso = () => {
 
     setIsUpdating(true);
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/casos/${id}/status`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ status: novoStatus }),
-        }
-      );
+      const API_BASE =
+        import.meta.env.VITE_API_URL || "http://localhost:8001/api";
+      const response = await fetch(`${API_BASE}/casos/${id}/status`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ status: novoStatus }),
+      });
 
       if (!response.ok) {
         throw new Error("Falha ao atualizar o status.");
@@ -108,6 +106,18 @@ export const DetalhesCaso = () => {
               {caso.relato_texto || "Nenhum relato textual fornecido."}
             </p>
           </div>
+        </div>
+
+        <div className="bg-slate-800/50 p-6 rounded-xl border border-slate-700">
+          <h2 className="text-2xl font-bold mb-4">
+            Rascunho da Petição Inicial (Gerado por IA)
+          </h2>
+          {/* Usamos <pre> para manter a formatação do texto gerado pela IA */}
+          <pre className="whitespace-pre-wrap text-sm font-mono bg-slate-900 p-4 rounded-md overflow-x-auto">
+            {caso.peticao_inicial_rascunho ||
+              "Rascunho não disponível ou não gerado."}
+          </pre>
+          {/* Futuramente, adicionar um botão de "Editar" aqui */}
         </div>
 
         {/* Coluna Lateral */}
