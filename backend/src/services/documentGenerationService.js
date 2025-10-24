@@ -3,13 +3,20 @@ import PizZip from "pizzip";
 import Docxtemplater from "docxtemplater";
 import fs from "fs/promises";
 import path from "path";
+import { fileURLToPath } from "url";
 
 export const generateDocx = async (data) => {
-  // Carrega o template.docx da pasta 'templates'
-  const templateContent = await fs.readFile(
-    path.resolve("templates", "template.docx"),
-    "binary"
+  // Resolve o caminho do template relativo a este arquivo (backend/src/services)
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  const templatePath = path.resolve(
+    __dirname,
+    "..",
+    "..",
+    "templates",
+    "template.docx"
   );
+  const templateContent = await fs.readFile(templatePath, "binary");
 
   const zip = new PizZip(templateContent);
 
