@@ -18,12 +18,28 @@ export const FormularioSubmissao = () => {
   const [nome, setNome] = useState("");
   const [cpf, setCpf] = useState("");
   const [telefone, setTelefone] = useState("");
-  const [tipoAcao, setTipoAcao] = useState("");
+  const [tipoAcao, setTipoAcao] = useState("familia"); // Quando for adicionar outras areas, Remover
   const [relato, setRelato] = useState("");
   const [documentFiles, setDocumentFiles] = useState([]);
   const [statusMessage, setStatusMessage] = useState("");
   const [acaoEspecifica, setAcaoEspecifica] = useState("");
   const [documentosMarcados, setDocumentosMarcados] = useState([]);
+
+  // --- NOVOS ESTADOS PARA DADOS ADICIONAIS ---
+  const [enderecoAssistido, setEnderecoAssistido] = useState("");
+  const [emailAssistido, setEmailAssistido] = useState("");
+  const [dadosAdicionaisRequerente, setDadosAdicionaisRequerente] =
+    useState("");
+
+  const [nomeRequerido, setNomeRequerido] = useState("");
+  const [cpfRequerido, setCpfRequerido] = useState("");
+  const [enderecoRequerido, setEnderecoRequerido] = useState("");
+  const [dadosAdicionaisRequerido, setDadosAdicionaisRequerido] = useState("");
+
+  const [filhosInfo, setFilhosInfo] = useState("");
+  const [dataInicioRelacao, setDataInicioRelacao] = useState("");
+  const [dataSeparacao, setDataSeparacao] = useState("");
+  const [bensPartilha, setBensPartilha] = useState("");
 
   // --- ESTADOS DA GRAVAÇÃO DE ÁUDIO ---
   const [isRecording, setIsRecording] = useState(false);
@@ -45,6 +61,28 @@ export const FormularioSubmissao = () => {
     tipoAcao && acaoEspecifica && documentosPorAcao[tipoAcao]?.[acaoEspecifica]
       ? documentosPorAcao[tipoAcao][acaoEspecifica]
       : [];
+
+  // Fallback temporário: garantir opções visíveis para Família
+  const acoesFallbackFamilia = [
+    "Fixação de Pensão Alimentícia",
+    "Divórcio",
+    "Reconhecimento e Dissolução de União Estável",
+    "Guarda de Filhos",
+    "Alvará",
+    "Execução de Alimentos Rito Penhora/Prisão",
+    "Revisão de Alimentos",
+  ];
+
+  const acoesParaMostrar =
+    tipoAcao === "familia" &&
+    (!acoesDisponiveis || acoesDisponiveis.length === 0)
+      ? acoesFallbackFamilia
+      : acoesDisponiveis;
+
+  // Mostrar dados do Requerido apenas quando a ação exigir
+  const shouldShowRequerido = !acaoEspecifica
+    ? true
+    : !acaoEspecifica.toLowerCase().includes("alvar");
 
   // --- LÓGICA DE VALIDAÇÃO DE INPUT ---
   const handleNumericInput = (e, setter) => {
@@ -177,6 +215,18 @@ export const FormularioSubmissao = () => {
       "documentos_informados",
       JSON.stringify(documentosMarcados)
     );
+    // --- ADICIONA OS NOVOS CAMPOS AO FORMDATA ---
+    formData.append("endereco_assistido", enderecoAssistido);
+    formData.append("email_assistido", emailAssistido);
+    formData.append("dados_adicionais_requerente", dadosAdicionaisRequerente);
+    formData.append("nome_requerido", nomeRequerido);
+    formData.append("cpf_requerido", cpfRequerido);
+    formData.append("endereco_requerido", enderecoRequerido);
+    formData.append("dados_adicionais_requerido", dadosAdicionaisRequerido);
+    formData.append("filhos_info", filhosInfo);
+    formData.append("data_inicio_relacao", dataInicioRelacao);
+    formData.append("data_separacao", dataSeparacao);
+    formData.append("bens_partilha", bensPartilha);
     // Anexa o áudio gravado, se existir
     if (audioBlob) {
       formData.append("audio", audioBlob, "gravacao.webm");
@@ -228,6 +278,18 @@ export const FormularioSubmissao = () => {
     setTelefone("");
     setTipoAcao("");
     setRelato("");
+    // limpar novos campos adicionados
+    setEnderecoAssistido("");
+    setEmailAssistido("");
+    setDadosAdicionaisRequerente("");
+    setNomeRequerido("");
+    setCpfRequerido("");
+    setEnderecoRequerido("");
+    setDadosAdicionaisRequerido("");
+    setFilhosInfo("");
+    setDataInicioRelacao("");
+    setDataSeparacao("");
+    setBensPartilha("");
     setAudioBlob(null);
     setDocumentFiles([]);
     setGeneratedCredentials(null); // Isso também esconderá a tela de sucesso
@@ -333,6 +395,39 @@ export const FormularioSubmissao = () => {
               className="w-full pl-10 pr-4 py-3 bg-slate-700 rounded-lg border border-slate-600 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
             />
           </div>
+
+          {/* --- NOVOS CAMPOS DO REQUERENTE --- */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <input
+              type="email"
+              placeholder="Seu Email (opcional)"
+              value={emailAssistido}
+              onChange={(e) => setEmailAssistido(e.target.value)}
+              className="w-full px-4 py-3 bg-slate-700 rounded-lg border border-slate-600 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+            />
+            <input
+              type="text"
+              placeholder="Seu Endereço Completo"
+              value={enderecoAssistido}
+              onChange={(e) => setEnderecoAssistido(e.target.value)}
+              required
+              className="w-full px-4 py-3 bg-slate-700 rounded-lg border border-slate-600 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+            />
+          </div>
+          <div>
+            <textarea
+              placeholder="Seus Dados Adicionais (RG, Nacionalidade, Estado Civil, Profissão, Data de Nascimento)"
+              value={dadosAdicionaisRequerente}
+              onChange={(e) => setDadosAdicionaisRequerente(e.target.value)}
+              rows="3"
+              className="w-full px-4 py-3 bg-slate-700 rounded-lg border border-slate-600 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+            ></textarea>
+            <p className="text-xs text-slate-400 mt-1">
+              Ex: 1234567 SSP/BA, Brasileiro(a), Casado(a), Vendedor(a),
+              01/01/1990
+            </p>
+          </div>
+
           <div>
             <select
               value={tipoAcao}
@@ -344,34 +439,130 @@ export const FormularioSubmissao = () => {
               required
               className="w-full px-4 py-3 bg-slate-700 rounded-lg ..."
             >
-              <option value="" disabled>
+              {/* <option value="" disabled>
                 1. Selecione a Área do Direito
-              </option>
-              <option value="familia">Direito de Família</option>
-              <option value="civel">Direito Cível</option>
-              <option value="consumidor">Direito Do Consumidor</option>
+              </option> */}
+              <option value="familia">Direito de Família </option>
+              {/*<option value="civel">Direito Cível</option>
+               <option value="consumidor">Direito Do Consumidor</option>
               <option value="saude">Direito à Saúde</option>
               <option value="criminal">Defesa Criminal</option>
-              <option value="infancia">Direito Infância e Juventude</option>
+              <option value="infancia">Direito Infância e Juventude</option> */}
             </select>
-            {tipoAcao && (
-              <select
-                value={acaoEspecifica}
-                onChange={(e) => setAcaoEspecifica(e.target.value)}
-                required
-                className="w-full px-4 py-3 mt-5 bg-slate-700 rounded-lg ..."
-              >
-                <option value="" disabled>
-                  2. Selecione a Ação Específica
+            {/*{tipoAcao && (*/}
+            <select
+              value={acaoEspecifica}
+              onChange={(e) => setAcaoEspecifica(e.target.value)}
+              required
+              className="w-full px-4 py-3 mt-5 bg-slate-700 rounded-lg ..."
+            >
+              <option value="" disabled>
+                2. Selecione a Ação Específica
+              </option>
+              {acoesParaMostrar.map((acao) => (
+                <option key={acao} value={acao}>
+                  {acao}
                 </option>
-                {acoesDisponiveis.map((acao) => (
-                  <option key={acao} value={acao}>
-                    {acao}
-                  </option>
-                ))}
-              </select>
-            )}
+              ))}
+            </select>
+            {/* )}*/}
           </div>
+          {/* --- SEÇÃO DADOS DO(A) REQUERIDO(A) --- */}
+          <div
+            className={`space-y-4 border-t border-slate-700 pt-4 ${
+              shouldShowRequerido ? "" : "hidden"
+            }`}
+          >
+            <h3 className="font-semibold text-lg text-slate-300">
+              Dados da Outra Parte (Requerido/a)
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <input
+                type="text"
+                placeholder="Nome Completo do(a) Requerido(a)"
+                value={nomeRequerido}
+                onChange={(e) => setNomeRequerido(e.target.value)}
+                className="w-full px-4 py-3 bg-slate-700 rounded-lg border border-slate-600 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+              />
+              <input
+                type="text"
+                placeholder="CPF do(a) Requerido(a) (apenas números, se souber)"
+                value={cpfRequerido}
+                onChange={(e) => handleNumericInput(e, setCpfRequerido)}
+                className="w-full px-4 py-3 bg-slate-700 rounded-lg border border-slate-600 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+              />
+            </div>
+            <input
+              type="text"
+              placeholder="Endereço Completo do(a) Requerido(a) (se souber)"
+              value={enderecoRequerido}
+              onChange={(e) => setEnderecoRequerido(e.target.value)}
+              className="w-full px-4 py-3 bg-slate-700 rounded-lg border border-slate-600 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+            />
+            <div>
+              <textarea
+                placeholder="Dados Adicionais do(a) Requerido(a) (RG, Nacionalidade, Estado Civil, Profissão, se souber)"
+                value={dadosAdicionaisRequerido}
+                onChange={(e) => setDadosAdicionaisRequerido(e.target.value)}
+                rows="3"
+                className="w-full px-4 py-3 bg-slate-700 rounded-lg border border-slate-600 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+              ></textarea>
+            </div>
+          </div>
+
+          {/* --- SEÇÃO DETALHES ADICIONAIS DO CASO --- */}
+          <div className="space-y-4 border-t border-slate-700 pt-4">
+            <h3 className="font-semibold text-lg text-slate-300">
+              Detalhes Adicionais (Importante para Ações de Família)
+            </h3>
+            <div>
+              <textarea
+                placeholder="Filhos (Nome Completo - Data de Nascimento DD/MM/AAAA)"
+                value={filhosInfo}
+                onChange={(e) => setFilhosInfo(e.target.value)}
+                rows="3"
+                className="w-full px-4 py-3 bg-slate-700 rounded-lg border border-slate-600 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+              ></textarea>
+              <p className="text-xs text-slate-400 mt-1">
+                Separe cada filho com ponto e vírgula (;). Ex: João Silva -
+                10/05/2015; Maria Silva - 20/12/2018
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-400 mb-1">
+                  Data Casamento/Início União
+                </label>
+                <input
+                  type="date"
+                  value={dataInicioRelacao}
+                  onChange={(e) => setDataInicioRelacao(e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-700 rounded-lg border border-slate-600 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-400 mb-1">
+                  Data Separação de Fato
+                </label>
+                <input
+                  type="date"
+                  value={dataSeparacao}
+                  onChange={(e) => setDataSeparacao(e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-700 rounded-lg border border-slate-600 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+                />
+              </div>
+            </div>
+            <div>
+              <textarea
+                placeholder="Bens a Partilhar (Descreva os bens adquiridos durante a união/casamento, se houver)"
+                value={bensPartilha}
+                onChange={(e) => setBensPartilha(e.target.value)}
+                rows="3"
+                className="w-full px-4 py-3 bg-slate-700 rounded-lg border border-slate-600 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+              ></textarea>
+            </div>
+          </div>
+
           <div>
             <textarea
               placeholder="Relate seu caso aqui..."

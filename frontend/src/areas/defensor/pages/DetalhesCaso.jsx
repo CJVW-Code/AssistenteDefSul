@@ -107,82 +107,78 @@ export const DetalhesCaso = () => {
             </p>
           </div>
         </div>
-
-        <div className="bg-slate-800/50 p-6 rounded-xl border border-slate-700">
-          <h2 className="text-2xl font-bold mb-4">
-            Rascunho da Petição Inicial (Gerado por IA)
+        <div className="bg-slate-900/50 p-6 rounded-xl border border-blue-700">
+          <h2 className="text-xl font-bold text-amber-400 mb-2">
+            Resumo da IA
           </h2>
-          {/* Usamos <pre> para manter a formatação do texto gerado pela IA */}
-          <pre className="whitespace-pre-wrap text-sm font-mono bg-slate-900 p-4 rounded-md overflow-x-auto">
-            {caso.peticao_inicial_rascunho ||
-              "Rascunho não disponível ou não gerado."}
-          </pre>
-          {/* Futuramente, adicionar um botão de "Editar" aqui */}
+          <p className="text-white">
+            {caso.resumo_ia || "Resumo não disponível."}
+          </p>
         </div>
-
+        <div className="bg-slate-800/50 p-6 rounded-xl border border-slate-700">
+          <h2 className="text-xl text-white font-bold mb-4">Status do Caso</h2>
+          <select
+            onChange={(e) => handleStatusChange(e.target.value)}
+            value={caso.status} // 'value' em vez de 'defaultValue' para controlar o estado
+            disabled={isUpdating}
+            className="w-full p-2 bg-slate-700 rounded-lg disabled:opacity-50"
+          >
+            <option value="recebido">Recebido</option>
+            <option value="em analise">Em Análise</option>
+            <option value="aguardando_docs">Aguardando Documentos</option>
+            <option value="finalizado">Finalizado</option>
+          </select>
+        </div>
+        <div className="bg-slate-800/50 p-6 rounded-xl border border-slate-700">
+          <h2 className="text-xl text-white font-bold mb-4">
+            Documentos e Anexos
+          </h2>
+          <div className="space-y-3">
+            {caso.url_documento_gerado && (
+              <a
+                href={caso.url_documento_gerado}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 p-3 bg-amber-600/80 hover:bg-amber-600 rounded-lg font-semibold"
+              >
+                <Download size={20} /> Baixar Petição Gerada
+              </a>
+            )}
+            {caso.url_audio && (
+              <a
+                href={caso.url_audio}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 p-3 bg-slate-700 text-white hover:bg-slate-600 rounded-lg"
+              >
+                <Mic size={20} /> Ouvir Áudio
+              </a>
+            )}
+            {caso.urls_documentos?.map((url, index) => (
+              <a
+                key={index}
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 p-3 bg-slate-700 text-white hover:bg-slate-600 rounded-lg"
+              >
+                <FileText size={20} /> Ver Documento {index + 1}
+              </a>
+            ))}
+          </div>
+        </div>
         {/* Coluna Lateral */}
         <div className="space-y-6">
-          <div className="bg-slate-900/50 p-6 rounded-xl border border-blue-700">
-            <h2 className="text-xl font-bold text-amber-400 mb-2">
-              Resumo da IA
-            </h2>
-            <p className="text-white">
-              {caso.resumo_ia || "Resumo não disponível."}
-            </p>
-          </div>
           <div className="bg-slate-800/50 p-6 rounded-xl border border-slate-700">
-            <h2 className="text-xl text-white font-bold mb-4">
-              Status do Caso
+            <h2 className="text-2xl text-white font-bold mb-4">
+              Rascunho da Petição Inicial (Gerado por IA)
             </h2>
-            <select
-              onChange={(e) => handleStatusChange(e.target.value)}
-              value={caso.status} // 'value' em vez de 'defaultValue' para controlar o estado
-              disabled={isUpdating}
-              className="w-full p-2 bg-slate-700 rounded-lg disabled:opacity-50"
-            >
-              <option value="recebido">Recebido</option>
-              <option value="em analise">Em Análise</option>
-              <option value="aguardando_docs">Aguardando Documentos</option>
-              <option value="finalizado">Finalizado</option>
-            </select>
-          </div>
-          <div className="bg-slate-800/50 p-6 rounded-xl border border-slate-700">
-            <h2 className="text-xl text-white font-bold mb-4">
-              Documentos e Anexos
-            </h2>
-            <div className="space-y-3">
-              {caso.url_documento_gerado && (
-                <a
-                  href={caso.url_documento_gerado}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 p-3 bg-amber-600/80 hover:bg-amber-600 rounded-lg font-semibold"
-                >
-                  <Download size={20} /> Baixar Petição Gerada
-                </a>
-              )}
-              {caso.url_audio && (
-                <a
-                  href={caso.url_audio}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 p-3 bg-slate-700 text-white hover:bg-slate-600 rounded-lg"
-                >
-                  <Mic size={20} /> Ouvir Áudio
-                </a>
-              )}
-              {caso.urls_documentos?.map((url, index) => (
-                <a
-                  key={index}
-                  href={url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 p-3 bg-slate-700 text-white hover:bg-slate-600 rounded-lg"
-                >
-                  <FileText size={20} /> Ver Documento {index + 1}
-                </a>
-              ))}
-            </div>
+            {/* Usamos <pre> para manter a formatação do texto gerado pela IA */}
+            <pre className="whitespace-pre-wrap text-sm font-mono bg-slate-900 text-white p-4 rounded-md overflow-x-auto">
+              {caso.peticao_inicial_rascunho ||
+                "Rascunho não disponível ou não gerado."}
+            </pre>
+            {/* Futuramente, adicionar um botão de "Editar" aqui */}
           </div>
         </div>
       </div>
