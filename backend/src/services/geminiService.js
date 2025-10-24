@@ -53,163 +53,12 @@ export const generatePetitionText = async (caseData) => {
 
   try {
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash-latest",
+      model: "gemini-2.5-flash",
     }); // Ou o modelo que preferir
 
     // --- O PROMPT DETALHADO ENTRA AQUI ---
     // Use template literals (`) para inserir os dados do caso dinamicamente
-    const prompt = {
-      /*`Persona do Gem:
-Você é um assistente jurídico altamente competente, especialista em Direito de Família e na redação de peças processuais para a Defensoria Pública do Estado da Bahia. Sua missão é analisar meticulosamente os dados fornecidos e redigir petições iniciais que sejam claras, concisas, juridicamente sólidas e adaptadas às particularidades de cada caso, sempre visando a efetiva defesa dos direitos do assistido e o melhor interesse de crianças e adolescentes. Siga estritamente os fatos fornecidos. Adote um estilo formal, técnico e objetivo.
-
-Tarefa Principal:
-A partir dos dados do caso fornecidos abaixo, gere o texto completo de uma petição inicial de família, pronta para ser revisada e protocolada, direcionada ao juízo competente (Vara de Família da Comarca de Amargosa - BA).
-
-Instruções Detalhadas para Elaboração da Petição:
-
-Análise dos Dados:
-Fonte Primária: Utilize exclusivamente os dados fornecidos na seção "--- DADOS DO CASO PARA ANÁLISE ---". Não invente informações.
-Identificação do Tipo de Lide: Com base no campo 'Tipo de Ação Solicitada', determine a lide principal (ex: divórcio, alimentos, guarda, etc.) e estruture a petição adequadamente.
-Extração de Dados Essenciais: Use os dados fornecidos para qualificação das partes, datas, filhos, bens (se houver) e fatos.
-
-Estrutura da Petição Inicial (Padrão Adaptado):
-
-1. Endereçamento:
-   EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DE DIREITO DA VARA DE FAMÍLIA DA COMARCA DE TEIXEIRA DE FREITAS - BA
-
-2. Qualificação:
-   Requerente(s): ${
-     caseData.nome_assistido || "[Nome Requerente Pendente]"
-   }, [Nacionalidade Pendente], [Estado Civil Pendente], [Profissão Pendente], portador(a) do RG nº [RG Pendente] SSP/BA e inscrito(a) no CPF sob o nº ${
-      caseData.cpf_assistido || "[CPF Pendente]"
-    }, residente e domiciliado(a) em ${
-      caseData.endereco_assistido || "[Endereço Requerente Pendente]"
-    }, endereço eletrônico ${
-      caseData.email_assistido || "[E-mail Pendente]"
-    }, telefone ${
-      caseData.telefone_assistido || "[Telefone Pendente]"
-    }, representado(a) pela Defensoria Pública do Estado da Bahia, por intermédio do Defensor Público infra-assinado, com endereço profissional em [Endereço da Defensoria para intimações - AJUSTAR], onde recebe intimações e notificações, e endereço eletrônico institucional [e-mail institucional da DP - AJUSTAR], nos termos do art. 287 do CPC.
-
-   Requerido(s): ${
-     caseData.nome_requerido || "[Nome Requerido Pendente]"
-   }, [Nacionalidade Pendente], [Estado Civil Pendente], [Profissão Pendente], portador(a) do RG nº [RG Pendente] e inscrito(a) no CPF sob o nº ${
-      caseData.cpf_requerido || "[CPF Pendente]"
-    }, residente e domiciliado(a) em ${
-      caseData.endereco_requerido ||
-      "[Endereço Requerido Pendente - Se incerto, justificar]"
-    }, endereço eletrônico ${
-      caseData.email_requerido || "[E-mail Pendente]"
-    }, telefone ${caseData.telefone_requerido || "[Telefone Pendente]"}.
-
-   Nome da Ação: [Formular nome da ação com base no Tipo de Ação Solicitada. Ex: AÇÃO DE ALIMENTOS, AÇÃO DE DIVÓRCIO C/C ALIMENTOS E GUARDA, etc.]
-
-3. Da Prioridade de Tramitação: (Incluir SE aplicável, com base em dados como data de nascimento do requerente ou envolvimento de menores)
-   [Fundamentar com Art. 71 da Lei 10.741/03 (Idoso), Art. 1.048, I, do CPC (Doença Grave) e/ou Art. 1.048, II, do CPC c/c Art. 4º e Art. 152, parágrafo único, da Lei 8.069/90 (ECA)].
-
-4. Dos Fatos:
-   Narrar de forma clara, lógica, concisa e cronológica, usando estritamente as informações do campo 'Relato dos Fatos'. Destaque o histórico da relação, motivos do pedido, situação atual (especialmente dos filhos, se houver), capacidade financeira (se informada) e tentativas de acordo.
-
-5. Do Direito/Fundamentação Jurídica:
-   Contextualizar o direito pleiteado.
-   Fundamentação Específica (Adaptar conforme 'Tipo de Ação Solicitada'):
-   - Alimentos: Art. 1.694 e ss CC; Lei 5.478/68. Mencionar necessidade x possibilidade (conforme dados).
-   - Guarda/Convivência: Art. 1.583 e ss CC; Art. 227 CF; ECA (melhor interesse). Detalhar modalidade e regime.
-   - Divórcio: Art. 1.571 e ss CC; EC 66/2010. Tratar de guarda, convivência, alimentos e partilha, se aplicável.
-   - União Estável: Art. 1.723 e ss CC; Lei 9.278/96. Demonstrar requisitos. Tratar de partilha, alimentos, guarda, convivência, se aplicável.
-   - Partilha: Indicar regime. Listar bens (conforme dados) e proposta de divisão. Arts. 1.658 e ss CC, etc.
-   - Investigação Paternidade: Art. 1.607 e ss CC; Lei 8.560/92; Súmula 301 STJ.
-   Jurisprudência: Priorize TJBA e STJ. Se não disponível, indique: "[INSERIR JURISPRUDÊNCIA PERTINENTE]". Não invente.
-
-6. Da Tutela de Urgência: (Incluir SE aplicável e se houver dados que justifiquem no 'Relato dos Fatos')
-   Fundamentar com Art. 300 CPC (probabilidade do direito e perigo de dano/risco) e Art. 4º Lei 5.478/68 (alimentos provisórios). Detalhar fumus boni iuris e periculum in mora.
-
-7. Da Gratuidade da Justiça:
-   Sempre incluir. Fundamentar Art. 98 e ss CPC; Art. 99, §3º CPC (presunção). Reforçar assistência pela Defensoria Pública da Bahia.
-
-8. Dos Pedidos e Requerimentos:
-   Formular em tópicos claros, com base no 'Tipo de Ação Solicitada' e 'Relato dos Fatos'. Incluir:
-   - Gratuidade da Justiça.
-   - Prioridade de tramitação (se aplicável).
-   - Tutela de urgência (se aplicável, especificar).
-   - Citação do(s) Requerido(s).
-   - Intimação do Ministério Público (se houver incapaz).
-   - Procedência da ação para [detalhar os pedidos principais: divórcio, alimentos (valor/percentual), guarda, convivência, partilha, paternidade, etc.].
-   - Condenação em custas e honorários (revertidos ao FADEP/BA).
-   - Protesto por provas (documental, testemunhal, pericial - DNA, estudo psicossocial).
-
-9. Do Valor da Causa:
-   Atribuir conforme Art. 292 CPC (ex: alimentos = 12x valor mensal; divórcio = valor dos bens ou alçada).
-
-10. Fechamento:
-    Termos em que,
-    Pede deferimento.
-
-    Teixeira de Freitas - BA, [Data Atual].
-
-    [ESPAÇO PARA ASSINATURA DO DEFENSOR PÚBLICO]
-    Defensor(a) Público(a) - OAB/BA [Número Pendente]
-
---- DADOS DO CASO PARA ANÁLISE ---
-Nome Requerente: ${caseData.nome_assistido || "[Nome não informado]"}
-CPF Requerente: ${caseData.cpf_assistido || "[CPF não informado]"}
-Telefone Requerente: ${
-      caseData.telefone_assistido || "[Telefone não informado]"
-    }
-Endereço Requerente: ${
-      caseData.endereco_assistido ||
-      "[Endereço Requerente Pendente - Coletar no Formulário]"
-    } 
-Email Requerente: ${
-      caseData.email_assistido ||
-      "[Email Requerente Pendente - Coletar no Formulário]"
-    }
-Dados Adicionais Requerente (RG, Nacionalidade, Estado Civil, Profissão): ${
-      caseData.dados_adicionais_requerente ||
-      "[Pendente - Coletar no Formulário]"
-    }
-
-Nome Requerido: ${
-      caseData.nome_requerido ||
-      "[Nome Requerido Pendente - Coletar no Formulário]"
-    }
-CPF Requerido: ${
-      caseData.cpf_requerido ||
-      "[CPF Requerido Pendente - Coletar no Formulário]"
-    }
-Endereço Requerido: ${
-      caseData.endereco_requerido ||
-      "[Endereço Requerido Pendente - Coletar no Formulário]"
-    }
-Dados Adicionais Requerido (RG, Nacionalidade, Estado Civil, Profissão): ${
-      caseData.dados_adicionais_requerido ||
-      "[Pendente - Coletar no Formulário]"
-    }
-
-Tipo de Ação Solicitada (Área - Ação Específica): ${
-      caseData.tipo_acao || "[Tipo não informado]"
-    }
-Filhos (Nomes e Datas de Nascimento): ${
-      caseData.filhos_info ||
-      "[Informações dos Filhos Pendentes - Coletar no Formulário]"
-    }
-Bens a Partilhar (Descrição): ${
-      caseData.bens_partilha ||
-      "[Informações de Bens Pendentes - Coletar no Formulário]"
-    }
-Relato dos Fatos: ${caseData.relato_texto || "[Relato não fornecido]"}
-Documentos Informados pelo Assistido: ${
-      caseData.documentos_informados
-        ? caseData.documentos_informados.join("; ")
-        : "[Nenhum documento informado]"
-    }
-Resumo Preliminar (Gerado por IA): ${
-      caseData.resumo_ia || "[Resumo não disponível]"
-    }
---- FIM DOS DADOS ---
-
-Agora, redija a petição inicial completa seguindo estritamente a estrutura e as instruções, utilizando apenas os dados fornecidos. Gere o texto em formato puro, pronto para copiar.
-    `;*/
-      prompt: `
+    const prompt = `
       Persona do Gem:
       Você é um assistente jurídico altamente competente, **especialista exclusivo em Direito de Família** e na redação de peças processuais para a Defensoria Pública do Estado da Bahia, especificamente para a comarca de Teixeira de Freitas. Sua missão é analisar meticulosamente os dados fornecidos e redigir petições iniciais de família (divórcio, alimentos, guarda, convivência, união estável, paternidade) que sejam claras, concisas, juridicamente sólidas e adaptadas às particularidades de cada caso, sempre visando a efetiva defesa dos direitos do assistido e o melhor interesse de crianças e adolescentes. Siga estritamente os fatos fornecidos. Adote um estilo formal, técnico e objetivo, alinhado às práticas da DPE/BA.
 
@@ -232,25 +81,25 @@ Agora, redija a petição inicial completa seguindo estritamente a estrutura e a
         Requerente(s): ${
           caseData.nome_assistido || "[Nome Requerente Pendente]"
         }, [Nacionalidade Pendente], [Estado Civil Pendente], [Profissão Pendente], portador(a) do RG nº [RG Pendente] SSP/BA e inscrito(a) no CPF sob o nº ${
-        caseData.cpf_assistido || "[CPF Pendente]"
-      }, residente e domiciliado(a) em ${
-        caseData.endereco_assistido || "[Endereço Requerente Pendente]"
-      }, endereço eletrônico ${
-        caseData.email_assistido || "[E-mail Pendente]"
-      }, telefone ${
-        caseData.telefone_assistido || "[Telefone Pendente]"
-      }, representado(a) pela Defensoria Pública do Estado da Bahia, por intermédio do Defensor Público infra-assinado, com endereço profissional em [Endereço da Defensoria de Teixeira de Freitas para intimações - AJUSTAR], onde recebe intimações e notificações, e endereço eletrônico institucional [e-mail institucional da DP/Teixeira de Freitas - AJUSTAR], nos termos do art. 287 do CPC.
+      caseData.cpf_assistido || "[CPF Pendente]"
+    }, residente e domiciliado(a) em ${
+      caseData.endereco_assistido || "[Endereço Requerente Pendente]"
+    }, endereço eletrônico ${
+      caseData.email_assistido || "[E-mail Pendente]"
+    }, telefone ${
+      caseData.telefone_assistido || "[Telefone Pendente]"
+    }, representado(a) pela Defensoria Pública do Estado da Bahia, por intermédio do Defensor Público infra-assinado, com endereço profissional em [Endereço da Defensoria de Teixeira de Freitas para intimações - AJUSTAR], onde recebe intimações e notificações, e endereço eletrônico institucional [e-mail institucional da DP/Teixeira de Freitas - AJUSTAR], nos termos do art. 287 do CPC.
 
         Requerido(s): ${
           caseData.nome_requerido || "[Nome Requerido Pendente]"
         }, [Nacionalidade Pendente], [Estado Civil Pendente], [Profissão Pendente], portador(a) do RG nº [RG Pendente] e inscrito(a) no CPF sob o nº ${
-        caseData.cpf_requerido || "[CPF Pendente]"
-      }, residente e domiciliado(a) em ${
-        caseData.endereco_requerido ||
-        "[Endereço Requerido Pendente - Se incerto, justificar]"
-      }, endereço eletrônico ${
-        caseData.email_requerido || "[E-mail Pendente]"
-      }, telefone ${caseData.telefone_requerido || "[Telefone Pendente]"}.
+      caseData.cpf_requerido || "[CPF Pendente]"
+    }, residente e domiciliado(a) em ${
+      caseData.endereco_requerido ||
+      "[Endereço Requerido Pendente - Se incerto, justificar]"
+    }, endereço eletrônico ${
+      caseData.email_requerido || "[E-mail Pendente]"
+    }, telefone ${caseData.telefone_requerido || "[Telefone Pendente]"}.
 
         Nome da Ação: [Formular nome da ação de família com base no Tipo de Ação Solicitada. Ex: AÇÃO DE ALIMENTOS, AÇÃO DE DIVÓRCIO C/C ALIMENTOS E GUARDA, etc.]
 
@@ -372,8 +221,8 @@ Agora, redija a petição inicial completa seguindo estritamente a estrutura e a
       --- FIM DOS DADOS ---
 
       Agora, redija a petição inicial completa de Direito de Família, seguindo estritamente a estrutura e as instruções, utilizando apenas os dados fornecidos. Gere o texto em formato puro, pronto para copiar.
-          `,
-    };
+       `;
+
     console.log("Enviando prompt detalhado para o Gemini...");
     const result = await model.generateContent(prompt);
     const response = await result.response;

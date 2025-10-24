@@ -11,11 +11,32 @@ import {
   analyzeCase,
   generatePetitionText,
 } from "../services/geminiService.js";
+// Tempo de expiração (em segundos) para URLs assinadas do Supabase
+// Pode ser configurado pela env var SIGNED_URL_EXPIRES; padrão 24h (86400s)
+const signedExpires = Number.parseInt(process.env.SIGNED_URL_EXPIRES || "86400", 10);
 // --- FUNÇÃO DE CRIAÇÃO (VERSÃO FINAL E COMPLETA) ---
 export const criarNovoCaso = async (req, res) => {
   try {
-    const { nome, cpf, telefone, tipoAcao, relato, documentos_informados } =
-      req.body;
+    const {
+      nome,
+      cpf,
+      telefone,
+      tipoAcao,
+      relato,
+      documentos_informados,
+      // novos campos
+      endereco_assistido,
+      email_assistido,
+      dados_adicionais_requerente,
+      nome_requerido,
+      cpf_requerido,
+      endereco_requerido,
+      dados_adicionais_requerido,
+      filhos_info,
+      data_inicio_relacao,
+      data_separacao,
+      bens_partilha,
+    } = req.body;
     const documentosInformadosArray = JSON.parse(documentos_informados || "[]");
     const { protocolo, chaveAcesso } = generateCredentials(tipoAcao);
     const chaveAcessoHash = hashKeyWithSalt(chaveAcesso);
@@ -65,8 +86,18 @@ export const criarNovoCaso = async (req, res) => {
       relato_texto: relato,
       documentos_informados: documentosInformadosArray,
       resumo_ia: resumo_ia,
-      // Adicione aqui OUTROS CAMPOS que o prompt detalhado precisa
-      // Ex: endereco_assistido: req.body.endereco, nome_requerido: req.body.nome_requerido, etc.
+      // Campos adicionais para o prompt detalhado
+      endereco_assistido: endereco_assistido,
+      email_assistido: email_assistido,
+      dados_adicionais_requerente: dados_adicionais_requerente,
+      nome_requerido: nome_requerido,
+      cpf_requerido: cpf_requerido,
+      endereco_requerido: endereco_requerido,
+      dados_adicionais_requerido: dados_adicionais_requerido,
+      filhos_info: filhos_info,
+      data_inicio_relacao: data_inicio_relacao,
+      data_separacao: data_separacao,
+      bens_partilha: bens_partilha,
     };
     const peticao_inicial_rascunho = await generatePetitionText(
       caseDataForPetition
@@ -78,6 +109,58 @@ export const criarNovoCaso = async (req, res) => {
     console.log("Gerando documento .docx..."); // Linha existente
 
     // ... (O código de upload dos arquivos originais continua aqui) ...
+    // --- GERAÇÃO E UPLOAD DO DOCX GERADO ---
+    try {
+      // Monta os dados para o template .docx (ajuste conforme placeholders do template)
+      const docxData = {
+        protocolo,
+        nome_assistido: nome,
+        cpf_assistido: cpf,
+        telefone_assistido: telefone,
+        tipo_acao: tipoAcao,
+        relato_texto: relato,
+        resumo_ia,
+        endereco_assistido,
+        email_assistido,
+        dados_adicionais_requerente,
+        nome_requerido,
+        cpf_requerido,
+        endereco_requerido,
+        dados_adicionais_requerido,
+        filhos_info,
+        data_inicio_relacao,
+        data_separacao,
+        bens_partilha,
+        // Se o template tiver um placeholder para o texto da petição
+        peticao_texto: peticao_inicial_rascunho,
+      };
+
+      const docxBuffer = await generateDocx(docxData);
+      const docxPath = `${protocolo}/peticao_inicial_${protocolo}.docx`;
+
+      const { error: uploadDocxErr } = await supabase.storage
+        .from("peticoes")
+        .upload(docxPath, docxBuffer, {
+          contentType:
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          upsert: true,
+        });
+      if (uploadDocxErr) {
+        console.error("Falha ao fazer upload do DOCX gerado:", uploadDocxErr);
+      } else {
+        const { data: signedDoc, error: signDocErr } = await supabase.storage
+          .from("peticoes")
+          .createSignedUrl(docxPath, signedExpires);
+        if (signDocErr) {
+          console.error("Falha ao criar URL assinada do DOCX:", signDocErr);
+        } else {
+          url_documento_gerado = signedDoc?.signedUrl || null;
+        }
+      }
+    } catch (e) {
+      console.error("Erro ao gerar/upload do DOCX:", e);
+    }
+
     // --- ETAPA 2: UPLOAD DOS ARQUIVOS ORIGINAIS ---
     console.log("Iniciando upload dos arquivos originais...");
     if (req.files) {

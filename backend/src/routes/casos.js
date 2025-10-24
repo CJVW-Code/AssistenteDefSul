@@ -20,14 +20,7 @@ router.post(
   criarNovoCaso
 );
 // Define que esta rota pode receber um arquivo de áudio e até 10 de documentos
-router.post(
-  "/novo",
-  upload.fields([
-    { name: "audio", maxCount: 2 },
-    { name: "documentos", maxCount: 10 },
-  ]),
-  criarNovoCaso
-);
+
 router.patch("/:id/status", authMiddleware, atualizarStatusCaso);
 router.get("/", authMiddleware, listarCasos);
 router.get("/:id", authMiddleware, obterDetalhesCaso);
