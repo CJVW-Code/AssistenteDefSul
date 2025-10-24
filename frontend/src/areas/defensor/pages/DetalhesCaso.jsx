@@ -121,8 +121,8 @@ export const DetalhesCaso = () => {
             className="w-full p-2 bg-slate-700 rounded-lg disabled:opacity-50"
           >
             <option value="recebido">Recebido</option>
-            <option value="em analise">Em Análise</option>
-            <option value="aguardando docs">Aguardando Documentos</option>
+            <option value="em_analise">Em Análise</option>
+            <option value="aguardando_docs">Aguardando Documentos</option>
             <option value="finalizado">Finalizado</option>
           </select>
         </div>

@@ -193,12 +193,12 @@ export const FormularioSubmissao = () => {
       setTimeout(() => setStatusMessage("Analisando documentos..."), 1000),
       setTimeout(
         () =>
-          setStatusMessage("Transcrevendo Ã¡udio (esta etapa pode demorar)..."),
+          setStatusMessage("Transcrevendo Áudio (esta etapa pode demorar)..."),
         3000
       ),
       setTimeout(
         () =>
-          setStatusMessage("Gerando resumo com a InteligÃªncia Artificial..."),
+          setStatusMessage("Gerando resumo com a Inteligência Artificial..."),
         8000
       ),
       setTimeout(
@@ -334,10 +334,7 @@ export const FormularioSubmissao = () => {
             </p>
           </div>
 
-          <button
-            onClick={resetForm}
-            className="mt-6 w-full btn btn-primary"
-          >
+          <button onClick={resetForm} className="mt-6 w-full btn btn-primary">
             Enviar Outro Caso
           </button>
         </div>
@@ -468,9 +465,7 @@ export const FormularioSubmissao = () => {
               shouldShowRequerido ? "" : "hidden"
             }`}
           >
-            <h3 className="heading-3">
-              Dados da Outra Parte (Requerido/a)
-            </h3>
+            <h3 className="heading-3">Dados da Outra Parte (Requerido/a)</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <input
                 type="text"
