@@ -8,19 +8,21 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, senha) => {
     try {
-      const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8001/api";
-      const response = await fetch(
-        `${API_BASE}/defensores/login`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, senha }),
-        }
-      );
-      const data = await response.json();
+      const API_BASE =
+        import.meta.env.VITE_API_URL || "http://localhost:8001/api";
+      const response = await fetch(`${API_BASE}/defensores/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, senha }),
+      });
+      const contentType = response.headers.get("content-type") || "";
+      const isJson = contentType.includes("application/json");
+      const data = isJson
+        ? await response.json()
+        : { error: await response.text() };
 
       if (!response.ok) {
-        throw new Error(data.error || "Email ou senha inválidos");
+        throw new Error(data.error || "Falha na requisição");
       }
 
       setToken(data.token);

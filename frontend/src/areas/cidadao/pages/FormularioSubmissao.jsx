@@ -230,9 +230,6 @@ export const FormularioSubmissao = () => {
     // Anexa o áudio gravado, se existir
     if (audioBlob) {
       formData.append("audio", audioBlob, "gravacao.webm");
-      documentFiles.forEach((file) => {
-        formData.append("documentos", file);
-      });
     }
 
     // Anexa todos os documentos
