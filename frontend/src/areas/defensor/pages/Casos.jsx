@@ -1,9 +1,10 @@
-// Arquivo: frontend-defensor/src/components/Casos.jsx
+﻿// Arquivo: frontend-defensor/src/components/Casos.jsx
 
 import React, { useEffect, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { Link } from "react-router-dom";
 import { Eye } from "lucide-react";
+import { API_BASE } from "../../../utils/apiBase";
 
 export const Casos = () => {
   const [casos, setCasos] = useState([]);
@@ -14,8 +15,7 @@ export const Casos = () => {
   useEffect(() => {
     const fetchCasos = async () => {
       try {
-        // A rota do backend é a mesma que usamos no Dashboard
-        const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8001/api";
+        // A rota do backend Ã© a mesma que usamos no Dashboard
         const response = await fetch(`${API_BASE}/casos`, {
           headers: {
             Authorization: `Bearer ${token}`,

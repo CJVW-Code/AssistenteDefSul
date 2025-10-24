@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { ChevronLeft, Download, FileText, Mic } from "lucide-react";
+import { API_BASE } from "../../../utils/apiBase";
 
 export const DetalhesCaso = () => {
   const { id } = useParams(); // Pega o ID da URL
@@ -12,8 +13,6 @@ export const DetalhesCaso = () => {
   useEffect(() => {
     const fetchDetalhes = async () => {
       try {
-        const API_BASE =
-          import.meta.env.VITE_API_URL || "http://localhost:8001/api";
         const response = await fetch(`${API_BASE}/casos/${id}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -29,14 +28,12 @@ export const DetalhesCaso = () => {
     fetchDetalhes();
   }, [id, token]);
 
-  // Lógica para atualizar o status (a ser implementada)
+  // LÃ³gica para atualizar o status (a ser implementada)
   const handleStatusChange = async (novoStatus) => {
     if (!novoStatus || novoStatus === caso.status) return;
 
     setIsUpdating(true);
     try {
-      const API_BASE =
-        import.meta.env.VITE_API_URL || "http://localhost:8001/api";
       const response = await fetch(`${API_BASE}/casos/${id}/status`, {
         method: "PATCH",
         headers: {
@@ -51,9 +48,9 @@ export const DetalhesCaso = () => {
       }
 
       const casoAtualizado = await response.json();
-      // Atualiza o estado local para refletir a mudança na UI instantaneamente
+      // Atualiza o estado local para refletir a mudanÃ§a na UI instantaneamente
       setCaso(casoAtualizado);
-      alert("Status atualizado com sucesso!"); // Feedback simples para o usuário
+      alert("Status atualizado com sucesso!"); // Feedback simples para o usuÃ¡rio
     } catch (error) {
       console.error(error);
       alert(error.message);
@@ -125,7 +122,7 @@ export const DetalhesCaso = () => {
           >
             <option value="recebido">Recebido</option>
             <option value="em analise">Em Análise</option>
-            <option value="aguardando_docs">Aguardando Documentos</option>
+            <option value="aguardando docs">Aguardando Documentos</option>
             <option value="finalizado">Finalizado</option>
           </select>
         </div>
@@ -173,12 +170,12 @@ export const DetalhesCaso = () => {
             <h2 className="text-2xl text-white font-bold mb-4">
               Rascunho da Petição Inicial (Gerado por IA)
             </h2>
-            {/* Usamos <pre> para manter a formatação do texto gerado pela IA */}
+            {/* Usamos <pre> para manter a formataÃ§Ã£o do texto gerado pela IA */}
             <pre className="whitespace-pre-wrap text-sm font-mono bg-slate-900 text-white p-4 rounded-md overflow-x-auto">
               {caso.peticao_inicial_rascunho ||
-                "Rascunho não disponível ou não gerado."}
+                "Rascunho não disponÃ­vel ou não gerado."}
             </pre>
-            {/* Futuramente, adicionar um botão de "Editar" aqui */}
+            {/* Futuramente, adicionar um botÃ£o de "Editar" aqui */}
           </div>
         </div>
       </div>

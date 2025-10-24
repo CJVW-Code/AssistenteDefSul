@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { Link } from "react-router-dom";
 import { FileText, Clock } from "lucide-react";
 import { jwtDecode } from "jwt-decode";
-
+import { API_BASE } from "../../../utils/apiBase";
+import { ThemeToggle } from "../../../components/ThemeToggle";
 export const Dashboard = () => {
   const [casos, setCasos] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -20,7 +21,6 @@ export const Dashboard = () => {
 
   useEffect(() => {
     const fetchCasos = async () => {
-      const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8001/api";
       try {
         const response = await fetch(`${API_BASE}/casos`, {
           headers: {
@@ -76,7 +76,9 @@ export const Dashboard = () => {
                   </div>
                   <div className="flex items-center gap-2 text-[#dae2db] text-sm">
                     <Clock className="w-4 h-4" />
-                    <span>{new Date(caso.created_at).toLocaleDateString()}</span>
+                    <span>
+                      {new Date(caso.created_at).toLocaleDateString()}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -87,4 +89,3 @@ export const Dashboard = () => {
     </div>
   );
 };
-

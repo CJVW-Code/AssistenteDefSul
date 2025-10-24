@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+﻿import React, { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   User,
@@ -13,8 +13,9 @@ import {
   Square,
 } from "lucide-react";
 import { documentosPorAcao } from "../../../data/documentos.js";
+import { API_BASE } from "../../../utils/apiBase";
 export const FormularioSubmissao = () => {
-  // --- ESTADOS DO FORMULÁRIO ---
+  // --- ESTADOS DO FORMULÃRIO ---
   const [nome, setNome] = useState("");
   const [cpf, setCpf] = useState("");
   const [telefone, setTelefone] = useState("");
@@ -41,9 +42,9 @@ export const FormularioSubmissao = () => {
   const [dataSeparacao, setDataSeparacao] = useState("");
   const [bensPartilha, setBensPartilha] = useState("");
 
-  // --- ESTADOS DA GRAVAÇÃO DE ÁUDIO ---
+  // --- ESTADOS DA GRAVAÃ‡ÃƒO DE ÃUDIO ---
   const [isRecording, setIsRecording] = useState(false);
-  const [audioBlob, setAudioBlob] = useState(null); // Armazena o áudio gravado como Blob
+  const [audioBlob, setAudioBlob] = useState(null); // Armazena o Ã¡udio gravado como Blob
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
 
@@ -62,15 +63,15 @@ export const FormularioSubmissao = () => {
       ? documentosPorAcao[tipoAcao][acaoEspecifica]
       : [];
 
-  // Fallback temporário: garantir opções visíveis para Família
+  // Fallback temporÃ¡rio: garantir opÃ§Ãµes visÃ­veis para FamÃ­lia
   const acoesFallbackFamilia = [
-    "Fixação de Pensão Alimentícia",
-    "Divórcio",
-    "Reconhecimento e Dissolução de União Estável",
+    "FixaÃ§Ã£o de PensÃ£o AlimentÃ­cia",
+    "DivÃ³rcio",
+    "Reconhecimento e DissoluÃ§Ã£o de UniÃ£o EstÃ¡vel",
     "Guarda de Filhos",
-    "Alvará",
-    "Execução de Alimentos Rito Penhora/Prisão",
-    "Revisão de Alimentos",
+    "AlvarÃ¡",
+    "ExecuÃ§Ã£o de Alimentos Rito Penhora/PrisÃ£o",
+    "RevisÃ£o de Alimentos",
   ];
 
   const acoesParaMostrar =
@@ -79,21 +80,21 @@ export const FormularioSubmissao = () => {
       ? acoesFallbackFamilia
       : acoesDisponiveis;
 
-  // Mostrar dados do Requerido apenas quando a ação exigir
+  // Mostrar dados do Requerido apenas quando a aÃ§Ã£o exigir
   const shouldShowRequerido = !acaoEspecifica
     ? true
     : !acaoEspecifica.toLowerCase().includes("alvar");
 
-  // --- LÓGICA DE VALIDAÇÃO DE INPUT ---
+  // --- LÃ“GICA DE VALIDAÃ‡ÃƒO DE INPUT ---
   const handleNumericInput = (e, setter) => {
     const value = e.target.value;
-    // Permite apenas números e um campo vazio
+    // Permite apenas nÃºmeros e um campo vazio
     if (/^[0-9]*$/.test(value)) {
       setter(value);
     }
   };
 
-  // --- LÓGICA DE GRAVAÇÃO DE ÁUDIO ---
+  // --- LÃ“GICA DE GRAVAÃ‡ÃƒO DE ÃUDIO ---
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -116,7 +117,7 @@ export const FormularioSubmissao = () => {
     } catch (err) {
       console.error("Erro ao acessar o microfone:", err);
       alert(
-        "Não foi possível acessar o microfone. Verifique as permissões do navegador."
+        "NÃ£o foi possÃ­vel acessar o microfone. Verifique as permissÃµes do navegador."
       );
     }
   };
@@ -130,7 +131,7 @@ export const FormularioSubmissao = () => {
     setAudioBlob(null);
   };
 
-  // --- LÓGICA DE UPLOAD DE ARQUIVOS ---
+  // --- LÃ“GICA DE UPLOAD DE ARQUIVOS ---
   const handleDocumentChange = (e) => {
     const novosArquivos = Array.from(e.target.files);
     setDocumentFiles((prevFiles) => [...prevFiles, ...novosArquivos]);
@@ -142,9 +143,9 @@ export const FormularioSubmissao = () => {
     );
   };
 
-  // --- LÓGICA DE GERAÇÃO DE CREDENCIAIS ---
+  // --- LÃ“GICA DE GERAÃ‡ÃƒO DE CREDENCIAIS ---
   const generateCredentials = (casoTipo) => {
-    // Geração da Chave de Acesso: DPB-00000-0XXXXX
+    // GeraÃ§Ã£o da Chave de Acesso: DPB-00000-0XXXXX
     const randomPart1 = Math.floor(Math.random() * 100000)
       .toString()
       .padStart(5, "0");
@@ -153,7 +154,7 @@ export const FormularioSubmissao = () => {
       .padStart(5, "0");
     const chaveAcesso = `DPB-${randomPart1}-0${randomPart2}`;
 
-    // Geração do Protocolo
+    // GeraÃ§Ã£o do Protocolo
     const now = new Date();
     const ano = now.getFullYear();
     const mes = (now.getMonth() + 1).toString().padStart(2, "0");
@@ -168,7 +169,7 @@ export const FormularioSubmissao = () => {
     };
     const idCaso = idCasoMap[casoTipo];
 
-    const numeroUnico = Date.now().toString().slice(-6); // Pega os últimos 6 dígitos do timestamp
+    const numeroUnico = Date.now().toString().slice(-6); // Pega os Ãºltimos 6 dÃ­gitos do timestamp
     const protocolo = `${ano}${mes}${dia}${idCaso}${numeroUnico}`;
 
     return { chaveAcesso, protocolo };
@@ -183,7 +184,7 @@ export const FormularioSubmissao = () => {
     }
   };
 
-  // --- LÓGICA DE SUBMISSÃO ---
+  // --- LÃ“GICA DE SUBMISSÃƒO ---
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -192,12 +193,12 @@ export const FormularioSubmissao = () => {
       setTimeout(() => setStatusMessage("Analisando documentos..."), 1000),
       setTimeout(
         () =>
-          setStatusMessage("Transcrevendo áudio (esta etapa pode demorar)..."),
+          setStatusMessage("Transcrevendo Ã¡udio (esta etapa pode demorar)..."),
         3000
       ),
       setTimeout(
         () =>
-          setStatusMessage("Gerando resumo com a Inteligência Artificial..."),
+          setStatusMessage("Gerando resumo com a InteligÃªncia Artificial..."),
         8000
       ),
       setTimeout(
@@ -227,7 +228,7 @@ export const FormularioSubmissao = () => {
     formData.append("data_inicio_relacao", dataInicioRelacao);
     formData.append("data_separacao", dataSeparacao);
     formData.append("bens_partilha", bensPartilha);
-    // Anexa o áudio gravado, se existir
+    // Anexa o Ã¡udio gravado, se existir
     if (audioBlob) {
       formData.append("audio", audioBlob, "gravacao.webm");
     }
@@ -238,15 +239,12 @@ export const FormularioSubmissao = () => {
     });
 
     try {
-      // ATENÇÃO: Verifique se a URL no seu .env está correta!
+      // ATENÃ‡ÃƒO: Verifique se a URL no seu .env estÃ¡ correta!
       // Ex: VITE_API_URL=http://localhost:3001/api
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/casos/novo`,
-        {
-          method: "POST",
-          body: formData, // Não precisa de 'Content-Type', o FormData cuida disso
-        }
-      );
+      const response = await fetch(`${API_BASE}/casos/novo`, {
+        method: "POST",
+        body: formData, // NÃ£o precisa de 'Content-Type', o FormData cuida disso
+      });
 
       const data = await response.json();
 
@@ -269,7 +267,7 @@ export const FormularioSubmissao = () => {
   };
 
   const resetForm = () => {
-    console.log("Botão clicado! A função resetForm foi chamada.");
+    console.log("BotÃ£o clicado! A função resetForm foi chamada.");
     setNome("");
     setCpf("");
     setTelefone("");
@@ -289,13 +287,13 @@ export const FormularioSubmissao = () => {
     setBensPartilha("");
     setAudioBlob(null);
     setDocumentFiles([]);
-    setGeneratedCredentials(null); // Isso também esconderá a tela de sucesso
+    setGeneratedCredentials(null); // Isso tambÃ©m esconderÃ¡ a tela de sucesso
   };
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-slate-800/50 p-6 sm:p-8 rounded-2xl border border-slate-700"
+      className="card"
     >
       {generatedCredentials ? (
         // --- TELA DE SUCESSO ---
@@ -306,20 +304,20 @@ export const FormularioSubmissao = () => {
 
           <div className="space-y-4 mb-6 text-left">
             <div>
-              <label className="text-sm font-semibold text-slate-400">
+              <label className="text-sm font-semibold text-muted">
                 PROTOCOLO
               </label>
-              <div className="bg-slate-900 p-3 rounded-lg">
+              <div className="bg-surface border border-soft p-3 rounded-xl">
                 <p className="text-xl font-mono tracking-widest text-amber-400">
                   {generatedCredentials.protocolo}
                 </p>
               </div>
             </div>
             <div>
-              <label className="text-sm font-semibold text-slate-400">
+              <label className="text-sm font-semibold text-muted">
                 CHAVE DE ACESSO
               </label>
-              <div className="bg-slate-900 p-3 rounded-lg">
+              <div className="bg-surface border border-soft p-3 rounded-xl">
                 <p className="text-xl font-mono tracking-widest text-amber-400">
                   {generatedCredentials.chaveAcesso}
                 </p>
@@ -331,26 +329,26 @@ export const FormularioSubmissao = () => {
             <AlertTriangle className="text-amber-400 w-8 h-8 flex-shrink-0 mt-1" />
             <p className="text-amber-300 text-left">
               <strong>Atenção:</strong> Anote e guarde seu protocolo e chave de
-              acesso em um local seguro. Eles são a **única forma** de consultar
+              acesso em um local seguro. Eles são a **unica forma** de consultar
               o andamento do seu caso.
             </p>
           </div>
 
           <button
             onClick={resetForm}
-            className="mt-6 w-full bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-lg font-semibold transition-colors"
+            className="mt-6 w-full btn btn-primary"
           >
             Enviar Outro Caso
           </button>
         </div>
       ) : (
-        // --- FORMULÁRIO DE ENVIO ---
+        // --- FORMULÃRIO DE ENVIO ---
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Nome e CPF */}
             <div className="relative">
               <User
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted"
                 size={20}
               />
               <input
@@ -359,12 +357,12 @@ export const FormularioSubmissao = () => {
                 value={nome}
                 onChange={(e) => setNome(e.target.value)}
                 required
-                className="w-full pl-10 pr-4 py-3 bg-slate-700 rounded-lg border border-slate-600 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+                className="input pl-10"
               />
             </div>
             <div className="relative">
               <FileText
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted"
                 size={20}
               />
               <input
@@ -373,14 +371,14 @@ export const FormularioSubmissao = () => {
                 value={cpf}
                 onChange={(e) => handleNumericInput(e, setCpf)}
                 required
-                className="w-full pl-10 pr-4 py-3 bg-slate-700 rounded-lg border border-slate-600 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+                className="input pl-10"
               />
             </div>
           </div>
 
           <div className="relative">
             <Phone
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted"
               size={20}
             />
             <input
@@ -389,7 +387,7 @@ export const FormularioSubmissao = () => {
               value={telefone}
               onChange={(e) => handleNumericInput(e, setTelefone)}
               required
-              className="w-full pl-10 pr-4 py-3 bg-slate-700 rounded-lg border border-slate-600 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+              className="input pl-10"
             />
           </div>
 
@@ -400,7 +398,7 @@ export const FormularioSubmissao = () => {
               placeholder="Seu Email (opcional)"
               value={emailAssistido}
               onChange={(e) => setEmailAssistido(e.target.value)}
-              className="w-full px-4 py-3 bg-slate-700 rounded-lg border border-slate-600 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+              className="input"
             />
             <input
               type="text"
@@ -408,18 +406,18 @@ export const FormularioSubmissao = () => {
               value={enderecoAssistido}
               onChange={(e) => setEnderecoAssistido(e.target.value)}
               required
-              className="w-full px-4 py-3 bg-slate-700 rounded-lg border border-slate-600 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+              className="input"
             />
           </div>
           <div>
             <textarea
-              placeholder="Seus Dados Adicionais (RG, Nacionalidade, Estado Civil, Profissão, Data de Nascimento)"
+              placeholder="Seus Dados Adicionais (RG, Nacionalidade, Estado Civil, Profissão , Data de Nascimento)"
               value={dadosAdicionaisRequerente}
               onChange={(e) => setDadosAdicionaisRequerente(e.target.value)}
               rows="3"
-              className="w-full px-4 py-3 bg-slate-700 rounded-lg border border-slate-600 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+              className="input"
             ></textarea>
-            <p className="text-xs text-slate-400 mt-1">
+            <p className="text-xs text-muted mt-1">
               Ex: 1234567 SSP/BA, Brasileiro(a), Casado(a), Vendedor(a),
               01/01/1990
             </p>
@@ -434,15 +432,15 @@ export const FormularioSubmissao = () => {
                 setDocumentosMarcados([]);
               }}
               required
-              className="w-full px-4 py-3 bg-slate-700 rounded-lg ..."
+              className="input"
             >
               {/* <option value="" disabled>
-                1. Selecione a Área do Direito
+                1. Selecione a Ãrea do Direito
               </option> */}
               <option value="familia">Direito de Família </option>
-              {/*<option value="civel">Direito Cível</option>
+              {/*<option value="civel">Direito Civel</option>
                <option value="consumidor">Direito Do Consumidor</option>
-              <option value="saude">Direito à Saúde</option>
+              <option value="saude">Direito Ã Saúde</option>
               <option value="criminal">Defesa Criminal</option>
               <option value="infancia">Direito Infância e Juventude</option> */}
             </select>
@@ -451,7 +449,7 @@ export const FormularioSubmissao = () => {
               value={acaoEspecifica}
               onChange={(e) => setAcaoEspecifica(e.target.value)}
               required
-              className="w-full px-4 py-3 mt-5 bg-slate-700 rounded-lg ..."
+              className="input mt-5"
             >
               <option value="" disabled>
                 2. Selecione a Ação Específica
@@ -464,13 +462,13 @@ export const FormularioSubmissao = () => {
             </select>
             {/* )}*/}
           </div>
-          {/* --- SEÇÃO DADOS DO(A) REQUERIDO(A) --- */}
+          {/* --- SEÃ‡ÃƒO DADOS DO(A) REQUERIDO(A) --- */}
           <div
-            className={`space-y-4 border-t border-slate-700 pt-4 ${
+            className={`space-y-4 border-t border-soft pt-4 ${
               shouldShowRequerido ? "" : "hidden"
             }`}
           >
-            <h3 className="font-semibold text-lg text-slate-300">
+            <h3 className="heading-3">
               Dados da Outra Parte (Requerido/a)
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -479,14 +477,14 @@ export const FormularioSubmissao = () => {
                 placeholder="Nome Completo do(a) Requerido(a)"
                 value={nomeRequerido}
                 onChange={(e) => setNomeRequerido(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-700 rounded-lg border border-slate-600 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+                className="input"
               />
               <input
                 type="text"
                 placeholder="CPF do(a) Requerido(a) (apenas números, se souber)"
                 value={cpfRequerido}
                 onChange={(e) => handleNumericInput(e, setCpfRequerido)}
-                className="w-full px-4 py-3 bg-slate-700 rounded-lg border border-slate-600 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+                className="input"
               />
             </div>
             <input
@@ -494,7 +492,7 @@ export const FormularioSubmissao = () => {
               placeholder="Endereço Completo do(a) Requerido(a) (se souber)"
               value={enderecoRequerido}
               onChange={(e) => setEnderecoRequerido(e.target.value)}
-              className="w-full px-4 py-3 bg-slate-700 rounded-lg border border-slate-600 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+              className="input"
             />
             <div>
               <textarea
@@ -502,14 +500,14 @@ export const FormularioSubmissao = () => {
                 value={dadosAdicionaisRequerido}
                 onChange={(e) => setDadosAdicionaisRequerido(e.target.value)}
                 rows="3"
-                className="w-full px-4 py-3 bg-slate-700 rounded-lg border border-slate-600 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+                className="input"
               ></textarea>
             </div>
           </div>
 
-          {/* --- SEÇÃO DETALHES ADICIONAIS DO CASO --- */}
-          <div className="space-y-4 border-t border-slate-700 pt-4">
-            <h3 className="font-semibold text-lg text-slate-300">
+          {/* --- SEÃ‡ÃƒO DETALHES ADICIONAIS DO CASO --- */}
+          <div className="space-y-4 border-t border-soft pt-4">
+            <h3 className="heading-3">
               Detalhes Adicionais (Importante para Ações de Família)
             </h3>
             <div>
@@ -518,34 +516,34 @@ export const FormularioSubmissao = () => {
                 value={filhosInfo}
                 onChange={(e) => setFilhosInfo(e.target.value)}
                 rows="3"
-                className="w-full px-4 py-3 bg-slate-700 rounded-lg border border-slate-600 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+                className="input"
               ></textarea>
-              <p className="text-xs text-slate-400 mt-1">
+              <p className="text-xs text-muted mt-1">
                 Separe cada filho com ponto e vírgula (;). Ex: João Silva -
                 10/05/2015; Maria Silva - 20/12/2018
               </p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-slate-400 mb-1">
+                <label className="block text-sm font-medium text-muted mb-1">
                   Data Casamento/Início União
                 </label>
                 <input
                   type="date"
                   value={dataInicioRelacao}
                   onChange={(e) => setDataInicioRelacao(e.target.value)}
-                  className="w-full px-4 py-3 bg-slate-700 rounded-lg border border-slate-600 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+                  className="input"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-400 mb-1">
+                <label className="block text-sm font-medium text-muted mb-1">
                   Data Separação de Fato
                 </label>
                 <input
                   type="date"
                   value={dataSeparacao}
                   onChange={(e) => setDataSeparacao(e.target.value)}
-                  className="w-full px-4 py-3 bg-slate-700 rounded-lg border border-slate-600 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+                  className="input"
                 />
               </div>
             </div>
@@ -555,7 +553,7 @@ export const FormularioSubmissao = () => {
                 value={bensPartilha}
                 onChange={(e) => setBensPartilha(e.target.value)}
                 rows="3"
-                className="w-full px-4 py-3 bg-slate-700 rounded-lg border border-slate-600 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+                className="input"
               ></textarea>
             </div>
           </div>
@@ -566,27 +564,27 @@ export const FormularioSubmissao = () => {
               value={relato}
               onChange={(e) => setRelato(e.target.value)}
               rows="5"
-              className="w-full px-4 py-3 bg-slate-700 rounded-lg border border-slate-600 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+              className="input"
             ></textarea>
           </div>
           {acaoEspecifica && (
-            <div className="space-y-3 bg-slate-800 p-4 rounded-lg">
-              <h3 className="font-semibold text-slate-300">
+            <div className="space-y-3 bg-surface p-4 rounded-lg border border-soft">
+              <h3 className="heading-3">
                 3. Marque os documentos que você possui:
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {listaDeDocumentos.map((doc) => (
                   <label
                     key={doc}
-                    className="flex items-center gap-2 p-2 rounded-md hover:bg-slate-700 cursor-pointer"
+                    className="flex items-center gap-2 p-2 rounded-md hover:bg-surface cursor-pointer"
                   >
                     <input
                       type="checkbox"
                       name={doc}
                       onChange={handleCheckboxChange}
-                      className="w-4 h-4 bg-slate-600 border-slate-500 rounded text-blue-500 focus:ring-blue-500"
+                      className="w-4 h-4"
                     />
-                    <span className="text-slate-400 text-sm">{doc}</span>
+                    <span className="text-muted text-sm">{doc}</span>
                   </label>
                 ))}
               </div>
@@ -594,13 +592,13 @@ export const FormularioSubmissao = () => {
           )}
           <div className="space-y-4">
             <p className="font-semibold">Anexos (Opcional)</p>
-            {/* Gravação de Áudio */}
-            <div className="bg-slate-700/50 p-4 rounded-lg border border-dashed border-slate-600">
+            {/* GravaÃ§Ã£o de Ãudio */}
+            <div className="bg-surface p-4 rounded-lg border border-dashed border-soft">
               {!isRecording && !audioBlob && (
                 <button
                   type="button"
                   onClick={startRecording}
-                  className="flex items-center gap-2 text-amber-400 hover:text-amber-300"
+                  className="btn btn-ghost"
                 >
                   <Mic size={20} /> Gravar Relato em Áudio
                 </button>
@@ -609,7 +607,7 @@ export const FormularioSubmissao = () => {
                 <button
                   type="button"
                   onClick={stopRecording}
-                  className="flex items-center gap-2 text-red-500 animate-pulse"
+                  className="btn btn-ghost text-red-500 animate-pulse"
                 >
                   <Square size={20} /> Parar Gravação
                 </button>
@@ -630,7 +628,7 @@ export const FormularioSubmissao = () => {
               )}
             </div>
             {/* Upload de Documentos */}
-            <div className="bg-slate-700/50 p-4 rounded-lg border border-dashed border-slate-600">
+            <div className="bg-surface p-4 rounded-lg border border-dashed border-soft">
               <input
                 type="file"
                 accept=".pdf,.jpg,.jpeg,.png"
@@ -642,7 +640,7 @@ export const FormularioSubmissao = () => {
               <button
                 type="button"
                 onClick={() => documentInputRef.current.click()}
-                className="flex items-center gap-2 text-blue-400 hover:text-blue-300"
+                className="btn btn-ghost"
               >
                 <Paperclip size={20} /> Anexar Documentos (RG, Comprovantes,
                 etc.)
@@ -651,9 +649,9 @@ export const FormularioSubmissao = () => {
                 {documentFiles.map((file) => (
                   <div
                     key={file.name}
-                    className="flex items-center justify-between bg-slate-800 p-1 rounded"
+                    className="flex items-center justify-between bg-surface p-1 rounded border border-soft"
                   >
-                    <span className="text-slate-300">{file.name}</span>
+                    <span>{file.name}</span>
                     <X
                       onClick={() => removeDocument(file.name)}
                       className="text-red-500 cursor-pointer"
@@ -668,14 +666,14 @@ export const FormularioSubmissao = () => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 px-6 py-4 rounded-lg font-semibold text-lg flex items-center justify-center gap-2 transition-colors"
+            className="btn btn-primary w-full py-4 text-lg"
           >
             {loading ? "Enviando..." : "Enviar Caso"}
             <Upload size={20} />
           </button>
           {loading && (
             <div className="text-center mt-4">
-              <p className="text-amber-400 animate-pulse">{statusMessage}</p>
+              <p className="text-muted animate-pulse">{statusMessage}</p>
             </div>
           )}
         </form>

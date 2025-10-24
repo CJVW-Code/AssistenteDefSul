@@ -27,7 +27,7 @@ const imagens = [
 
 export const CarrosselAvisos = () => {
   return (
-    <section className="bg-slate-800/50 p-6 sm:p-8 rounded-2xl border border-slate-700">
+    <section className="bg-app p-6 sm:p-8 rounded-2xl border border-soft">
       <h2 className="text-2xl font-semibold mb-4 text-center text-amber-400">
         Fique Atento aos Golpes!
       </h2>

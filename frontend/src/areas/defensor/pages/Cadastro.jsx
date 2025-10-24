@@ -1,7 +1,8 @@
-// Arquivo: frontend-defensor/src/components/Cadastro.jsx
+﻿// Arquivo: frontend-defensor/src/components/Cadastro.jsx
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { UserPlus, Shield } from "lucide-react";
+import { API_BASE } from "../../../utils/apiBase";
 
 export const Cadastro = () => {
   const [nome, setNome] = useState("");
@@ -17,16 +18,14 @@ export const Cadastro = () => {
     setError(null);
     setSuccess(null);
 
-    // Validação de email no frontend para feedback rápido
+    // ValidaÃ§Ã£o de email no frontend para feedback rÃ¡pido
     if (!email.endsWith("@defensoria.ba.def.br")) {
-      setError("Apenas emails @defensoria.ba.def.br são permitidos.");
+      setError("Apenas emails @defensoria.ba.def.br sÃ£o permitidos.");
       return;
     }
 
     setLoading(true);
     try {
-      const API_BASE =
-        import.meta.env.VITE_API_URL || "http://localhost:8001/api";
       const response = await fetch(`${API_BASE}/defensores/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -39,7 +38,7 @@ export const Cadastro = () => {
       }
 
       setSuccess(
-        "Cadastro realizado com sucesso! Você será redirecionado para o login."
+        "Cadastro realizado com sucesso! VocÃª serÃ¡ redirecionado para o login."
       );
       setTimeout(() => navigate("/painel/login"), 1500);
     } catch (err) {
@@ -50,7 +49,7 @@ export const Cadastro = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center bg-[#00330f] justify-center p-4 ">
+    <div className="min-h-screen flex items-center bg-[#00330f]  justify-center p-4 ">
       <div className="w-full max-w-md">
         <div className="bg-slate-800/50 p-8 rounded-2xl border border-slate-700">
           <div className="flex items-center gap-3 mb-6">
@@ -99,17 +98,17 @@ export const Cadastro = () => {
               {loading ? "Cadastrando..." : "Criar Conta"}
             </button>
             <p className="text-center text-sm text-white">
-              Já tem uma conta?{" "}
+              JÃ¡ tem uma conta?{" "}
               <Link
                 to="/painel/login"
                 className="font-semibold text-amber-500 hover:underline"
               >
-                Faça o login
+                FaÃ§a o login
               </Link>
             </p>
             <p className="text-center rounded-3xl py-2 bg-amber-700 text-sm text-amber-100">
               Apenas emails{" "}
-              <span className="font-bold">@defensoria.ba.def.br</span> são
+              <span className="font-bold">@defensoria.ba.def.br</span> sÃ£o
               permitidos.
             </p>
           </form>

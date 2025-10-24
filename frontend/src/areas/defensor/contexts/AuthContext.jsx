@@ -1,4 +1,5 @@
-import React, { createContext, useState, useContext, useEffect } from "react";
+﻿import React, { createContext, useState, useContext, useEffect } from "react";
+import { API_BASE } from '../../../utils/apiBase';
 
 const AuthContext = createContext(null);
 
@@ -8,8 +9,6 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, senha) => {
     try {
-      const API_BASE =
-        import.meta.env.VITE_API_URL || "http://localhost:8001/api";
       const response = await fetch(`${API_BASE}/defensores/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -22,7 +21,7 @@ export const AuthProvider = ({ children }) => {
         : { error: await response.text() };
 
       if (!response.ok) {
-        throw new Error(data.error || "Falha na requisição");
+        throw new Error(data.error || "Falha na requisiÃ§Ã£o");
       }
 
       setToken(data.token);

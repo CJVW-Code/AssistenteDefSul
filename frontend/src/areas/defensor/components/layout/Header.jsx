@@ -3,6 +3,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { jwtDecode } from "jwt-decode";
 import { Link } from "react-router-dom";
 import { ExternalLink } from "lucide-react";
+import { ThemeToggle } from "../../../../components/ThemeToggle";
 
 export const Header = () => {
   const { token, logout } = useAuth();
@@ -19,6 +20,7 @@ export const Header = () => {
         Ver Portal do Cidadão
       </Link>
       <div className="flex items-center gap-4">
+        <ThemeToggle />
         <span className="font-semibold text-[#dae2db]">
           Dr(a). {defensor?.nome || "Defensor"}
         </span>
