@@ -27,7 +27,7 @@ const imagens = [
 
 export const CarrosselAvisos = () => {
   return (
-    <section className="bg-app p-6 sm:p-8 rounded-2xl border border-soft">
+    <section className="bg-app p-4 sm:p-6 rounded-2xl border border-soft max-w-3xl mx-auto">
       <h2 className="text-2xl font-semibold mb-4 text-center text-amber-400">
         Fique Atento aos Golpes!
       </h2>
@@ -35,18 +35,19 @@ export const CarrosselAvisos = () => {
         modules={[Navigation, Pagination, Autoplay]}
         spaceBetween={30}
         slidesPerView={1}
+        autoHeight={true}
         navigation
         pagination={{ clickable: true }}
         loop={true}
         autoplay={{ delay: 4000, disableOnInteraction: false }}
-        className="rounded-lg"
+        className="rounded-lg "
       >
         {imagens.map((img, index) => (
           <SwiperSlide key={index}>
             <img
               src={`/avisos/${img}`}
               alt={`Aviso sobre golpes ${index + 1}`}
-              className="w-full h-auto object-contain rounded-lg"
+              className="w-full h-auto max-h-90 sm:max-h-100 md:max-h-100 lg:max-h-[500px] object-contain rounded-lg mx-auto"
             />
           </SwiperSlide>
         ))}

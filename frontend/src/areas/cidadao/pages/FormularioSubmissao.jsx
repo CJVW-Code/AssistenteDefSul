@@ -612,7 +612,7 @@ export const FormularioSubmissao = () => {
                   <audio
                     src={URL.createObjectURL(audioBlob)}
                     controls
-                    className="flex-grow"
+                    className="flex-gro w"
                   />
                   <X
                     onClick={removeAudioRecording}

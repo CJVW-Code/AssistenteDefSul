@@ -30,7 +30,7 @@ export const ConsultaStatus = () => {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "NÃ£o foi possí­vel consultar o status.");
+        throw new Error(data.error || "Não foi possí­vel consultar o status.");
       }
       setStatus(data.status);
     } catch (err) {
