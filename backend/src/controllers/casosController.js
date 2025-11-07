@@ -36,6 +36,25 @@ export const criarNovoCaso = async (req, res) => {
       data_inicio_relacao,
       data_separacao,
       bens_partilha,
+      // FIXAÇÃO/OFERTA
+      percentual_sm_requerido,
+      percentual_despesas_extra,
+      dia_pagamento_requerido,
+      dados_bancarios_deposito,
+      requerido_tem_emprego_formal,
+      empregador_requerido_nome,
+      empregador_requerido_endereco,
+      // EXECUÇÃO
+      numero_processo_originario,
+      vara_originaria,
+      percentual_ou_valor_fixado,
+      dia_pagamento_fixado,
+      periodo_debito_execucao,
+      valor_total_debito_execucao,
+      // DIVÓRCIO
+      regime_bens,
+      retorno_nome_solteira,
+      alimentos_para_ex_conjuge,
     } = req.body;
     const documentosInformadosArray = JSON.parse(documentos_informados || "[]");
     const { protocolo, chaveAcesso } = generateCredentials(tipoAcao);
@@ -78,11 +97,14 @@ export const criarNovoCaso = async (req, res) => {
     resumo_ia = await analyzeCase(textoCompleto);
     console.log("Resumo gerado.");
     console.log("Gerando rascunho da petição inicial...");
+    const acaoEspecifica =
+      (tipoAcao || "").split(" - ")[1]?.trim() || (tipoAcao || "").trim();
     const caseDataForPetition = {
       nome_assistido: nome,
       cpf_assistido: cpf,
       telefone_assistido: telefone,
       tipo_acao: tipoAcao, // Pode precisar dividir entre área e ação específica
+      acao_especifica: acaoEspecifica,
       relato_texto: relato,
       documentos_informados: documentosInformadosArray,
       resumo_ia: resumo_ia,
@@ -98,6 +120,25 @@ export const criarNovoCaso = async (req, res) => {
       data_inicio_relacao: data_inicio_relacao,
       data_separacao: data_separacao,
       bens_partilha: bens_partilha,
+      // Fixação/Oferta
+      percentual_sm_requerido,
+      percentual_despesas_extra,
+      dia_pagamento_requerido,
+      dados_bancarios_deposito,
+      requerido_tem_emprego_formal,
+      empregador_requerido_nome,
+      empregador_requerido_endereco,
+      // Execução
+      numero_processo_originario,
+      vara_originaria,
+      percentual_ou_valor_fixado,
+      dia_pagamento_fixado,
+      periodo_debito_execucao,
+      valor_total_debito_execucao,
+      // Divórcio
+      regime_bens,
+      retorno_nome_solteira,
+      alimentos_para_ex_conjuge,
     };
     const peticao_inicial_rascunho = await generatePetitionText(
       caseDataForPetition

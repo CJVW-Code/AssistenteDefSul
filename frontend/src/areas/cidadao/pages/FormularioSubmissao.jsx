@@ -42,6 +42,30 @@ export const FormularioSubmissao = () => {
   const [dataSeparacao, setDataSeparacao] = useState("");
   const [bensPartilha, setBensPartilha] = useState("");
 
+  // --- CAMPOS ESPECÍFICOS: FIXAÇÃO/OFERTA DE ALIMENTOS ---
+  const [percentualSmRequerido, setPercentualSmRequerido] = useState("");
+  const [percentualDespesasExtra, setPercentualDespesasExtra] = useState("");
+  const [diaPagamentoRequerido, setDiaPagamentoRequerido] = useState("");
+  const [dadosBancariosDeposito, setDadosBancariosDeposito] = useState("");
+  const [requeridoTemEmpregoFormal, setRequeridoTemEmpregoFormal] =
+    useState(""); // "sim" | "nao" | "nao_sei"
+  const [empregadorRequeridoNome, setEmpregadorRequeridoNome] = useState("");
+  const [empregadorRequeridoEndereco, setEmpregadorRequeridoEndereco] =
+    useState("");
+
+  // --- CAMPOS ESPECÍFICOS: EXECUÇÃO DE ALIMENTOS ---
+  const [numeroProcessoOriginario, setNumeroProcessoOriginario] = useState("");
+  const [varaOriginaria, setVaraOriginaria] = useState("");
+  const [percentualOuValorFixado, setPercentualOuValorFixado] = useState("");
+  const [diaPagamentoFixado, setDiaPagamentoFixado] = useState("");
+  const [periodoDebitoExecucao, setPeriodoDebitoExecucao] = useState("");
+  const [valorTotalDebitoExecucao, setValorTotalDebitoExecucao] = useState("");
+
+  // --- CAMPOS ESPECÍFICOS: DIVÓRCIO ---
+  const [regimeBens, setRegimeBens] = useState("");
+  const [retornoNomeSolteira, setRetornoNomeSolteira] = useState("");
+  const [alimentosParaExConjuge, setAlimentosParaExConjuge] = useState("");
+
   // --- ESTADOS DA GRAVAÃ‡ÃƒO DE ÃUDIO ---
   const [isRecording, setIsRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState(null); // Armazena o Ã¡udio gravado como Blob
@@ -84,6 +108,14 @@ export const FormularioSubmissao = () => {
   const shouldShowRequerido = !acaoEspecifica
     ? true
     : !acaoEspecifica.toLowerCase().includes("alvar");
+
+  // --- HELPERS DE CONDIÇÃO POR AÇÃO ESPECÍFICA ---
+  const acaoNorm = (acaoEspecifica || "").toLowerCase();
+  const isFixacaoOuOferta = acaoNorm.includes("fixa") || acaoNorm.includes("oferta");
+  const isExecucao = acaoNorm.includes("execu");
+  const isDivorcio = acaoNorm.includes("divór") || acaoNorm.includes("divor");
+  const showFixacaoBaseFields = isFixacaoOuOferta || isExecucao;
+  const mostrarEmpregador = requeridoTemEmpregoFormal === "sim";
 
   // --- LÃ“GICA DE VALIDAÃ‡ÃƒO DE INPUT ---
   const handleNumericInput = (e, setter) => {
@@ -228,6 +260,31 @@ export const FormularioSubmissao = () => {
     formData.append("data_inicio_relacao", dataInicioRelacao);
     formData.append("data_separacao", dataSeparacao);
     formData.append("bens_partilha", bensPartilha);
+    // --- CAMPOS ESPECÍFICOS: FIXAÇÃO/OFERTA (também usados na Execução) ---
+    formData.append("percentual_sm_requerido", percentualSmRequerido);
+    formData.append("percentual_despesas_extra", percentualDespesasExtra);
+    formData.append("dia_pagamento_requerido", diaPagamentoRequerido);
+    formData.append("dados_bancarios_deposito", dadosBancariosDeposito);
+    formData.append(
+      "requerido_tem_emprego_formal",
+      requeridoTemEmpregoFormal
+    );
+    formData.append("empregador_requerido_nome", empregadorRequeridoNome);
+    formData.append(
+      "empregador_requerido_endereco",
+      empregadorRequeridoEndereco
+    );
+    // --- CAMPOS ESPECÍFICOS: EXECUÇÃO ---
+    formData.append("numero_processo_originario", numeroProcessoOriginario);
+    formData.append("vara_originaria", varaOriginaria);
+    formData.append("percentual_ou_valor_fixado", percentualOuValorFixado);
+    formData.append("dia_pagamento_fixado", diaPagamentoFixado);
+    formData.append("periodo_debito_execucao", periodoDebitoExecucao);
+    formData.append("valor_total_debito_execucao", valorTotalDebitoExecucao);
+    // --- CAMPOS ESPECÍFICOS: DIVÓRCIO ---
+    formData.append("regime_bens", regimeBens);
+    formData.append("retorno_nome_solteira", retornoNomeSolteira);
+    formData.append("alimentos_para_ex_conjuge", alimentosParaExConjuge);
     // Anexa o Ã¡udio gravado, se existir
     if (audioBlob) {
       formData.append("audio", audioBlob, "gravacao.webm");
@@ -285,6 +342,23 @@ export const FormularioSubmissao = () => {
     setDataInicioRelacao("");
     setDataSeparacao("");
     setBensPartilha("");
+    // limpar campos específicos
+    setPercentualSmRequerido("");
+    setPercentualDespesasExtra("");
+    setDiaPagamentoRequerido("");
+    setDadosBancariosDeposito("");
+    setRequeridoTemEmpregoFormal("");
+    setEmpregadorRequeridoNome("");
+    setEmpregadorRequeridoEndereco("");
+    setNumeroProcessoOriginario("");
+    setVaraOriginaria("");
+    setPercentualOuValorFixado("");
+    setDiaPagamentoFixado("");
+    setPeriodoDebitoExecucao("");
+    setValorTotalDebitoExecucao("");
+    setRegimeBens("");
+    setRetornoNomeSolteira("");
+    setAlimentosParaExConjuge("");
     setAudioBlob(null);
     setDocumentFiles([]);
     setGeneratedCredentials(null); // Isso tambÃ©m esconderÃ¡ a tela de sucesso
@@ -552,6 +626,205 @@ export const FormularioSubmissao = () => {
               ></textarea>
             </div>
           </div>
+
+          {/* Seções condicionais por ação */}
+          {showFixacaoBaseFields && (
+            <div className="bg-surface p-4 rounded-lg border border-soft space-y-4">
+              <h3 className="heading-3">Detalhes da Fixação/Oferta de Alimentos</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Percentual/Valor da Pensão</label>
+                  <input
+                    type="text"
+                    placeholder='Ex: "30%" ou "R$ 600,00"'
+                    value={percentualSmRequerido}
+                    onChange={(e) => setPercentualSmRequerido(e.target.value)}
+                    className="input"
+                  />
+                </div>
+                <div>
+                  <label className="label">Despesas Extras</label>
+                  <input
+                    type="text"
+                    placeholder='Ex: "50% de gastos com saúde e educação"'
+                    value={percentualDespesasExtra}
+                    onChange={(e) => setPercentualDespesasExtra(e.target.value)}
+                    className="input"
+                  />
+                </div>
+                <div>
+                  <label className="label">Data de Pagamento</label>
+                  <input
+                    type="text"
+                    placeholder='Ex: "Até o dia 10 de cada mês"'
+                    value={diaPagamentoRequerido}
+                    onChange={(e) => setDiaPagamentoRequerido(e.target.value)}
+                    className="input"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="label">Dados Bancários para Depósito</label>
+                  <textarea
+                    rows="3"
+                    placeholder="Informe: Titular da Conta, CPF do Titular, Banco, Agência, Conta e Chave PIX"
+                    value={dadosBancariosDeposito}
+                    onChange={(e) => setDadosBancariosDeposito(e.target.value)}
+                    className="input"
+                  ></textarea>
+                </div>
+                <div>
+                  <label className="label">Vínculo Empregatício do Requerido</label>
+                  <select
+                    className="input"
+                    value={requeridoTemEmpregoFormal}
+                    onChange={(e) => setRequeridoTemEmpregoFormal(e.target.value)}
+                  >
+                    <option value="">Selecione...</option>
+                    <option value="sim">Sim</option>
+                    <option value="nao">Não</option>
+                    <option value="nao_sei">Não sei</option>
+                  </select>
+                </div>
+                {mostrarEmpregador && (
+                  <>
+                    <div>
+                      <label className="label">Nome do Empregador do Requerido</label>
+                      <input
+                        type="text"
+                        placeholder="Nome da empresa"
+                        value={empregadorRequeridoNome}
+                        onChange={(e) => setEmpregadorRequeridoNome(e.target.value)}
+                        className="input"
+                      />
+                    </div>
+                    <div>
+                      <label className="label">Endereço do Empregador</label>
+                      <input
+                        type="text"
+                        placeholder="Endereço completo da empresa"
+                        value={empregadorRequeridoEndereco}
+                        onChange={(e) => setEmpregadorRequeridoEndereco(e.target.value)}
+                        className="input"
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+          {isExecucao && (
+            <div className="bg-surface p-4 rounded-lg border border-soft space-y-4">
+              <h3 className="heading-3">Dados da Execução de Alimentos</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Nº do Processo Originário</label>
+                  <input
+                    type="text"
+                    placeholder="Nº do processo que fixou os alimentos"
+                    value={numeroProcessoOriginario}
+                    onChange={(e) => setNumeroProcessoOriginario(e.target.value)}
+                    className="input"
+                  />
+                </div>
+                <div>
+                  <label className="label">Vara Originária</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: 1ª Vara de Família de Teixeira de Freitas"
+                    value={varaOriginaria}
+                    onChange={(e) => setVaraOriginaria(e.target.value)}
+                    className="input"
+                  />
+                </div>
+                <div>
+                  <label className="label">Valor/Percentual Fixado</label>
+                  <input
+                    type="text"
+                    placeholder='Ex: "30%" ou "R$ 600,00"'
+                    value={percentualOuValorFixado}
+                    onChange={(e) => setPercentualOuValorFixado(e.target.value)}
+                    className="input"
+                  />
+                </div>
+                <div>
+                  <label className="label">Dia de Pagamento (na sentença)</label>
+                  <input
+                    type="text"
+                    placeholder='Ex: "Dia 10 de cada mês"'
+                    value={diaPagamentoFixado}
+                    onChange={(e) => setDiaPagamentoFixado(e.target.value)}
+                    className="input"
+                  />
+                </div>
+                <div>
+                  <label className="label">Período do Débito</label>
+                  <input
+                    type="text"
+                    placeholder='Ex: "Março/2025 a Outubro/2025"'
+                    value={periodoDebitoExecucao}
+                    onChange={(e) => setPeriodoDebitoExecucao(e.target.value)}
+                    className="input"
+                  />
+                </div>
+                <div>
+                  <label className="label">Valor Total da Dívida</label>
+                  <input
+                    type="text"
+                    placeholder='Ex: "R$ 3.250,00"'
+                    value={valorTotalDebitoExecucao}
+                    onChange={(e) => setValorTotalDebitoExecucao(e.target.value)}
+                    className="input"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {isDivorcio && (
+            <div className="bg-surface p-4 rounded-lg border border-soft space-y-4">
+              <h3 className="heading-3">Detalhes do Divórcio</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Regime de Bens</label>
+                  <select
+                    className="input"
+                    value={regimeBens}
+                    onChange={(e) => setRegimeBens(e.target.value)}
+                  >
+                    <option value="">Selecione...</option>
+                    <option value="comunhao_parcial">Comunhão Parcial de Bens</option>
+                    <option value="comunhao_universal">Comunhão Universal</option>
+                    <option value="separacao_total">Separação Total de Bens</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Nome de Solteira</label>
+                  <select
+                    className="input"
+                    value={retornoNomeSolteira}
+                    onChange={(e) => setRetornoNomeSolteira(e.target.value)}
+                  >
+                    <option value="">Selecione...</option>
+                    <option value="sim">Sim, desejo voltar a usar o nome de solteira</option>
+                    <option value="nao">Não, quero manter o nome de casada</option>
+                  </select>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="label">Pensão para o Cônjuge</label>
+                  <select
+                    className="input"
+                    value={alimentosParaExConjuge}
+                    onChange={(e) => setAlimentosParaExConjuge(e.target.value)}
+                  >
+                    <option value="">Selecione...</option>
+                    <option value="sim">Sim, preciso de pensão para mim</option>
+                    <option value="nao">Não, dispenso alimentos para mim</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div>
             <textarea
