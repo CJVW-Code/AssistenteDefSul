@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { ChevronLeft, Download, FileText, Mic } from "lucide-react";
@@ -28,7 +28,7 @@ export const DetalhesCaso = () => {
     fetchDetalhes();
   }, [id, token]);
 
-  // Lógica para atualizar o status (a ser implementada)
+  // LÃ³gica para atualizar o status (a ser implementada)
   const handleStatusChange = async (novoStatus) => {
     if (!novoStatus || novoStatus === caso.status) return;
 
@@ -48,9 +48,9 @@ export const DetalhesCaso = () => {
       }
 
       const casoAtualizado = await response.json();
-      // Atualiza o estado local para refletir a mudança na UI instantaneamente
+      // Atualiza o estado local para refletir a mudanÃ§a na UI instantaneamente
       setCaso(casoAtualizado);
-      alert("Status atualizado com sucesso!"); // Feedback simples para o usuário
+      alert("Status atualizado com sucesso!"); // Feedback simples para o usuÃ¡rio
     } catch (error) {
       console.error(error);
       alert(error.message);
@@ -61,7 +61,7 @@ export const DetalhesCaso = () => {
 
   if (loading)
     return <p className="text-center p-8">Carregando detalhes do caso...</p>;
-  if (!caso) return <p className="text-center p-8">Caso n�o encontrado.</p>;
+  if (!caso) return <p className="text-center p-8">Caso não encontrado.</p>;
   // Normaliza o status para evitar valor indefinido no select controlado
   const statusOptions = ["recebido", "em_analise", "aguardando_docs", "finalizado"];
   const selectedStatus = statusOptions.includes(caso?.status)
@@ -96,7 +96,7 @@ export const DetalhesCaso = () => {
               {caso.telefone_assistido}
             </p>
             <p className="text-amber-400">
-              <strong className="text-white">Tipo de A��o:</strong>{" "}
+              <strong className="text-white">Tipo de Ação:</strong>{" "}
               {caso.tipo_acao}
             </p>
           </div>
@@ -109,14 +109,6 @@ export const DetalhesCaso = () => {
             </p>
           </div>
         </div>
-        <div className="bg-slate-900/50 p-6 rounded-xl border border-blue-700">
-          <h2 className="text-xl font-bold text-amber-400 mb-2">
-            Resumo da IA
-          </h2>
-          <p className="text-white">
-            {caso.resumo_ia || "Resumo n�o dispon�vel."}
-          </p>
-        </div>
         <div className="bg-slate-800/50 p-6 rounded-xl border border-slate-700">
           <h2 className="text-xl text-white font-bold mb-4">Status do Caso</h2>
           <select
@@ -126,7 +118,7 @@ export const DetalhesCaso = () => {
             className="w-full p-2 bg-slate-700 rounded-lg disabled:opacity-50"
           >
             <option value="recebido">Recebido</option>
-            <option value="em_analise">Em An�lise</option>
+            <option value="em_analise">Em Análise</option>
             <option value="aguardando_docs">Aguardando Documentos</option>
             <option value="finalizado">Finalizado</option>
           </select>
@@ -143,7 +135,7 @@ export const DetalhesCaso = () => {
                 rel="noopener noreferrer"
                 className="flex items-center gap-3 p-3 bg-amber-600/80 hover:bg-amber-600 rounded-lg font-semibold"
               >
-                <Download size={20} /> Baixar Peti��o Gerada
+                <Download size={20} /> Baixar Petição Gerada
               </a>
             )}
             {caso.url_audio && (
@@ -153,7 +145,7 @@ export const DetalhesCaso = () => {
                 rel="noopener noreferrer"
                 className="flex items-center gap-3 p-3 bg-slate-700 text-white hover:bg-slate-600 rounded-lg"
               >
-                <Mic size={20} /> Ouvir �udio
+                <Mic size={20} /> Ouvir Áudio
               </a>
             )}
             {caso.urls_documentos?.map((url, index) => (
@@ -173,18 +165,19 @@ export const DetalhesCaso = () => {
         <div className="space-y-6">
           <div className="bg-slate-800/50 p-6 rounded-xl border border-slate-700">
             <h2 className="text-2xl text-white font-bold mb-4">
-              Rascunho da Peti��o Inicial (Gerado por IA)
+              Rascunho da Petição Inicial (Gerado por IA)
             </h2>
-            {/* Usamos <pre> para manter a formatação do texto gerado pela IA */}
+            {/* Usamos <pre> para manter a formataÃ§Ã£o do texto gerado pela IA */}
             <pre className="whitespace-pre-wrap text-sm font-mono bg-slate-900 text-white p-4 rounded-md overflow-x-auto">
               {caso.peticao_inicial_rascunho ||
-                "Rascunho n�o disponível ou n�o gerado."}
+                "Rascunho não disponÃ­vel ou não gerado."}
             </pre>
-            {/* Futuramente, adicionar um botão de "Editar" aqui */}
+            {/* Futuramente, adicionar um botÃ£o de "Editar" aqui */}
           </div>
         </div>
       </div>
     </div>
   );
 };
+
 
