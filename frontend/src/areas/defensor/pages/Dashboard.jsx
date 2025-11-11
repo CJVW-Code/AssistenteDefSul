@@ -48,7 +48,7 @@ export const Dashboard = () => {
         <div className="flex justify-between items-center mb-5">
           <div>
             {defensor && (
-              <h1 className="text-3xl text-[#dae2db] font-bold">
+              <h1 className="text-3xl text-slate-400 font-bold">
                 Olá, Dr(a). {defensor.nome}
               </h1>
             )}

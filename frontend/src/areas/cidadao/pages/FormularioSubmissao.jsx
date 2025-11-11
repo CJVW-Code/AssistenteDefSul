@@ -89,13 +89,13 @@ export const FormularioSubmissao = () => {
 
   // Fallback temporÃ¡rio: garantir opÃ§Ãµes visÃ­veis para FamÃ­lia
   const acoesFallbackFamilia = [
-    "FixaÃ§Ã£o de PensÃ£o AlimentÃ­cia",
-    "DivÃ³rcio",
-    "Reconhecimento e DissoluÃ§Ã£o de UniÃ£o EstÃ¡vel",
+    "Fixação de Pensão Alimentí­cia",
+    "Divórcio",
+    "Reconhecimento e Dissolussão de União Estável",
     "Guarda de Filhos",
-    "AlvarÃ¡",
-    "ExecuÃ§Ã£o de Alimentos Rito Penhora/PrisÃ£o",
-    "RevisÃ£o de Alimentos",
+    "Alvará",
+    "Execução de Alimentos Rito Penhora/Prisão",
+    "Revisão de Alimentos",
   ];
 
   const acoesParaMostrar =
@@ -149,7 +149,7 @@ export const FormularioSubmissao = () => {
     } catch (err) {
       console.error("Erro ao acessar o microfone:", err);
       alert(
-        "NÃ£o foi possÃ­vel acessar o microfone. Verifique as permissÃµes do navegador."
+        "Não foi possí­vel acessar o microfone. Verifique as permissões do navegador."
       );
     }
   };
