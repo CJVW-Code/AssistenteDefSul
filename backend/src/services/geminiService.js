@@ -27,7 +27,7 @@ const DEFAULT_TRIAGEM = "[TRIAGEM SIGAD/SOLAR]";
 const DEFAULT_PROCESSO = "[NÚMERO DO PROCESSO/DEPENDÊNCIA]";
 const PLACEHOLDER_FIELD = "[DADO PENDENTE]";
 
-const normalizePromptData = (raw = {}) => {
+export const normalizePromptData = (raw = {}) => {
   const requerente =
     raw.requerente || raw.exequente || raw.assistido || raw.cliente || {
       nome:
@@ -158,6 +158,25 @@ const percentOrPlaceholder = (value, fallback = "[PERCENTUAL]") => {
   return normalized.endsWith("%") ? normalized : `${normalized}%`;
 };
 
+const cleanText = (value, fallback = "") => {
+  if (value === undefined || value === null) return fallback;
+  const text = String(value).trim();
+  return text.length ? text : fallback;
+};
+
+const formatDocumentList = (docs = []) => {
+  if (!Array.isArray(docs) || !docs.length) {
+    return "Nenhum documento ou prova informado.";
+  }
+  const filtered = docs
+    .map((doc) => cleanText(doc))
+    .filter((doc) => Boolean(doc));
+  if (!filtered.length) {
+    return "Nenhum documento ou prova informado.";
+  }
+  return filtered.map((doc, index) => `${index + 1}. ${doc}`).join("\n");
+};
+
 export const analyzeCase = async (fullText) => {
   if (!process.env.GEMINI_API_KEY) {
     throw new Error(
@@ -190,6 +209,97 @@ export const analyzeCase = async (fullText) => {
   } catch (error) {
     console.error("Ocorreu um erro durante a análise com o Gemini:", error);
     throw new Error("Falha ao gerar o resumo do caso com a IA.");
+  }
+};
+
+export const generateDosFatos = async (caseData = {}) => {
+  if (!process.env.GEMINI_API_KEY) {
+    throw new Error(
+      "A chave da API do Gemini n\u00e3o foi configurada no arquivo .env"
+    );
+  }
+
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const normalized = normalizePromptData(caseData);
+    const relatoBase =
+      cleanText(
+        caseData.relato_texto ||
+          caseData.relato ||
+          normalized.relato ||
+          caseData.relatoBruto,
+        "Relato detalhado n\u00e3o informado."
+      ) || "Relato detalhado n\u00e3o informado.";
+    const documentosList = formatDocumentList(caseData.documentos_informados);
+    const filhosInfo = cleanText(
+      caseData.filhos_info,
+      "Informa\u00e7\u00f5es sobre filhos n\u00e3o foram apresentadas."
+    );
+    const situacaoAssistido = cleanText(
+      caseData.dados_adicionais_requerente,
+      "Sem detalhes adicionais sobre o assistido."
+    );
+    const situacaoRequerido = cleanText(
+      caseData.dados_adicionais_requerido,
+      "Sem detalhes adicionais sobre o requerido."
+    );
+    const percentualPretendido = cleanText(
+      caseData.percentual_sm_requerido ||
+        normalized.valorPercentualSalMin,
+      "Percentual n\u00e3o informado"
+    );
+    const percentualExtras = cleanText(
+      caseData.percentual_despesas_extra,
+      "Percentual de despesas adicionais n\u00e3o informado"
+    );
+    const prompt = `Voc\u00ea \u00e9 um redator jur\u00eddico da Defensoria P\u00fablica e precisa escrever a se\u00e7\u00e3o \"DOS FATOS\" de uma peti\u00e7\u00e3o de alimentos, com base apenas nos dados a seguir.
+
+Regras obrigat\u00f3rias:
+1. Identifique o problema logo no primeiro par\u00e1grafo com uma s\u00edntese do ocorrido.
+2. Narre os fatos em ordem cronol\u00f3gica, conectando causa e efeito.
+3. Mantenha clareza e objetividade; use linguagem simples, mas formal.
+4. Relacione a narrativa com a necessidade do pedido e a capacidade contributiva do requerido.
+5. Destaque apenas fatos relevantes ao conflito e \u00e0 solu\u00e7\u00e3o judicial.
+6. Indique, ao final, as provas/documentos existentes que sustentam os fatos.
+7. Produza entre 3 e 5 par\u00e1grafos e evite repetir informa\u00e7\u00f5es.
+
+Dados do caso:
+- Assistido: ${cleanText(
+      normalized.requerente?.nome,
+      "Nome do assistido n\u00e3o informado"
+    )} (${cleanText(
+      normalized.requerente?.cpf,
+      "CPF n\u00e3o informado"
+    )}), nascimento: ${cleanText(
+      normalized.requerente?.dataNascimento,
+      "sem data informada"
+    )}.
+- Requerido: ${cleanText(
+      normalized.requerido?.nome,
+      "Nome do requerido n\u00e3o informado"
+    )}, CPF ${cleanText(normalized.requerido?.cpf, "n\u00e3o informado")}.
+- Situa\u00e7\u00e3o econ\u00f4mica do assistido: ${situacaoAssistido}
+- Situa\u00e7\u00e3o econ\u00f4mica do requerido: ${situacaoRequerido}
+- Percentual pretendido sobre o sal\u00e1rio m\u00ednimo: ${percentualPretendido}%
+- Percentual para despesas extras (sa\u00fade, educa\u00e7\u00e3o, vestu\u00e1rio): ${percentualExtras}%
+- Informa\u00e7\u00f5es sobre filhos/dependentes: ${filhosInfo}
+- Relato fornecido pelo assistido:
+\"\"\"${relatoBase}\"\"\"
+- Provas/documentos mencionados:
+${documentosList}
+
+Escreva apenas o texto da se\u00e7\u00e3o \"DOS FATOS\" seguindo as regras acima, sem incluir o t\u00edtulo ou qualquer instru\u00e7\u00e3o adicional.`;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const texto = response.text() || "";
+    return sanitizeLegalAbbreviations(texto.trim());
+  } catch (error) {
+    console.error(
+      "Erro ao gerar a se\u00e7\u00e3o 'Dos Fatos' com o Gemini:",
+      error
+    );
+    throw new Error("Falha ao gerar a se\u00e7\u00e3o 'Dos Fatos' com a IA.");
   }
 };
 

@@ -31,40 +31,95 @@ export const FormularioSubmissao = () => {
   const [emailAssistido, setEmailAssistido] = useState("");
   const [dadosAdicionaisRequerente, setDadosAdicionaisRequerente] =
     useState("");
+  const [varaCompetente, setVaraCompetente] = useState("");
+  const [assistidoEhIncapaz, setAssistidoEhIncapaz] = useState("nao");
+  const [assistidoNacionalidade, setAssistidoNacionalidade] = useState("");
+  const [assistidoEstadoCivil, setAssistidoEstadoCivil] = useState("");
+  const [assistidoOcupacao, setAssistidoOcupacao] = useState("");
+  const [dataNascimentoAssistido, setDataNascimentoAssistido] = useState("");
+  const [
+    enderecoProfissionalAssistido,
+    setEnderecoProfissionalAssistido,
+  ] = useState("");
+
+  const [representanteNome, setRepresentanteNome] = useState("");
+  const [representanteNacionalidade, setRepresentanteNacionalidade] =
+    useState("");
+  const [representanteEstadoCivil, setRepresentanteEstadoCivil] =
+    useState("");
+  const [representanteOcupacao, setRepresentanteOcupacao] = useState("");
+  const [representanteCpf, setRepresentanteCpf] = useState("");
+  const [
+    representanteEnderecoResidencial,
+    setRepresentanteEnderecoResidencial,
+  ] = useState("");
+  const [
+    representanteEnderecoProfissional,
+    setRepresentanteEnderecoProfissional,
+  ] = useState("");
+  const [representanteEmail, setRepresentanteEmail] = useState("");
+  const [representanteTelefone, setRepresentanteTelefone] = useState("");
 
   const [nomeRequerido, setNomeRequerido] = useState("");
   const [cpfRequerido, setCpfRequerido] = useState("");
   const [enderecoRequerido, setEnderecoRequerido] = useState("");
   const [dadosAdicionaisRequerido, setDadosAdicionaisRequerido] = useState("");
+  const [requeridoNacionalidade, setRequeridoNacionalidade] = useState("");
+  const [requeridoEstadoCivil, setRequeridoEstadoCivil] = useState("");
+  const [requeridoOcupacao, setRequeridoOcupacao] = useState("");
+  const [requeridoEnderecoProfissional, setRequeridoEnderecoProfissional] =
+    useState("");
+  const [requeridoEmail, setRequeridoEmail] = useState("");
+  const [requeridoTelefone, setRequeridoTelefone] = useState("");
 
   const [filhosInfo, setFilhosInfo] = useState("");
   const [dataInicioRelacao, setDataInicioRelacao] = useState("");
   const [dataSeparacao, setDataSeparacao] = useState("");
   const [bensPartilha, setBensPartilha] = useState("");
+  const [descricaoGuarda, setDescricaoGuarda] = useState("");
+  const [situacaoFinanceiraGenitora, setSituacaoFinanceiraGenitora] =
+    useState("");
 
   // --- CAMPOS ESPECÍFICOS: FIXAÇÃO/OFERTA DE ALIMENTOS ---
   const [percentualSmRequerido, setPercentualSmRequerido] = useState("");
   const [percentualDespesasExtra, setPercentualDespesasExtra] = useState("");
   const [diaPagamentoRequerido, setDiaPagamentoRequerido] = useState("");
   const [dadosBancariosDeposito, setDadosBancariosDeposito] = useState("");
+  const [valorProvisorioReferencia, setValorProvisorioReferencia] =
+    useState("");
+  const [
+    percentualDefinitivoSalarioMin,
+    setPercentualDefinitivoSalarioMin,
+  ] = useState("");
+  const [percentualDefinitivoExtras, setPercentualDefinitivoExtras] =
+    useState("");
   const [requeridoTemEmpregoFormal, setRequeridoTemEmpregoFormal] =
     useState(""); // "sim" | "nao" | "nao_sei"
   const [empregadorRequeridoNome, setEmpregadorRequeridoNome] = useState("");
   const [empregadorRequeridoEndereco, setEmpregadorRequeridoEndereco] =
     useState("");
+  const [empregadorEmail, setEmpregadorEmail] = useState("");
 
   // --- CAMPOS ESPECÍFICOS: EXECUÇÃO DE ALIMENTOS ---
   const [numeroProcessoOriginario, setNumeroProcessoOriginario] = useState("");
   const [varaOriginaria, setVaraOriginaria] = useState("");
+  const [processoTituloNumero, setProcessoTituloNumero] = useState("");
   const [percentualOuValorFixado, setPercentualOuValorFixado] = useState("");
   const [diaPagamentoFixado, setDiaPagamentoFixado] = useState("");
   const [periodoDebitoExecucao, setPeriodoDebitoExecucao] = useState("");
   const [valorTotalDebitoExecucao, setValorTotalDebitoExecucao] = useState("");
+  const [valorTotalExtenso, setValorTotalExtenso] = useState("");
+  const [valorDebitoExtenso, setValorDebitoExtenso] = useState("");
 
   // --- CAMPOS ESPECÍFICOS: DIVÓRCIO ---
   const [regimeBens, setRegimeBens] = useState("");
   const [retornoNomeSolteira, setRetornoNomeSolteira] = useState("");
   const [alimentosParaExConjuge, setAlimentosParaExConjuge] = useState("");
+
+  // --- CAMPOS GERAIS PARA DOCUMENTOS ---
+  const [valorCausa, setValorCausa] = useState("");
+  const [valorCausaExtenso, setValorCausaExtenso] = useState("");
+  const [cidadeAssinatura, setCidadeAssinatura] = useState("");
 
   // --- ESTADOS DA GRAVAÃ‡ÃƒO DE ÃUDIO ---
   const [isRecording, setIsRecording] = useState(false);
@@ -256,15 +311,66 @@ export const FormularioSubmissao = () => {
     formData.append("cpf_requerido", cpfRequerido);
     formData.append("endereco_requerido", enderecoRequerido);
     formData.append("dados_adicionais_requerido", dadosAdicionaisRequerido);
+    formData.append("vara_competente", varaCompetente);
+    formData.append("assistido_eh_incapaz", assistidoEhIncapaz);
+    formData.append("assistido_nacionalidade", assistidoNacionalidade);
+    formData.append("assistido_estado_civil", assistidoEstadoCivil);
+    formData.append("assistido_ocupacao", assistidoOcupacao);
+    formData.append("assistido_data_nascimento", dataNascimentoAssistido);
+    formData.append(
+      "assistido_endereco_profissional",
+      enderecoProfissionalAssistido
+    );
+    formData.append("representante_nome", representanteNome);
+    formData.append("representante_nacionalidade", representanteNacionalidade);
+    formData.append("representante_estado_civil", representanteEstadoCivil);
+    formData.append("representante_ocupacao", representanteOcupacao);
+    formData.append("representante_cpf", representanteCpf);
+    formData.append(
+      "representante_endereco_residencial",
+      representanteEnderecoResidencial
+    );
+    formData.append(
+      "representante_endereco_profissional",
+      representanteEnderecoProfissional
+    );
+    formData.append("representante_email", representanteEmail);
+    formData.append("representante_telefone", representanteTelefone);
+    formData.append("requerido_nacionalidade", requeridoNacionalidade);
+    formData.append("requerido_estado_civil", requeridoEstadoCivil);
+    formData.append("requerido_ocupacao", requeridoOcupacao);
+    formData.append(
+      "requerido_endereco_profissional",
+      requeridoEnderecoProfissional
+    );
+    formData.append("requerido_email", requeridoEmail);
+    formData.append("requerido_telefone", requeridoTelefone);
     formData.append("filhos_info", filhosInfo);
     formData.append("data_inicio_relacao", dataInicioRelacao);
     formData.append("data_separacao", dataSeparacao);
     formData.append("bens_partilha", bensPartilha);
+    formData.append("descricao_guarda", descricaoGuarda);
+    formData.append(
+      "situacao_financeira_genitora",
+      situacaoFinanceiraGenitora
+    );
     // --- CAMPOS ESPECÍFICOS: FIXAÇÃO/OFERTA (também usados na Execução) ---
     formData.append("percentual_sm_requerido", percentualSmRequerido);
     formData.append("percentual_despesas_extra", percentualDespesasExtra);
     formData.append("dia_pagamento_requerido", diaPagamentoRequerido);
     formData.append("dados_bancarios_deposito", dadosBancariosDeposito);
+    formData.append(
+      "valor_provisorio_referencia",
+      valorProvisorioReferencia
+    );
+    formData.append(
+      "percentual_definitivo_salario_min",
+      percentualDefinitivoSalarioMin
+    );
+    formData.append(
+      "percentual_definitivo_extras",
+      percentualDefinitivoExtras
+    );
     formData.append(
       "requerido_tem_emprego_formal",
       requeridoTemEmpregoFormal
@@ -274,17 +380,24 @@ export const FormularioSubmissao = () => {
       "empregador_requerido_endereco",
       empregadorRequeridoEndereco
     );
+    formData.append("empregador_email", empregadorEmail);
     // --- CAMPOS ESPECÍFICOS: EXECUÇÃO ---
     formData.append("numero_processo_originario", numeroProcessoOriginario);
     formData.append("vara_originaria", varaOriginaria);
+    formData.append("processo_titulo_numero", processoTituloNumero);
     formData.append("percentual_ou_valor_fixado", percentualOuValorFixado);
     formData.append("dia_pagamento_fixado", diaPagamentoFixado);
     formData.append("periodo_debito_execucao", periodoDebitoExecucao);
     formData.append("valor_total_debito_execucao", valorTotalDebitoExecucao);
+    formData.append("valor_total_extenso", valorTotalExtenso);
+    formData.append("valor_debito_extenso", valorDebitoExtenso);
     // --- CAMPOS ESPECÍFICOS: DIVÓRCIO ---
     formData.append("regime_bens", regimeBens);
     formData.append("retorno_nome_solteira", retornoNomeSolteira);
     formData.append("alimentos_para_ex_conjuge", alimentosParaExConjuge);
+    formData.append("valor_causa", valorCausa);
+    formData.append("valor_causa_extenso", valorCausaExtenso);
+    formData.append("cidade_assinatura", cidadeAssinatura);
     // Anexa o Ã¡udio gravado, se existir
     if (audioBlob) {
       formData.append("audio", audioBlob, "gravacao.webm");
@@ -334,31 +447,65 @@ export const FormularioSubmissao = () => {
     setEnderecoAssistido("");
     setEmailAssistido("");
     setDadosAdicionaisRequerente("");
+    setVaraCompetente("");
+    setAssistidoEhIncapaz("nao");
+    setAssistidoNacionalidade("");
+    setAssistidoEstadoCivil("");
+    setAssistidoOcupacao("");
+    setDataNascimentoAssistido("");
+    setEnderecoProfissionalAssistido("");
+    setRepresentanteNome("");
+    setRepresentanteNacionalidade("");
+    setRepresentanteEstadoCivil("");
+    setRepresentanteOcupacao("");
+    setRepresentanteCpf("");
+    setRepresentanteEnderecoResidencial("");
+    setRepresentanteEnderecoProfissional("");
+    setRepresentanteEmail("");
+    setRepresentanteTelefone("");
     setNomeRequerido("");
     setCpfRequerido("");
     setEnderecoRequerido("");
     setDadosAdicionaisRequerido("");
+    setRequeridoNacionalidade("");
+    setRequeridoEstadoCivil("");
+    setRequeridoOcupacao("");
+    setRequeridoEnderecoProfissional("");
+    setRequeridoEmail("");
+    setRequeridoTelefone("");
     setFilhosInfo("");
     setDataInicioRelacao("");
     setDataSeparacao("");
     setBensPartilha("");
+    setDescricaoGuarda("");
+    setSituacaoFinanceiraGenitora("");
     // limpar campos específicos
     setPercentualSmRequerido("");
     setPercentualDespesasExtra("");
     setDiaPagamentoRequerido("");
     setDadosBancariosDeposito("");
+    setValorProvisorioReferencia("");
+    setPercentualDefinitivoSalarioMin("");
+    setPercentualDefinitivoExtras("");
     setRequeridoTemEmpregoFormal("");
     setEmpregadorRequeridoNome("");
     setEmpregadorRequeridoEndereco("");
+    setEmpregadorEmail("");
     setNumeroProcessoOriginario("");
     setVaraOriginaria("");
+    setProcessoTituloNumero("");
     setPercentualOuValorFixado("");
     setDiaPagamentoFixado("");
     setPeriodoDebitoExecucao("");
     setValorTotalDebitoExecucao("");
+    setValorTotalExtenso("");
+    setValorDebitoExtenso("");
     setRegimeBens("");
     setRetornoNomeSolteira("");
     setAlimentosParaExConjuge("");
+    setValorCausa("");
+    setValorCausaExtenso("");
+    setCidadeAssinatura("");
     setAudioBlob(null);
     setDocumentFiles([]);
     setGeneratedCredentials(null); // Isso tambÃ©m esconderÃ¡ a tela de sucesso
@@ -493,6 +640,176 @@ export const FormularioSubmissao = () => {
               01/01/1990
             </p>
           </div>
+          <div className="bg-surface p-4 rounded-lg border border-soft space-y-4">
+            <h3 className="heading-3">Informações complementares do assistido</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <select value={assistidoEhIncapaz} onChange={(e) => setAssistidoEhIncapaz(e.target.value)} className="input">
+                <option value="nao">Sou o próprio interessado</option>
+                <option value="sim">Estou representando meu filho/filha</option>
+              </select>
+              <input type="date" value={dataNascimentoAssistido} onChange={(e) => setDataNascimentoAssistido(e.target.value)} className="input" />
+              <input type="text" placeholder="Nacionalidade" value={assistidoNacionalidade} onChange={(e) => setAssistidoNacionalidade(e.target.value)} className="input" />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <input type="text" placeholder="Estado civil" value={assistidoEstadoCivil} onChange={(e) => setAssistidoEstadoCivil(e.target.value)} className="input" />
+              <input type="text" placeholder="Profissão ou ocupação" value={assistidoOcupacao} onChange={(e) => setAssistidoOcupacao(e.target.value)} className="input" />
+            </div>
+            <input type="text" placeholder="Endereço profissional (se houver)" value={enderecoProfissionalAssistido} onChange={(e) => setEnderecoProfissionalAssistido(e.target.value)} className="input" />
+          </div>
+
+          {mostrarRepresentante && (
+            <div className="bg-surface p-4 rounded-lg border border-soft space-y-4">
+              <h3 className="heading-3">Dados do representante legal</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <input type="text" placeholder="Nome completo do representante" value={representanteNome} onChange={(e) => setRepresentanteNome(e.target.value)} className="input" />
+                <input type="text" placeholder="CPF (apenas números)" value={representanteCpf} onChange={(e) => handleNumericInput(e, setRepresentanteCpf)} className="input" />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <input type="text" placeholder="Nacionalidade" value={representanteNacionalidade} onChange={(e) => setRepresentanteNacionalidade(e.target.value)} className="input" />
+                <input type="text" placeholder="Estado civil" value={representanteEstadoCivil} onChange={(e) => setRepresentanteEstadoCivil(e.target.value)} className="input" />
+                <input type="text" placeholder="Profissão" value={representanteOcupacao} onChange={(e) => setRepresentanteOcupacao(e.target.value)} className="input" />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <input type="text" placeholder="Endereço residencial" value={representanteEnderecoResidencial} onChange={(e) => setRepresentanteEnderecoResidencial(e.target.value)} className="input" />
+                <input type="text" placeholder="Endereço profissional" value={representanteEnderecoProfissional} onChange={(e) => setRepresentanteEnderecoProfissional(e.target.value)} className="input" />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <input type="email" placeholder="Email do representante" value={representanteEmail} onChange={(e) => setRepresentanteEmail(e.target.value)} className="input" />
+                <input type="tel" placeholder="Telefone do representante" value={representanteTelefone} onChange={(e) => handleNumericInput(e, setRepresentanteTelefone)} className="input" />
+              </div>
+            </div>
+          )}
+
+          <div className="bg-surface p-4 rounded-lg border border-soft space-y-4">
+            <h3 className="heading-3">Informacoes complementares do assistido</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <select
+                value={assistidoEhIncapaz}
+                onChange={(e) => setAssistidoEhIncapaz(e.target.value)}
+                className="input"
+              >
+                <option value="nao">Sou o proprio interessado</option>
+                <option value="sim">Estou representando meu filho/filha</option>
+              </select>
+              <input
+                type="date"
+                value={dataNascimentoAssistido}
+                onChange={(e) => setDataNascimentoAssistido(e.target.value)}
+                className="input"
+                placeholder="Data de nascimento"
+              />
+              <input
+                type="text"
+                value={assistidoNacionalidade}
+                onChange={(e) => setAssistidoNacionalidade(e.target.value)}
+                className="input"
+                placeholder="Nacionalidade"
+              />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <input
+                type="text"
+                value={assistidoEstadoCivil}
+                onChange={(e) => setAssistidoEstadoCivil(e.target.value)}
+                className="input"
+                placeholder="Estado civil"
+              />
+              <input
+                type="text"
+                value={assistidoOcupacao}
+                onChange={(e) => setAssistidoOcupacao(e.target.value)}
+                className="input"
+                placeholder="Profissao ou ocupacao"
+              />
+            </div>
+            <input
+              type="text"
+              value={enderecoProfissionalAssistido}
+              onChange={(e) => setEnderecoProfissionalAssistido(e.target.value)}
+              className="input"
+              placeholder="Endereco profissional (se houver)"
+            />
+            <p className="text-xs text-muted">
+              Use estas informacoes para identificar voce ou seu dependente no processo.
+            </p>
+          </div>
+
+          {mostrarRepresentante && (
+            <div className="bg-surface p-4 rounded-lg border border-soft space-y-4">
+              <h3 className="heading-3">Dados do representante legal</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <input
+                  type="text"
+                  value={representanteNome}
+                  onChange={(e) => setRepresentanteNome(e.target.value)}
+                  className="input"
+                  placeholder="Nome completo do representante"
+                />
+                <input
+                  type="text"
+                  value={representanteCpf}
+                  onChange={(e) => handleNumericInput(e, setRepresentanteCpf)}
+                  className="input"
+                  placeholder="CPF do representante (apenas numeros)"
+                />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <input
+                  type="text"
+                  value={representanteNacionalidade}
+                  onChange={(e) => setRepresentanteNacionalidade(e.target.value)}
+                  className="input"
+                  placeholder="Nacionalidade"
+                />
+                <input
+                  type="text"
+                  value={representanteEstadoCivil}
+                  onChange={(e) => setRepresentanteEstadoCivil(e.target.value)}
+                  className="input"
+                  placeholder="Estado civil"
+                />
+                <input
+                  type="text"
+                  value={representanteOcupacao}
+                  onChange={(e) => setRepresentanteOcupacao(e.target.value)}
+                  className="input"
+                  placeholder="Profissao"
+                />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <input
+                  type="text"
+                  value={representanteEnderecoResidencial}
+                  onChange={(e) => setRepresentanteEnderecoResidencial(e.target.value)}
+                  className="input"
+                  placeholder="Endereco residencial"
+                />
+                <input
+                  type="text"
+                  value={representanteEnderecoProfissional}
+                  onChange={(e) => setRepresentanteEnderecoProfissional(e.target.value)}
+                  className="input"
+                  placeholder="Endereco profissional"
+                />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <input
+                  type="email"
+                  value={representanteEmail}
+                  onChange={(e) => setRepresentanteEmail(e.target.value)}
+                  className="input"
+                  placeholder="Email do representante"
+                />
+                <input
+                  type="tel"
+                  value={representanteTelefone}
+                  onChange={(e) => handleNumericInput(e, setRepresentanteTelefone)}
+                  className="input"
+                  placeholder="Telefone do representante"
+                />
+              </div>
+            </div>
+          )}
 
           <div>
             <select
@@ -563,8 +880,64 @@ export const FormularioSubmissao = () => {
               onChange={(e) => setEnderecoRequerido(e.target.value)}
               className="input"
             />
-            <div>
-              <textarea
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <input type="text" placeholder="Nacionalidade (se souber)" value={requeridoNacionalidade} onChange={(e) => setRequeridoNacionalidade(e.target.value)} className="input" />
+              <input type="text" placeholder="Estado civil" value={requeridoEstadoCivil} onChange={(e) => setRequeridoEstadoCivil(e.target.value)} className="input" />
+              <input type="text" placeholder="Profissão ou ocupação" value={requeridoOcupacao} onChange={(e) => setRequeridoOcupacao(e.target.value)} className="input" />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <input type="text" placeholder="Endereço profissional (se souber)" value={requeridoEnderecoProfissional} onChange={(e) => setRequeridoEnderecoProfissional(e.target.value)} className="input" />
+              <input type="email" placeholder="Email do requerido" value={requeridoEmail} onChange={(e) => setRequeridoEmail(e.target.value)} className="input" />
+            </div>
+            <input type="tel" placeholder="Telefone do requerido (se souber)" value={requeridoTelefone} onChange={(e) => handleNumericInput(e, setRequeridoTelefone)} className="input" />
+          <div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <input
+                type="text"
+                placeholder="Nacionalidade (se souber)"
+                value={requeridoNacionalidade}
+                onChange={(e) => setRequeridoNacionalidade(e.target.value)}
+                className="input"
+              />
+              <input
+                type="text"
+                placeholder="Estado civil"
+                value={requeridoEstadoCivil}
+                onChange={(e) => setRequeridoEstadoCivil(e.target.value)}
+                className="input"
+              />
+              <input
+                type="text"
+                placeholder="Profissao ou ocupacao"
+                value={requeridoOcupacao}
+                onChange={(e) => setRequeridoOcupacao(e.target.value)}
+                className="input"
+              />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <input
+                type="text"
+                placeholder="Endereco profissional (se souber)"
+                value={requeridoEnderecoProfissional}
+                onChange={(e) => setRequeridoEnderecoProfissional(e.target.value)}
+                className="input"
+              />
+              <input
+                type="email"
+                placeholder="Email do requerido"
+                value={requeridoEmail}
+                onChange={(e) => setRequeridoEmail(e.target.value)}
+                className="input"
+              />
+            </div>
+            <input
+              type="tel"
+              placeholder="Telefone do requerido (se souber)"
+              value={requeridoTelefone}
+              onChange={(e) => handleNumericInput(e, setRequeridoTelefone)}
+              className="input"
+            />
+            <textarea
                 placeholder="Dados Adicionais do(a) Requerido(a) (RG, Nacionalidade, Estado Civil, Profissão, se souber)"
                 value={dadosAdicionaisRequerido}
                 onChange={(e) => setDadosAdicionaisRequerido(e.target.value)}
@@ -625,6 +998,108 @@ export const FormularioSubmissao = () => {
                 className="input"
               ></textarea>
             </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <textarea
+                placeholder="Descreva como esta a guarda e rotina dos filhos (quem cuida, onde moram, visitas)"
+                value={descricaoGuarda}
+                onChange={(e) => setDescricaoGuarda(e.target.value)}
+                rows="3"
+                className="input"
+              ></textarea>
+              <textarea
+                placeholder="Conte a situacao financeira de quem cuida das criancas (renda, despesas, dificuldades)"
+                value={situacaoFinanceiraGenitora}
+                onChange={(e) => setSituacaoFinanceiraGenitora(e.target.value)}
+                rows="3"
+                className="input"
+              ></textarea>
+            </div>
+          </div>
+
+          <div className="bg-surface p-4 rounded-lg border border-soft space-y-4">
+            <h3 className="heading-3">Informacoes para o documento</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <input
+                type="text"
+                placeholder="Vara competente ou juizo (opcional)"
+                value={varaCompetente}
+                onChange={(e) => setVaraCompetente(e.target.value)}
+                className="input"
+              />
+              <input
+                type="text"
+                placeholder="Cidade para assinatura do documento"
+                value={cidadeAssinatura}
+                onChange={(e) => setCidadeAssinatura(e.target.value)}
+                className="input"
+              />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <input
+                type="text"
+                placeholder="Valor da causa (em reais)"
+                value={valorCausa}
+                onChange={(e) => setValorCausa(e.target.value)}
+                className="input"
+              />
+              <input
+                type="text"
+                placeholder="Valor da causa por extenso"
+                value={valorCausaExtenso}
+                onChange={(e) => setValorCausaExtenso(e.target.value)}
+                className="input"
+              />
+            </div>
+            {showFixacaoBaseFields && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <input
+                  type="text"
+                  placeholder="Valor de referencia dos alimentos provisórios"
+                  value={valorProvisorioReferencia}
+                  onChange={(e) => setValorProvisorioReferencia(e.target.value)}
+                  className="input"
+                />
+                <input
+                  type="text"
+                  placeholder="Percentual definitivo sobre o salario minimo"
+                  value={percentualDefinitivoSalarioMin}
+                  onChange={(e) => setPercentualDefinitivoSalarioMin(e.target.value)}
+                  className="input"
+                />
+                <input
+                  type="text"
+                  placeholder="Percentual definitivo das despesas extras"
+                  value={percentualDefinitivoExtras}
+                  onChange={(e) => setPercentualDefinitivoExtras(e.target.value)}
+                  className="input"
+                />
+              </div>
+            )}
+            {isExecucao && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <input
+                  type="text"
+                  placeholder="Numero do titulo/execucao (se houver)"
+                  value={processoTituloNumero}
+                  onChange={(e) => setProcessoTituloNumero(e.target.value)}
+                  className="input"
+                />
+                <input
+                  type="text"
+                  placeholder="Valor total executado por extenso"
+                  value={valorTotalExtenso}
+                  onChange={(e) => setValorTotalExtenso(e.target.value)}
+                  className="input"
+                />
+                <input
+                  type="text"
+                  placeholder="Valor da divida para prisao por extenso"
+                  value={valorDebitoExtenso}
+                  onChange={(e) => setValorDebitoExtenso(e.target.value)}
+                  className="input"
+                />
+              </div>
+            )}
           </div>
 
           {/* Seções condicionais por ação */}
@@ -704,6 +1179,16 @@ export const FormularioSubmissao = () => {
                         placeholder="Endereço completo da empresa"
                         value={empregadorRequeridoEndereco}
                         onChange={(e) => setEmpregadorRequeridoEndereco(e.target.value)}
+                        className="input"
+                      />
+                    </div>
+                    <div>
+                      <label className="label">Email do empregador (opcional)</label>
+                      <input
+                        type="email"
+                        placeholder="Email do RH ou responsavel"
+                        value={empregadorEmail}
+                        onChange={(e) => setEmpregadorEmail(e.target.value)}
                         className="input"
                       />
                     </div>
@@ -949,3 +1434,7 @@ export const FormularioSubmissao = () => {
     </motion.div>
   );
 };
+
+
+
+
