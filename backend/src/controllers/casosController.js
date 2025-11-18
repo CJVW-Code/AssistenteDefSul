@@ -131,6 +131,9 @@ const buildDocxTemplatePayload = (
     requerente_dataNascimento: ensureText(
       baseData.assistido_data_nascimento || requerente.dataNascimento
     ),
+    requerente_data_nascimento: ensureText(
+      baseData.assistido_data_nascimento || requerente.dataNascimento
+    ),
     requerente_cpf: ensureText(assistidoCpf),
     requerente_nacionalidade: ensureText(baseData.assistido_nacionalidade),
     requerente_estado_civil: ensureText(baseData.assistido_estado_civil),
@@ -170,10 +173,13 @@ const buildDocxTemplatePayload = (
     exequente_representante: ensureText(requerente.representante),
     executado_nome: ensureText(baseData.nome_requerido || requerido.nome),
     executado_cpf: ensureText(baseData.cpf_requerido || requerido.cpf),
+    requerido_nome: ensureText(baseData.nome_requerido || requerido.nome),
+    requerido_cpf: ensureText(baseData.cpf_requerido || requerido.cpf),
     executado_nacionalidade: ensureText(baseData.requerido_nacionalidade),
     executado_estado_civil: ensureText(baseData.requerido_estado_civil),
     executado_ocupacao: ensureText(baseData.requerido_ocupacao),
     executado_endereco_residencial: ensureText(executadoEndereco),
+    requerido_endereco_residencial: ensureText(executadoEndereco),
     executado_endereco_profissional: ensureText(
       baseData.requerido_endereco_profissional
     ),

@@ -11,7 +11,7 @@ export const LayoutCidadao = () => {
           <ThemeToggle />
         </div>
         <div className="flex items-center">
-          <Link to="/painel/login" className="btn btn-secondary">
+          <Link to="/painel" className="btn btn-secondary">
             <LogIn size={16} />
             Painel do Defensor
           </Link>

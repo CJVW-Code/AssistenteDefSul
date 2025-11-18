@@ -29,7 +29,7 @@ export const FormularioSubmissao = () => {
   // --- NOVOS ESTADOS PARA DADOS ADICIONAIS ---
   const [enderecoAssistido, setEnderecoAssistido] = useState("");
   const [emailAssistido, setEmailAssistido] = useState("");
-  const [dadosAdicionaisRequerente, setDadosAdicionaisRequerente] =
+  const [assistido_RG, assistidoRG] =
     useState("");
   const [varaCompetente, setVaraCompetente] = useState("");
   const [assistidoEhIncapaz, setAssistidoEhIncapaz] = useState("nao");
@@ -99,6 +99,7 @@ export const FormularioSubmissao = () => {
   const [empregadorRequeridoEndereco, setEmpregadorRequeridoEndereco] =
     useState("");
   const [empregadorEmail, setEmpregadorEmail] = useState("");
+  const mostrarRepresentante = assistidoEhIncapaz === "sim";
 
   // --- CAMPOS ESPECÍFICOS: EXECUÇÃO DE ALIMENTOS ---
   const [numeroProcessoOriginario, setNumeroProcessoOriginario] = useState("");
@@ -306,7 +307,6 @@ export const FormularioSubmissao = () => {
     // --- ADICIONA OS NOVOS CAMPOS AO FORMDATA ---
     formData.append("endereco_assistido", enderecoAssistido);
     formData.append("email_assistido", emailAssistido);
-    formData.append("dados_adicionais_requerente", dadosAdicionaisRequerente);
     formData.append("nome_requerido", nomeRequerido);
     formData.append("cpf_requerido", cpfRequerido);
     formData.append("endereco_requerido", enderecoRequerido);
@@ -321,6 +321,7 @@ export const FormularioSubmissao = () => {
       "assistido_endereco_profissional",
       enderecoProfissionalAssistido
     );
+    formData.append("assistido_RG", assistidoRG);
     formData.append("representante_nome", representanteNome);
     formData.append("representante_nacionalidade", representanteNacionalidade);
     formData.append("representante_estado_civil", representanteEstadoCivil);
@@ -446,7 +447,6 @@ export const FormularioSubmissao = () => {
     // limpar novos campos adicionados
     setEnderecoAssistido("");
     setEmailAssistido("");
-    setDadosAdicionaisRequerente("");
     setVaraCompetente("");
     setAssistidoEhIncapaz("nao");
     setAssistidoNacionalidade("");
@@ -563,7 +563,6 @@ export const FormularioSubmissao = () => {
         // --- FORMULÃRIO DE ENVIO ---
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Nome e CPF */}
             <div className="relative">
               <User
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-muted"
@@ -608,6 +607,7 @@ export const FormularioSubmissao = () => {
               className="input pl-10"
             />
           </div>
+          
 
           {/* --- NOVOS CAMPOS DO REQUERENTE --- */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -629,33 +629,15 @@ export const FormularioSubmissao = () => {
           </div>
           <div>
             <textarea
-              placeholder="Seus Dados Adicionais (RG, Nacionalidade, Estado Civil, Profissão , Data de Nascimento)"
-              value={dadosAdicionaisRequerente}
-              onChange={(e) => setDadosAdicionaisRequerente(e.target.value)}
+              placeholder="Insira seu RG: Ex:00.000.000-00"
+              value={assistido_RG}
+              onChange={(e) => assistidoRG(e.target.value)}
               rows="3"
               className="input"
             ></textarea>
-            <p className="text-xs text-muted mt-1">
-              Ex: 1234567 SSP/BA, Brasileiro(a), Casado(a), Vendedor(a),
-              01/01/1990
-            </p>
+            
           </div>
-          <div className="bg-surface p-4 rounded-lg border border-soft space-y-4">
-            <h3 className="heading-3">Informações complementares do assistido</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <select value={assistidoEhIncapaz} onChange={(e) => setAssistidoEhIncapaz(e.target.value)} className="input">
-                <option value="nao">Sou o próprio interessado</option>
-                <option value="sim">Estou representando meu filho/filha</option>
-              </select>
-              <input type="date" value={dataNascimentoAssistido} onChange={(e) => setDataNascimentoAssistido(e.target.value)} className="input" />
-              <input type="text" placeholder="Nacionalidade" value={assistidoNacionalidade} onChange={(e) => setAssistidoNacionalidade(e.target.value)} className="input" />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <input type="text" placeholder="Estado civil" value={assistidoEstadoCivil} onChange={(e) => setAssistidoEstadoCivil(e.target.value)} className="input" />
-              <input type="text" placeholder="Profissão ou ocupação" value={assistidoOcupacao} onChange={(e) => setAssistidoOcupacao(e.target.value)} className="input" />
-            </div>
-            <input type="text" placeholder="Endereço profissional (se houver)" value={enderecoProfissionalAssistido} onChange={(e) => setEnderecoProfissionalAssistido(e.target.value)} className="input" />
-          </div>
+          
 
           {mostrarRepresentante && (
             <div className="bg-surface p-4 rounded-lg border border-soft space-y-4">
@@ -734,82 +716,6 @@ export const FormularioSubmissao = () => {
             </p>
           </div>
 
-          {mostrarRepresentante && (
-            <div className="bg-surface p-4 rounded-lg border border-soft space-y-4">
-              <h3 className="heading-3">Dados do representante legal</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <input
-                  type="text"
-                  value={representanteNome}
-                  onChange={(e) => setRepresentanteNome(e.target.value)}
-                  className="input"
-                  placeholder="Nome completo do representante"
-                />
-                <input
-                  type="text"
-                  value={representanteCpf}
-                  onChange={(e) => handleNumericInput(e, setRepresentanteCpf)}
-                  className="input"
-                  placeholder="CPF do representante (apenas numeros)"
-                />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <input
-                  type="text"
-                  value={representanteNacionalidade}
-                  onChange={(e) => setRepresentanteNacionalidade(e.target.value)}
-                  className="input"
-                  placeholder="Nacionalidade"
-                />
-                <input
-                  type="text"
-                  value={representanteEstadoCivil}
-                  onChange={(e) => setRepresentanteEstadoCivil(e.target.value)}
-                  className="input"
-                  placeholder="Estado civil"
-                />
-                <input
-                  type="text"
-                  value={representanteOcupacao}
-                  onChange={(e) => setRepresentanteOcupacao(e.target.value)}
-                  className="input"
-                  placeholder="Profissao"
-                />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <input
-                  type="text"
-                  value={representanteEnderecoResidencial}
-                  onChange={(e) => setRepresentanteEnderecoResidencial(e.target.value)}
-                  className="input"
-                  placeholder="Endereco residencial"
-                />
-                <input
-                  type="text"
-                  value={representanteEnderecoProfissional}
-                  onChange={(e) => setRepresentanteEnderecoProfissional(e.target.value)}
-                  className="input"
-                  placeholder="Endereco profissional"
-                />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <input
-                  type="email"
-                  value={representanteEmail}
-                  onChange={(e) => setRepresentanteEmail(e.target.value)}
-                  className="input"
-                  placeholder="Email do representante"
-                />
-                <input
-                  type="tel"
-                  value={representanteTelefone}
-                  onChange={(e) => handleNumericInput(e, setRepresentanteTelefone)}
-                  className="input"
-                  placeholder="Telefone do representante"
-                />
-              </div>
-            </div>
-          )}
 
           <div>
             <select
@@ -891,52 +797,6 @@ export const FormularioSubmissao = () => {
             </div>
             <input type="tel" placeholder="Telefone do requerido (se souber)" value={requeridoTelefone} onChange={(e) => handleNumericInput(e, setRequeridoTelefone)} className="input" />
           <div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <input
-                type="text"
-                placeholder="Nacionalidade (se souber)"
-                value={requeridoNacionalidade}
-                onChange={(e) => setRequeridoNacionalidade(e.target.value)}
-                className="input"
-              />
-              <input
-                type="text"
-                placeholder="Estado civil"
-                value={requeridoEstadoCivil}
-                onChange={(e) => setRequeridoEstadoCivil(e.target.value)}
-                className="input"
-              />
-              <input
-                type="text"
-                placeholder="Profissao ou ocupacao"
-                value={requeridoOcupacao}
-                onChange={(e) => setRequeridoOcupacao(e.target.value)}
-                className="input"
-              />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <input
-                type="text"
-                placeholder="Endereco profissional (se souber)"
-                value={requeridoEnderecoProfissional}
-                onChange={(e) => setRequeridoEnderecoProfissional(e.target.value)}
-                className="input"
-              />
-              <input
-                type="email"
-                placeholder="Email do requerido"
-                value={requeridoEmail}
-                onChange={(e) => setRequeridoEmail(e.target.value)}
-                className="input"
-              />
-            </div>
-            <input
-              type="tel"
-              placeholder="Telefone do requerido (se souber)"
-              value={requeridoTelefone}
-              onChange={(e) => handleNumericInput(e, setRequeridoTelefone)}
-              className="input"
-            />
             <textarea
                 placeholder="Dados Adicionais do(a) Requerido(a) (RG, Nacionalidade, Estado Civil, Profissão, se souber)"
                 value={dadosAdicionaisRequerido}
