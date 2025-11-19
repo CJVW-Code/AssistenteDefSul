@@ -262,6 +262,7 @@ Regras obrigat\u00f3rias:
 5. Destaque apenas fatos relevantes ao conflito e \u00e0 solu\u00e7\u00e3o judicial.
 6. Indique, ao final, as provas/documentos existentes que sustentam os fatos.
 7. Produza entre 3 e 5 par\u00e1grafos e evite repetir informa\u00e7\u00f5es.
+8. N\u00e3o utilize termos como \"menor\" ou \"incapaz\" para se referir \u00e0 pessoa em desenvolvimento; prefira \"crian\u00e7a\" ou \"adolescente\", conforme a idade indicada nos dados do caso.
 
 Dados do caso:
 - Assistido: ${cleanText(

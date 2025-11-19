@@ -165,7 +165,7 @@ export const DetalhesCaso = () => {
         <div className="space-y-6">
           <div className="bg-slate-800/50 p-6 rounded-xl border border-slate-700">
             <h2 className="text-2xl text-white font-bold mb-4">
-              Rascunho da Petição Inicial (Gerado por IA)
+              Rascunho da Petição Inicial
             </h2>
             {/* Usamos <pre> para manter a formataÃ§Ã£o do texto gerado pela IA */}
             <pre className="whitespace-pre-wrap text-sm font-mono bg-slate-900 text-white p-4 rounded-md overflow-x-auto">
