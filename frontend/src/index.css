@@ -17,11 +17,11 @@
 
   /* Surfaces & text */
   --color-bg: #f5f7f8;
-  --color-surface: #ffffff;
-  --color-border: #d8dee4;
+  --color-surface: #f5f5f5;
+  --color-border: #9fa0a0;
 
-  --color-text: #1e2a33;
-  --color-text-muted: #555f6a;
+  --color-text: #000000;
+  --color-text-muted: #4f5152;
 
   /* Feedback */
   --color-success: #1fa97c;

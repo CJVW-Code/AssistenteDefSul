@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useEffect } from "react";
+﻿import React, { useState, useRef, useReducer } from "react";
 import { motion } from "framer-motion";
 import {
   User,
@@ -14,117 +14,117 @@ import {
 } from "lucide-react";
 import { documentosPorAcao } from "../../../data/documentos.js";
 import { API_BASE } from "../../../utils/apiBase";
+
+// 1. Definir o estado inicial em um único objeto
+const initialState = {
+  nome: "",
+  cpf: "",
+  telefone: "",
+  tipoAcao: "familia",
+  relato: "",
+  documentFiles: [],
+  acaoEspecifica: "",
+  documentosMarcados: [],
+  enderecoAssistido: "",
+  emailAssistido: "",
+  assistido_RG: "",
+  varaCompetente: "",
+  assistidoEhIncapaz: "nao",
+  assistidoNacionalidade: "",
+  assistidoEstadoCivil: "",
+  assistidoOcupacao: "",
+  dataNascimentoAssistido: "",
+  enderecoProfissionalAssistido: "",
+  representanteNome: "",
+  representanteNacionalidade: "",
+  representanteEstadoCivil: "",
+  representanteOcupacao: "",
+  representanteCpf: "",
+  representanteEnderecoResidencial: "",
+  representanteEnderecoProfissional: "",
+  representanteEmail: "",
+  representanteTelefone: "",
+  nomeRequerido: "",
+  cpfRequerido: "",
+  enderecoRequerido: "",
+  dadosAdicionaisRequerido: "",
+  requeridoNacionalidade: "",
+  requeridoEstadoCivil: "",
+  requeridoOcupacao: "",
+  requeridoEnderecoProfissional: "",
+  requeridoEmail: "",
+  requeridoTelefone: "",
+  filhosInfo: "",
+  dataInicioRelacao: "",
+  dataSeparacao: "",
+  bensPartilha: "",
+  descricaoGuarda: "",
+  situacaoFinanceiraGenitora: "",
+  percentualSmRequerido: "",
+  percentualDespesasExtra: "",
+  diaPagamentoRequerido: "",
+  dadosBancariosDeposito: "",
+  valorProvisorioReferencia: "",
+  percentualDefinitivoSalarioMin: "",
+  percentualDefinitivoExtras: "",
+  requeridoTemEmpregoFormal: "",
+  empregadorRequeridoNome: "",
+  empregadorRequeridoEndereco: "",
+  empregadorEmail: "",
+  numeroProcessoOriginario: "",
+  varaOriginaria: "",
+  processoTituloNumero: "",
+  percentualOuValorFixado: "",
+  diaPagamentoFixado: "",
+  periodoDebitoExecucao: "",
+  valorTotalDebitoExecucao: "",
+  valorTotalExtenso: "",
+  valorDebitoExtenso: "",
+  regimeBens: "",
+  retornoNomeSolteira: "",
+  alimentosParaExConjuge: "",
+  valorCausa: "",
+  valorCausaExtenso: "",
+  cidadeAssinatura: "",
+  audioBlob: null,
+};
+
+// 2. Criar a função reducer para gerenciar as atualizações de estado
+function formReducer(state, action) {
+  switch (action.type) {
+    case 'UPDATE_FIELD':
+      return { ...state, [action.field]: action.value };
+    case 'RESET_FORM':
+      return { ...initialState, documentFiles: [], documentosMarcados: [] }; // Mantém alguns estados de controle se necessário
+    default:
+      throw new Error(`Ação desconhecida: ${action.type}`);
+  }
+}
+
+const nacionalidadeOptions = [
+  { value: "", label: "Nacionalidade" },
+  { value: "brasileira", label: "Brasileiro(a)" },
+  { value: "estrangeira", label: "Estrangeiro(a)" },
+];
+
+const estadoCivilOptions = [
+  { value: "", label: "Estado Civil" },
+  { value: "solteiro", label: "Solteiro(a)" },
+  { value: "casado", label: "Casado(a)" },
+  { value: "divorciado", label: "Divorciado(a)" },
+  { value: "viuvo", label: "Viúvo(a)" },
+  { value: "uniao_estavel", label: "União Estável" },
+];
+
 export const FormularioSubmissao = () => {
-  // --- ESTADOS DO FORMULÃRIO ---
-  const [nome, setNome] = useState("");
-  const [cpf, setCpf] = useState("");
-  const [telefone, setTelefone] = useState("");
-  const [tipoAcao, setTipoAcao] = useState("familia"); // Quando for adicionar outras areas, Remover
-  const [relato, setRelato] = useState("");
-  const [documentFiles, setDocumentFiles] = useState([]);
+  // 3. Usar o hook useReducer em vez de múltiplos useState
+  const [formState, dispatch] = useReducer(formReducer, initialState);
+
+  // Estados de controle da UI permanecem separados
   const [statusMessage, setStatusMessage] = useState("");
-  const [acaoEspecifica, setAcaoEspecifica] = useState("");
-  const [documentosMarcados, setDocumentosMarcados] = useState([]);
-
-  // --- NOVOS ESTADOS PARA DADOS ADICIONAIS ---
-  const [enderecoAssistido, setEnderecoAssistido] = useState("");
-  const [emailAssistido, setEmailAssistido] = useState("");
-  const [assistido_RG, assistidoRG] =
-    useState("");
-  const [varaCompetente, setVaraCompetente] = useState("");
-  const [assistidoEhIncapaz, setAssistidoEhIncapaz] = useState("nao");
-  const [assistidoNacionalidade, setAssistidoNacionalidade] = useState("");
-  const [assistidoEstadoCivil, setAssistidoEstadoCivil] = useState("");
-  const [assistidoOcupacao, setAssistidoOcupacao] = useState("");
-  const [dataNascimentoAssistido, setDataNascimentoAssistido] = useState("");
-  const [
-    enderecoProfissionalAssistido,
-    setEnderecoProfissionalAssistido,
-  ] = useState("");
-
-  const [representanteNome, setRepresentanteNome] = useState("");
-  const [representanteNacionalidade, setRepresentanteNacionalidade] =
-    useState("");
-  const [representanteEstadoCivil, setRepresentanteEstadoCivil] =
-    useState("");
-  const [representanteOcupacao, setRepresentanteOcupacao] = useState("");
-  const [representanteCpf, setRepresentanteCpf] = useState("");
-  const [
-    representanteEnderecoResidencial,
-    setRepresentanteEnderecoResidencial,
-  ] = useState("");
-  const [
-    representanteEnderecoProfissional,
-    setRepresentanteEnderecoProfissional,
-  ] = useState("");
-  const [representanteEmail, setRepresentanteEmail] = useState("");
-  const [representanteTelefone, setRepresentanteTelefone] = useState("");
-
-  const [nomeRequerido, setNomeRequerido] = useState("");
-  const [cpfRequerido, setCpfRequerido] = useState("");
-  const [enderecoRequerido, setEnderecoRequerido] = useState("");
-  const [dadosAdicionaisRequerido, setDadosAdicionaisRequerido] = useState("");
-  const [requeridoNacionalidade, setRequeridoNacionalidade] = useState("");
-  const [requeridoEstadoCivil, setRequeridoEstadoCivil] = useState("");
-  const [requeridoOcupacao, setRequeridoOcupacao] = useState("");
-  const [requeridoEnderecoProfissional, setRequeridoEnderecoProfissional] =
-    useState("");
-  const [requeridoEmail, setRequeridoEmail] = useState("");
-  const [requeridoTelefone, setRequeridoTelefone] = useState("");
-
-  const [filhosInfo, setFilhosInfo] = useState("");
-  const [dataInicioRelacao, setDataInicioRelacao] = useState("");
-  const [dataSeparacao, setDataSeparacao] = useState("");
-  const [bensPartilha, setBensPartilha] = useState("");
-  const [descricaoGuarda, setDescricaoGuarda] = useState("");
-  const [situacaoFinanceiraGenitora, setSituacaoFinanceiraGenitora] =
-    useState("");
-
-  // --- CAMPOS ESPECÍFICOS: FIXAÇÃO/OFERTA DE ALIMENTOS ---
-  const [percentualSmRequerido, setPercentualSmRequerido] = useState("");
-  const [percentualDespesasExtra, setPercentualDespesasExtra] = useState("");
-  const [diaPagamentoRequerido, setDiaPagamentoRequerido] = useState("");
-  const [dadosBancariosDeposito, setDadosBancariosDeposito] = useState("");
-  const [valorProvisorioReferencia, setValorProvisorioReferencia] =
-    useState("");
-  const [
-    percentualDefinitivoSalarioMin,
-    setPercentualDefinitivoSalarioMin,
-  ] = useState("");
-  const [percentualDefinitivoExtras, setPercentualDefinitivoExtras] =
-    useState("");
-  const [requeridoTemEmpregoFormal, setRequeridoTemEmpregoFormal] =
-    useState(""); // "sim" | "nao" | "nao_sei"
-  const [empregadorRequeridoNome, setEmpregadorRequeridoNome] = useState("");
-  const [empregadorRequeridoEndereco, setEmpregadorRequeridoEndereco] =
-    useState("");
-  const [empregadorEmail, setEmpregadorEmail] = useState("");
-  const mostrarRepresentante = assistidoEhIncapaz === "sim";
-
-  // --- CAMPOS ESPECÍFICOS: EXECUÇÃO DE ALIMENTOS ---
-  const [numeroProcessoOriginario, setNumeroProcessoOriginario] = useState("");
-  const [varaOriginaria, setVaraOriginaria] = useState("");
-  const [processoTituloNumero, setProcessoTituloNumero] = useState("");
-  const [percentualOuValorFixado, setPercentualOuValorFixado] = useState("");
-  const [diaPagamentoFixado, setDiaPagamentoFixado] = useState("");
-  const [periodoDebitoExecucao, setPeriodoDebitoExecucao] = useState("");
-  const [valorTotalDebitoExecucao, setValorTotalDebitoExecucao] = useState("");
-  const [valorTotalExtenso, setValorTotalExtenso] = useState("");
-  const [valorDebitoExtenso, setValorDebitoExtenso] = useState("");
-
-  // --- CAMPOS ESPECÍFICOS: DIVÓRCIO ---
-  const [regimeBens, setRegimeBens] = useState("");
-  const [retornoNomeSolteira, setRetornoNomeSolteira] = useState("");
-  const [alimentosParaExConjuge, setAlimentosParaExConjuge] = useState("");
-
-  // --- CAMPOS GERAIS PARA DOCUMENTOS ---
-  const [valorCausa, setValorCausa] = useState("");
-  const [valorCausaExtenso, setValorCausaExtenso] = useState("");
-  const [cidadeAssinatura, setCidadeAssinatura] = useState("");
 
   // --- ESTADOS DA GRAVAÃ‡ÃƒO DE ÃUDIO ---
   const [isRecording, setIsRecording] = useState(false);
-  const [audioBlob, setAudioBlob] = useState(null); // Armazena o Ã¡udio gravado como Blob
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
 
@@ -133,6 +133,12 @@ export const FormularioSubmissao = () => {
   const [generatedCredentials, setGeneratedCredentials] = useState(null);
   const documentInputRef = useRef(null);
 
+  // 4. Criar um handler genérico para atualizar os campos
+  const handleFieldChange = (e) => {
+    dispatch({ type: 'UPDATE_FIELD', field: e.target.name, value: e.target.value });
+  };
+
+  const { tipoAcao, acaoEspecifica } = formState;
   const acoesDisponiveis =
     tipoAcao && documentosPorAcao[tipoAcao]
       ? Object.keys(documentosPorAcao[tipoAcao])
@@ -161,24 +167,25 @@ export const FormularioSubmissao = () => {
       : acoesDisponiveis;
 
   // Mostrar dados do Requerido apenas quando a aÃ§Ã£o exigir
-  const shouldShowRequerido = !acaoEspecifica
+  const shouldShowRequerido = !formState.acaoEspecifica
     ? true
-    : !acaoEspecifica.toLowerCase().includes("alvar");
+    : !formState.acaoEspecifica.toLowerCase().includes("alvar");
 
   // --- HELPERS DE CONDIÇÃO POR AÇÃO ESPECÍFICA ---
-  const acaoNorm = (acaoEspecifica || "").toLowerCase();
+  const acaoNorm = (formState.acaoEspecifica || "").toLowerCase();
   const isFixacaoOuOferta = acaoNorm.includes("fixa") || acaoNorm.includes("oferta");
   const isExecucao = acaoNorm.includes("execu");
   const isDivorcio = acaoNorm.includes("divór") || acaoNorm.includes("divor");
   const showFixacaoBaseFields = isFixacaoOuOferta || isExecucao;
-  const mostrarEmpregador = requeridoTemEmpregoFormal === "sim";
+  const mostrarRepresentante = formState.assistidoEhIncapaz === "sim";
+  const mostrarEmpregador = formState.requeridoTemEmpregoFormal === "sim";
 
   // --- LÃ“GICA DE VALIDAÃ‡ÃƒO DE INPUT ---
-  const handleNumericInput = (e, setter) => {
+  const handleNumericInput = (e) => {
     const value = e.target.value;
-    // Permite apenas nÃºmeros e um campo vazio
+    // Permite apenas números e um campo vazio
     if (/^[0-9]*$/.test(value)) {
-      setter(value);
+      handleFieldChange(e);
     }
   };
 
@@ -196,7 +203,7 @@ export const FormularioSubmissao = () => {
         const audioBlob = new Blob(audioChunksRef.current, {
           type: "audio/webm",
         });
-        setAudioBlob(audioBlob);
+        dispatch({ type: 'UPDATE_FIELD', field: 'audioBlob', value: audioBlob });
         audioChunksRef.current = [];
       };
 
@@ -216,19 +223,18 @@ export const FormularioSubmissao = () => {
   };
 
   const removeAudioRecording = () => {
-    setAudioBlob(null);
+    dispatch({ type: 'UPDATE_FIELD', field: 'audioBlob', value: null });
   };
 
   // --- LÃ“GICA DE UPLOAD DE ARQUIVOS ---
   const handleDocumentChange = (e) => {
     const novosArquivos = Array.from(e.target.files);
-    setDocumentFiles((prevFiles) => [...prevFiles, ...novosArquivos]);
+    dispatch({ type: 'UPDATE_FIELD', field: 'documentFiles', value: [...formState.documentFiles, ...novosArquivos] });
   };
 
   const removeDocument = (fileName) => {
-    setDocumentFiles((prevFiles) =>
-      prevFiles.filter((file) => file.name !== fileName)
-    );
+    const updatedFiles = formState.documentFiles.filter((file) => file.name !== fileName);
+    dispatch({ type: 'UPDATE_FIELD', field: 'documentFiles', value: updatedFiles });
   };
 
   // --- LÃ“GICA DE GERAÃ‡ÃƒO DE CREDENCIAIS ---
@@ -266,9 +272,11 @@ export const FormularioSubmissao = () => {
   const handleCheckboxChange = (e) => {
     const { name, checked } = e.target;
     if (checked) {
-      setDocumentosMarcados((prev) => [...prev, name]);
+      const newDocs = [...formState.documentosMarcados, name];
+      dispatch({ type: 'UPDATE_FIELD', field: 'documentosMarcados', value: newDocs });
     } else {
-      setDocumentosMarcados((prev) => prev.filter((doc) => doc !== name));
+      const newDocs = formState.documentosMarcados.filter((doc) => doc !== name);
+      dispatch({ type: 'UPDATE_FIELD', field: 'documentosMarcados', value: newDocs });
     }
   };
 
@@ -295,117 +303,22 @@ export const FormularioSubmissao = () => {
       ),
     ];
     const formData = new FormData();
-    formData.append("nome", nome);
-    formData.append("cpf", cpf);
-    formData.append("telefone", telefone);
-    formData.append("tipoAcao", `${tipoAcao} - ${acaoEspecifica}`);
-    formData.append("relato", relato);
-    formData.append(
-      "documentos_informados",
-      JSON.stringify(documentosMarcados)
-    );
-    // --- ADICIONA OS NOVOS CAMPOS AO FORMDATA ---
-    formData.append("endereco_assistido", enderecoAssistido);
-    formData.append("email_assistido", emailAssistido);
-    formData.append("nome_requerido", nomeRequerido);
-    formData.append("cpf_requerido", cpfRequerido);
-    formData.append("endereco_requerido", enderecoRequerido);
-    formData.append("dados_adicionais_requerido", dadosAdicionaisRequerido);
-    formData.append("vara_competente", varaCompetente);
-    formData.append("assistido_eh_incapaz", assistidoEhIncapaz);
-    formData.append("assistido_nacionalidade", assistidoNacionalidade);
-    formData.append("assistido_estado_civil", assistidoEstadoCivil);
-    formData.append("assistido_ocupacao", assistidoOcupacao);
-    formData.append("assistido_data_nascimento", dataNascimentoAssistido);
-    formData.append(
-      "assistido_endereco_profissional",
-      enderecoProfissionalAssistido
-    );
-    formData.append("assistido_RG", assistidoRG);
-    formData.append("representante_nome", representanteNome);
-    formData.append("representante_nacionalidade", representanteNacionalidade);
-    formData.append("representante_estado_civil", representanteEstadoCivil);
-    formData.append("representante_ocupacao", representanteOcupacao);
-    formData.append("representante_cpf", representanteCpf);
-    formData.append(
-      "representante_endereco_residencial",
-      representanteEnderecoResidencial
-    );
-    formData.append(
-      "representante_endereco_profissional",
-      representanteEnderecoProfissional
-    );
-    formData.append("representante_email", representanteEmail);
-    formData.append("representante_telefone", representanteTelefone);
-    formData.append("requerido_nacionalidade", requeridoNacionalidade);
-    formData.append("requerido_estado_civil", requeridoEstadoCivil);
-    formData.append("requerido_ocupacao", requeridoOcupacao);
-    formData.append(
-      "requerido_endereco_profissional",
-      requeridoEnderecoProfissional
-    );
-    formData.append("requerido_email", requeridoEmail);
-    formData.append("requerido_telefone", requeridoTelefone);
-    formData.append("filhos_info", filhosInfo);
-    formData.append("data_inicio_relacao", dataInicioRelacao);
-    formData.append("data_separacao", dataSeparacao);
-    formData.append("bens_partilha", bensPartilha);
-    formData.append("descricao_guarda", descricaoGuarda);
-    formData.append(
-      "situacao_financeira_genitora",
-      situacaoFinanceiraGenitora
-    );
-    // --- CAMPOS ESPECÍFICOS: FIXAÇÃO/OFERTA (também usados na Execução) ---
-    formData.append("percentual_sm_requerido", percentualSmRequerido);
-    formData.append("percentual_despesas_extra", percentualDespesasExtra);
-    formData.append("dia_pagamento_requerido", diaPagamentoRequerido);
-    formData.append("dados_bancarios_deposito", dadosBancariosDeposito);
-    formData.append(
-      "valor_provisorio_referencia",
-      valorProvisorioReferencia
-    );
-    formData.append(
-      "percentual_definitivo_salario_min",
-      percentualDefinitivoSalarioMin
-    );
-    formData.append(
-      "percentual_definitivo_extras",
-      percentualDefinitivoExtras
-    );
-    formData.append(
-      "requerido_tem_emprego_formal",
-      requeridoTemEmpregoFormal
-    );
-    formData.append("empregador_requerido_nome", empregadorRequeridoNome);
-    formData.append(
-      "empregador_requerido_endereco",
-      empregadorRequeridoEndereco
-    );
-    formData.append("empregador_email", empregadorEmail);
-    // --- CAMPOS ESPECÍFICOS: EXECUÇÃO ---
-    formData.append("numero_processo_originario", numeroProcessoOriginario);
-    formData.append("vara_originaria", varaOriginaria);
-    formData.append("processo_titulo_numero", processoTituloNumero);
-    formData.append("percentual_ou_valor_fixado", percentualOuValorFixado);
-    formData.append("dia_pagamento_fixado", diaPagamentoFixado);
-    formData.append("periodo_debito_execucao", periodoDebitoExecucao);
-    formData.append("valor_total_debito_execucao", valorTotalDebitoExecucao);
-    formData.append("valor_total_extenso", valorTotalExtenso);
-    formData.append("valor_debito_extenso", valorDebitoExtenso);
-    // --- CAMPOS ESPECÍFICOS: DIVÓRCIO ---
-    formData.append("regime_bens", regimeBens);
-    formData.append("retorno_nome_solteira", retornoNomeSolteira);
-    formData.append("alimentos_para_ex_conjuge", alimentosParaExConjuge);
-    formData.append("valor_causa", valorCausa);
-    formData.append("valor_causa_extenso", valorCausaExtenso);
-    formData.append("cidade_assinatura", cidadeAssinatura);
+
+    // Adiciona todos os campos do estado ao formData
+    for (const key in formState) {
+      if (key !== 'documentFiles' && key !== 'documentosMarcados' && key !== 'audioBlob') {
+        formData.append(key, formState[key]);
+      }
+    }
+    formData.append("documentos_informados", JSON.stringify(formState.documentosMarcados));
+
     // Anexa o Ã¡udio gravado, se existir
-    if (audioBlob) {
-      formData.append("audio", audioBlob, "gravacao.webm");
+    if (formState.audioBlob) {
+      formData.append("audio", formState.audioBlob, "gravacao.webm");
     }
 
     // Anexa todos os documentos
-    documentFiles.forEach((file) => {
+    formState.documentFiles.forEach((file) => {
       formData.append("documentos", file);
     });
 
@@ -439,75 +352,7 @@ export const FormularioSubmissao = () => {
 
   const resetForm = () => {
     console.log("BotÃ£o clicado! A função resetForm foi chamada.");
-    setNome("");
-    setCpf("");
-    setTelefone("");
-    setTipoAcao("");
-    setRelato("");
-    // limpar novos campos adicionados
-    setEnderecoAssistido("");
-    setEmailAssistido("");
-    setVaraCompetente("");
-    setAssistidoEhIncapaz("nao");
-    setAssistidoNacionalidade("");
-    setAssistidoEstadoCivil("");
-    setAssistidoOcupacao("");
-    setDataNascimentoAssistido("");
-    setEnderecoProfissionalAssistido("");
-    setRepresentanteNome("");
-    setRepresentanteNacionalidade("");
-    setRepresentanteEstadoCivil("");
-    setRepresentanteOcupacao("");
-    setRepresentanteCpf("");
-    setRepresentanteEnderecoResidencial("");
-    setRepresentanteEnderecoProfissional("");
-    setRepresentanteEmail("");
-    setRepresentanteTelefone("");
-    setNomeRequerido("");
-    setCpfRequerido("");
-    setEnderecoRequerido("");
-    setDadosAdicionaisRequerido("");
-    setRequeridoNacionalidade("");
-    setRequeridoEstadoCivil("");
-    setRequeridoOcupacao("");
-    setRequeridoEnderecoProfissional("");
-    setRequeridoEmail("");
-    setRequeridoTelefone("");
-    setFilhosInfo("");
-    setDataInicioRelacao("");
-    setDataSeparacao("");
-    setBensPartilha("");
-    setDescricaoGuarda("");
-    setSituacaoFinanceiraGenitora("");
-    // limpar campos específicos
-    setPercentualSmRequerido("");
-    setPercentualDespesasExtra("");
-    setDiaPagamentoRequerido("");
-    setDadosBancariosDeposito("");
-    setValorProvisorioReferencia("");
-    setPercentualDefinitivoSalarioMin("");
-    setPercentualDefinitivoExtras("");
-    setRequeridoTemEmpregoFormal("");
-    setEmpregadorRequeridoNome("");
-    setEmpregadorRequeridoEndereco("");
-    setEmpregadorEmail("");
-    setNumeroProcessoOriginario("");
-    setVaraOriginaria("");
-    setProcessoTituloNumero("");
-    setPercentualOuValorFixado("");
-    setDiaPagamentoFixado("");
-    setPeriodoDebitoExecucao("");
-    setValorTotalDebitoExecucao("");
-    setValorTotalExtenso("");
-    setValorDebitoExtenso("");
-    setRegimeBens("");
-    setRetornoNomeSolteira("");
-    setAlimentosParaExConjuge("");
-    setValorCausa("");
-    setValorCausaExtenso("");
-    setCidadeAssinatura("");
-    setAudioBlob(null);
-    setDocumentFiles([]);
+    dispatch({ type: 'RESET_FORM' });
     setGeneratedCredentials(null); // Isso tambÃ©m esconderÃ¡ a tela de sucesso
   };
   return (
@@ -571,9 +416,10 @@ export const FormularioSubmissao = () => {
               <input
                 type="text"
                 placeholder="Nome Completo"
-                value={nome}
-                onChange={(e) => setNome(e.target.value)}
+                value={formState.nome}
+                onChange={handleFieldChange}
                 required
+                name="nome"
                 className="input pl-10"
               />
             </div>
@@ -585,9 +431,10 @@ export const FormularioSubmissao = () => {
               <input
                 type="text"
                 placeholder="CPF (apenas números)"
-                value={cpf}
-                onChange={(e) => handleNumericInput(e, setCpf)}
+                value={formState.cpf}
+                onChange={handleNumericInput}
                 required
+                name="cpf"
                 className="input pl-10"
               />
             </div>
@@ -601,9 +448,10 @@ export const FormularioSubmissao = () => {
             <input
               type="tel"
               placeholder="Telefone (apenas números)"
-              value={telefone}
-              onChange={(e) => handleNumericInput(e, setTelefone)}
+              value={formState.telefone}
+              onChange={handleNumericInput}
               required
+              name="telefone"
               className="input pl-10"
             />
           </div>
@@ -614,25 +462,28 @@ export const FormularioSubmissao = () => {
             <input
               type="email"
               placeholder="Seu Email (opcional)"
-              value={emailAssistido}
-              onChange={(e) => setEmailAssistido(e.target.value)}
+              value={formState.emailAssistido}
+              onChange={handleFieldChange}
+              name="emailAssistido"
               className="input"
             />
             <input
               type="text"
               placeholder="Seu Endereço Completo"
-              value={enderecoAssistido}
-              onChange={(e) => setEnderecoAssistido(e.target.value)}
+              value={formState.enderecoAssistido}
+              onChange={handleFieldChange}
               required
+              name="enderecoAssistido"
               className="input"
             />
           </div>
           <div>
             <textarea
               placeholder="Insira seu RG: Ex:00.000.000-00"
-              value={assistido_RG}
-              onChange={(e) => assistidoRG(e.target.value)}
+              value={formState.assistido_RG}
+              onChange={handleFieldChange}
               rows="3"
+              name="assistido_RG"
               className="input"
             ></textarea>
             
@@ -643,21 +494,25 @@ export const FormularioSubmissao = () => {
             <div className="bg-surface p-4 rounded-lg border border-soft space-y-4">
               <h3 className="heading-3">Dados do representante legal</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <input type="text" placeholder="Nome completo do representante" value={representanteNome} onChange={(e) => setRepresentanteNome(e.target.value)} className="input" />
-                <input type="text" placeholder="CPF (apenas números)" value={representanteCpf} onChange={(e) => handleNumericInput(e, setRepresentanteCpf)} className="input" />
+                <input type="text" placeholder="Nome completo do representante" name="representanteNome" value={formState.representanteNome} onChange={handleFieldChange} className="input" />
+                <input type="text" placeholder="CPF (apenas números)" name="representanteCpf" value={formState.representanteCpf} onChange={handleNumericInput} className="input" />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <input type="text" placeholder="Nacionalidade" value={representanteNacionalidade} onChange={(e) => setRepresentanteNacionalidade(e.target.value)} className="input" />
-                <input type="text" placeholder="Estado civil" value={representanteEstadoCivil} onChange={(e) => setRepresentanteEstadoCivil(e.target.value)} className="input" />
-                <input type="text" placeholder="Profissão" value={representanteOcupacao} onChange={(e) => setRepresentanteOcupacao(e.target.value)} className="input" />
+                <select name="representanteNacionalidade" value={formState.representanteNacionalidade} onChange={handleFieldChange} className="input">
+                  {nacionalidadeOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                </select>
+                <select name="representanteEstadoCivil" value={formState.representanteEstadoCivil} onChange={handleFieldChange} className="input">
+                  {estadoCivilOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                </select>
+                <input type="text" placeholder="Profissão" name="representanteOcupacao" value={formState.representanteOcupacao} onChange={handleFieldChange} className="input" />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <input type="text" placeholder="Endereço residencial" value={representanteEnderecoResidencial} onChange={(e) => setRepresentanteEnderecoResidencial(e.target.value)} className="input" />
-                <input type="text" placeholder="Endereço profissional" value={representanteEnderecoProfissional} onChange={(e) => setRepresentanteEnderecoProfissional(e.target.value)} className="input" />
+                <input type="text" placeholder="Endereço residencial" name="representanteEnderecoResidencial" value={formState.representanteEnderecoResidencial} onChange={handleFieldChange} className="input" />
+                <input type="text" placeholder="Endereço profissional" name="representanteEnderecoProfissional" value={formState.representanteEnderecoProfissional} onChange={handleFieldChange} className="input" />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <input type="email" placeholder="Email do representante" value={representanteEmail} onChange={(e) => setRepresentanteEmail(e.target.value)} className="input" />
-                <input type="tel" placeholder="Telefone do representante" value={representanteTelefone} onChange={(e) => handleNumericInput(e, setRepresentanteTelefone)} className="input" />
+                <input type="email" placeholder="Email do representante" name="representanteEmail" value={formState.representanteEmail} onChange={handleFieldChange} className="input" />
+                <input type="tel" placeholder="Telefone do representante" name="representanteTelefone" value={formState.representanteTelefone} onChange={handleNumericInput} className="input" />
               </div>
             </div>
           )}
@@ -666,8 +521,9 @@ export const FormularioSubmissao = () => {
             <h3 className="heading-3">Informacoes complementares do assistido</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <select
-                value={assistidoEhIncapaz}
-                onChange={(e) => setAssistidoEhIncapaz(e.target.value)}
+                value={formState.assistidoEhIncapaz}
+                onChange={handleFieldChange}
+                name="assistidoEhIncapaz"
                 className="input"
               >
                 <option value="nao">Sou o proprio interessado</option>
@@ -675,39 +531,44 @@ export const FormularioSubmissao = () => {
               </select>
               <input
                 type="date"
-                value={dataNascimentoAssistido}
-                onChange={(e) => setDataNascimentoAssistido(e.target.value)}
+                value={formState.dataNascimentoAssistido}
+                onChange={handleFieldChange}
+                name="dataNascimentoAssistido"
                 className="input"
                 placeholder="Data de nascimento"
               />
-              <input
-                type="text"
-                value={assistidoNacionalidade}
-                onChange={(e) => setAssistidoNacionalidade(e.target.value)}
+              <select
+                value={formState.assistidoNacionalidade}
+                onChange={handleFieldChange}
+                name="assistidoNacionalidade"
                 className="input"
-                placeholder="Nacionalidade"
-              />
+              >
+                {nacionalidadeOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+              </select>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <input
-                type="text"
-                value={assistidoEstadoCivil}
-                onChange={(e) => setAssistidoEstadoCivil(e.target.value)}
+              <select
+                value={formState.assistidoEstadoCivil}
+                onChange={handleFieldChange}
+                name="assistidoEstadoCivil"
                 className="input"
-                placeholder="Estado civil"
-              />
+              >
+                {estadoCivilOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+              </select>
               <input
                 type="text"
-                value={assistidoOcupacao}
-                onChange={(e) => setAssistidoOcupacao(e.target.value)}
+                value={formState.assistidoOcupacao}
+                onChange={handleFieldChange}
+                name="assistidoOcupacao"
                 className="input"
                 placeholder="Profissao ou ocupacao"
               />
             </div>
             <input
               type="text"
-              value={enderecoProfissionalAssistido}
-              onChange={(e) => setEnderecoProfissionalAssistido(e.target.value)}
+              value={formState.enderecoProfissionalAssistido}
+              onChange={handleFieldChange}
+              name="enderecoProfissionalAssistido"
               className="input"
               placeholder="Endereco profissional (se houver)"
             />
@@ -719,12 +580,12 @@ export const FormularioSubmissao = () => {
 
           <div>
             <select
-              value={tipoAcao}
+              value={formState.tipoAcao}
               onChange={(e) => {
-                setTipoAcao(e.target.value);
-                setAcaoEspecifica("");
-                setDocumentosMarcados([]);
+                dispatch({ type: 'UPDATE_FIELD', field: 'tipoAcao', value: e.target.value });
+                dispatch({ type: 'UPDATE_FIELD', field: 'acaoEspecifica', value: '' });
               }}
+              name="tipoAcao"
               required
               className="input"
             >
@@ -740,9 +601,10 @@ export const FormularioSubmissao = () => {
             </select>
             {/*{tipoAcao && (*/}
             <select
-              value={acaoEspecifica}
-              onChange={(e) => setAcaoEspecifica(e.target.value)}
+              value={formState.acaoEspecifica}
+              onChange={handleFieldChange}
               required
+              name="acaoEspecifica"
               className="input mt-5"
             >
               <option value="" disabled>
@@ -767,40 +629,48 @@ export const FormularioSubmissao = () => {
               <input
                 type="text"
                 placeholder="Nome Completo do(a) Requerido(a)"
-                value={nomeRequerido}
-                onChange={(e) => setNomeRequerido(e.target.value)}
+                value={formState.nomeRequerido}
+                onChange={handleFieldChange}
+                name="nomeRequerido"
                 className="input"
               />
               <input
                 type="text"
                 placeholder="CPF do(a) Requerido(a) (apenas números, se souber)"
-                value={cpfRequerido}
-                onChange={(e) => handleNumericInput(e, setCpfRequerido)}
+                value={formState.cpfRequerido}
+                onChange={handleNumericInput}
+                name="cpfRequerido"
                 className="input"
               />
             </div>
             <input
               type="text"
-              placeholder="Endereço Completo do(a) Requerido(a) (se souber)"
-              value={enderecoRequerido}
-              onChange={(e) => setEnderecoRequerido(e.target.value)}
+              placeholder="Endereço Residencial do(a) Requerido(a) (se souber)"
+              value={formState.enderecoRequerido}
+              onChange={handleFieldChange}
+              name="enderecoRequerido"
               className="input"
             />
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <input type="text" placeholder="Nacionalidade (se souber)" value={requeridoNacionalidade} onChange={(e) => setRequeridoNacionalidade(e.target.value)} className="input" />
-              <input type="text" placeholder="Estado civil" value={requeridoEstadoCivil} onChange={(e) => setRequeridoEstadoCivil(e.target.value)} className="input" />
-              <input type="text" placeholder="Profissão ou ocupação" value={requeridoOcupacao} onChange={(e) => setRequeridoOcupacao(e.target.value)} className="input" />
+              <select name="requeridoNacionalidade" value={formState.requeridoNacionalidade} onChange={handleFieldChange} className="input">
+                {nacionalidadeOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+              </select>
+              <select name="requeridoEstadoCivil" value={formState.requeridoEstadoCivil} onChange={handleFieldChange} className="input">
+                {estadoCivilOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+              </select>
+              <input type="text" placeholder="Profissão ou ocupação" name="requeridoOcupacao" value={formState.requeridoOcupacao} onChange={handleFieldChange} className="input" />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <input type="text" placeholder="Endereço profissional (se souber)" value={requeridoEnderecoProfissional} onChange={(e) => setRequeridoEnderecoProfissional(e.target.value)} className="input" />
-              <input type="email" placeholder="Email do requerido" value={requeridoEmail} onChange={(e) => setRequeridoEmail(e.target.value)} className="input" />
+              <input type="text" placeholder="Endereço profissional (se souber)" name="requeridoEnderecoProfissional" value={formState.requeridoEnderecoProfissional} onChange={handleFieldChange} className="input" />
+              <input type="email" placeholder="Email do requerido" name="requeridoEmail" value={formState.requeridoEmail} onChange={handleFieldChange} className="input" />
             </div>
-            <input type="tel" placeholder="Telefone do requerido (se souber)" value={requeridoTelefone} onChange={(e) => handleNumericInput(e, setRequeridoTelefone)} className="input" />
+            <input type="tel" placeholder="Telefone do requerido (se souber)" name="requeridoTelefone" value={formState.requeridoTelefone} onChange={handleNumericInput} className="input" />
           <div>
             <textarea
                 placeholder="Dados Adicionais do(a) Requerido(a) (RG, Nacionalidade, Estado Civil, Profissão, se souber)"
-                value={dadosAdicionaisRequerido}
-                onChange={(e) => setDadosAdicionaisRequerido(e.target.value)}
+                value={formState.dadosAdicionaisRequerido}
+                onChange={handleFieldChange}
+                name="dadosAdicionaisRequerido"
                 rows="3"
                 className="input"
               ></textarea>
@@ -815,9 +685,10 @@ export const FormularioSubmissao = () => {
             <div>
               <textarea
                 placeholder="Filhos (Nome Completo - Data de Nascimento DD/MM/AAAA)"
-                value={filhosInfo}
-                onChange={(e) => setFilhosInfo(e.target.value)}
+                value={formState.filhosInfo}
+                onChange={handleFieldChange}
                 rows="3"
+                name="filhosInfo"
                 className="input"
               ></textarea>
               <p className="text-xs text-muted mt-1">
@@ -832,8 +703,9 @@ export const FormularioSubmissao = () => {
                 </label>
                 <input
                   type="date"
-                  value={dataInicioRelacao}
-                  onChange={(e) => setDataInicioRelacao(e.target.value)}
+                  value={formState.dataInicioRelacao}
+                  onChange={handleFieldChange}
+                  name="dataInicioRelacao"
                   className="input"
                 />
               </div>
@@ -843,8 +715,9 @@ export const FormularioSubmissao = () => {
                 </label>
                 <input
                   type="date"
-                  value={dataSeparacao}
-                  onChange={(e) => setDataSeparacao(e.target.value)}
+                  value={formState.dataSeparacao}
+                  onChange={handleFieldChange}
+                  name="dataSeparacao"
                   className="input"
                 />
               </div>
@@ -852,8 +725,9 @@ export const FormularioSubmissao = () => {
             <div>
               <textarea
                 placeholder="Bens a Partilhar (Descreva os bens adquiridos durante a união/casamento, se houver)"
-                value={bensPartilha}
-                onChange={(e) => setBensPartilha(e.target.value)}
+                value={formState.bensPartilha}
+                onChange={handleFieldChange}
+                name="bensPartilha"
                 rows="3"
                 className="input"
               ></textarea>
@@ -861,15 +735,17 @@ export const FormularioSubmissao = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <textarea
                 placeholder="Descreva como esta a guarda e rotina dos filhos (quem cuida, onde moram, visitas)"
-                value={descricaoGuarda}
-                onChange={(e) => setDescricaoGuarda(e.target.value)}
+                value={formState.descricaoGuarda}
+                onChange={handleFieldChange}
+                name="descricaoGuarda"
                 rows="3"
                 className="input"
               ></textarea>
               <textarea
                 placeholder="Conte a situacao financeira de quem cuida das criancas (renda, despesas, dificuldades)"
-                value={situacaoFinanceiraGenitora}
-                onChange={(e) => setSituacaoFinanceiraGenitora(e.target.value)}
+                value={formState.situacaoFinanceiraGenitora}
+                onChange={handleFieldChange}
+                name="situacaoFinanceiraGenitora"
                 rows="3"
                 className="input"
               ></textarea>
@@ -882,15 +758,17 @@ export const FormularioSubmissao = () => {
               <input
                 type="text"
                 placeholder="Vara competente ou juizo (opcional)"
-                value={varaCompetente}
-                onChange={(e) => setVaraCompetente(e.target.value)}
+                value={formState.varaCompetente}
+                onChange={handleFieldChange}
+                name="varaCompetente"
                 className="input"
               />
               <input
                 type="text"
                 placeholder="Cidade para assinatura do documento"
-                value={cidadeAssinatura}
-                onChange={(e) => setCidadeAssinatura(e.target.value)}
+                value={formState.cidadeAssinatura}
+                onChange={handleFieldChange}
+                name="cidadeAssinatura"
                 className="input"
               />
             </div>
@@ -898,15 +776,17 @@ export const FormularioSubmissao = () => {
               <input
                 type="text"
                 placeholder="Valor da causa (em reais)"
-                value={valorCausa}
-                onChange={(e) => setValorCausa(e.target.value)}
+                value={formState.valorCausa}
+                onChange={handleFieldChange}
+                name="valorCausa"
                 className="input"
               />
               <input
                 type="text"
                 placeholder="Valor da causa por extenso"
-                value={valorCausaExtenso}
-                onChange={(e) => setValorCausaExtenso(e.target.value)}
+                value={formState.valorCausaExtenso}
+                onChange={handleFieldChange}
+                name="valorCausaExtenso"
                 className="input"
               />
             </div>
@@ -915,22 +795,25 @@ export const FormularioSubmissao = () => {
                 <input
                   type="text"
                   placeholder="Valor de referencia dos alimentos provisórios"
-                  value={valorProvisorioReferencia}
-                  onChange={(e) => setValorProvisorioReferencia(e.target.value)}
+                  value={formState.valorProvisorioReferencia}
+                  onChange={handleFieldChange}
+                  name="valorProvisorioReferencia"
                   className="input"
                 />
                 <input
                   type="text"
                   placeholder="Percentual definitivo sobre o salario minimo"
-                  value={percentualDefinitivoSalarioMin}
-                  onChange={(e) => setPercentualDefinitivoSalarioMin(e.target.value)}
+                  value={formState.percentualDefinitivoSalarioMin}
+                  onChange={handleFieldChange}
+                  name="percentualDefinitivoSalarioMin"
                   className="input"
                 />
                 <input
                   type="text"
                   placeholder="Percentual definitivo das despesas extras"
-                  value={percentualDefinitivoExtras}
-                  onChange={(e) => setPercentualDefinitivoExtras(e.target.value)}
+                  value={formState.percentualDefinitivoExtras}
+                  onChange={handleFieldChange}
+                  name="percentualDefinitivoExtras"
                   className="input"
                 />
               </div>
@@ -940,22 +823,25 @@ export const FormularioSubmissao = () => {
                 <input
                   type="text"
                   placeholder="Numero do titulo/execucao (se houver)"
-                  value={processoTituloNumero}
-                  onChange={(e) => setProcessoTituloNumero(e.target.value)}
+                  value={formState.processoTituloNumero}
+                  onChange={handleFieldChange}
+                  name="processoTituloNumero"
                   className="input"
                 />
                 <input
                   type="text"
                   placeholder="Valor total executado por extenso"
-                  value={valorTotalExtenso}
-                  onChange={(e) => setValorTotalExtenso(e.target.value)}
+                  value={formState.valorTotalExtenso}
+                  onChange={handleFieldChange}
+                  name="valorTotalExtenso"
                   className="input"
                 />
                 <input
                   type="text"
                   placeholder="Valor da divida para prisao por extenso"
-                  value={valorDebitoExtenso}
-                  onChange={(e) => setValorDebitoExtenso(e.target.value)}
+                  value={formState.valorDebitoExtenso}
+                  onChange={handleFieldChange}
+                  name="valorDebitoExtenso"
                   className="input"
                 />
               </div>
@@ -972,8 +858,9 @@ export const FormularioSubmissao = () => {
                   <input
                     type="text"
                     placeholder='Ex: "30%" ou "R$ 600,00"'
-                    value={percentualSmRequerido}
-                    onChange={(e) => setPercentualSmRequerido(e.target.value)}
+                    value={formState.percentualSmRequerido}
+                    onChange={handleFieldChange}
+                    name="percentualSmRequerido"
                     className="input"
                   />
                 </div>
@@ -982,8 +869,9 @@ export const FormularioSubmissao = () => {
                   <input
                     type="text"
                     placeholder='Ex: "50% de gastos com saúde e educação"'
-                    value={percentualDespesasExtra}
-                    onChange={(e) => setPercentualDespesasExtra(e.target.value)}
+                    value={formState.percentualDespesasExtra}
+                    onChange={handleFieldChange}
+                    name="percentualDespesasExtra"
                     className="input"
                   />
                 </div>
@@ -992,8 +880,9 @@ export const FormularioSubmissao = () => {
                   <input
                     type="text"
                     placeholder='Ex: "Até o dia 10 de cada mês"'
-                    value={diaPagamentoRequerido}
-                    onChange={(e) => setDiaPagamentoRequerido(e.target.value)}
+                    value={formState.diaPagamentoRequerido}
+                    onChange={handleFieldChange}
+                    name="diaPagamentoRequerido"
                     className="input"
                   />
                 </div>
@@ -1002,8 +891,9 @@ export const FormularioSubmissao = () => {
                   <textarea
                     rows="3"
                     placeholder="Informe: Titular da Conta, CPF do Titular, Banco, Agência, Conta e Chave PIX"
-                    value={dadosBancariosDeposito}
-                    onChange={(e) => setDadosBancariosDeposito(e.target.value)}
+                    value={formState.dadosBancariosDeposito}
+                    onChange={handleFieldChange}
+                    name="dadosBancariosDeposito"
                     className="input"
                   ></textarea>
                 </div>
@@ -1011,8 +901,9 @@ export const FormularioSubmissao = () => {
                   <label className="label">Vínculo Empregatício do Requerido</label>
                   <select
                     className="input"
-                    value={requeridoTemEmpregoFormal}
-                    onChange={(e) => setRequeridoTemEmpregoFormal(e.target.value)}
+                    value={formState.requeridoTemEmpregoFormal}
+                    onChange={handleFieldChange}
+                    name="requeridoTemEmpregoFormal"
                   >
                     <option value="">Selecione...</option>
                     <option value="sim">Sim</option>
@@ -1027,8 +918,9 @@ export const FormularioSubmissao = () => {
                       <input
                         type="text"
                         placeholder="Nome da empresa"
-                        value={empregadorRequeridoNome}
-                        onChange={(e) => setEmpregadorRequeridoNome(e.target.value)}
+                        value={formState.empregadorRequeridoNome}
+                        onChange={handleFieldChange}
+                        name="empregadorRequeridoNome"
                         className="input"
                       />
                     </div>
@@ -1037,8 +929,9 @@ export const FormularioSubmissao = () => {
                       <input
                         type="text"
                         placeholder="Endereço completo da empresa"
-                        value={empregadorRequeridoEndereco}
-                        onChange={(e) => setEmpregadorRequeridoEndereco(e.target.value)}
+                        value={formState.empregadorRequeridoEndereco}
+                        onChange={handleFieldChange}
+                        name="empregadorRequeridoEndereco"
                         className="input"
                       />
                     </div>
@@ -1047,8 +940,9 @@ export const FormularioSubmissao = () => {
                       <input
                         type="email"
                         placeholder="Email do RH ou responsavel"
-                        value={empregadorEmail}
-                        onChange={(e) => setEmpregadorEmail(e.target.value)}
+                        value={formState.empregadorEmail}
+                        onChange={handleFieldChange}
+                        name="empregadorEmail"
                         className="input"
                       />
                     </div>
@@ -1067,8 +961,9 @@ export const FormularioSubmissao = () => {
                   <input
                     type="text"
                     placeholder="Nº do processo que fixou os alimentos"
-                    value={numeroProcessoOriginario}
-                    onChange={(e) => setNumeroProcessoOriginario(e.target.value)}
+                    value={formState.numeroProcessoOriginario}
+                    onChange={handleFieldChange}
+                    name="numeroProcessoOriginario"
                     className="input"
                   />
                 </div>
@@ -1077,8 +972,9 @@ export const FormularioSubmissao = () => {
                   <input
                     type="text"
                     placeholder="Ex: 1ª Vara de Família de Teixeira de Freitas"
-                    value={varaOriginaria}
-                    onChange={(e) => setVaraOriginaria(e.target.value)}
+                    value={formState.varaOriginaria}
+                    onChange={handleFieldChange}
+                    name="varaOriginaria"
                     className="input"
                   />
                 </div>
@@ -1087,8 +983,9 @@ export const FormularioSubmissao = () => {
                   <input
                     type="text"
                     placeholder='Ex: "30%" ou "R$ 600,00"'
-                    value={percentualOuValorFixado}
-                    onChange={(e) => setPercentualOuValorFixado(e.target.value)}
+                    value={formState.percentualOuValorFixado}
+                    onChange={handleFieldChange}
+                    name="percentualOuValorFixado"
                     className="input"
                   />
                 </div>
@@ -1097,8 +994,9 @@ export const FormularioSubmissao = () => {
                   <input
                     type="text"
                     placeholder='Ex: "Dia 10 de cada mês"'
-                    value={diaPagamentoFixado}
-                    onChange={(e) => setDiaPagamentoFixado(e.target.value)}
+                    value={formState.diaPagamentoFixado}
+                    onChange={handleFieldChange}
+                    name="diaPagamentoFixado"
                     className="input"
                   />
                 </div>
@@ -1107,8 +1005,9 @@ export const FormularioSubmissao = () => {
                   <input
                     type="text"
                     placeholder='Ex: "Março/2025 a Outubro/2025"'
-                    value={periodoDebitoExecucao}
-                    onChange={(e) => setPeriodoDebitoExecucao(e.target.value)}
+                    value={formState.periodoDebitoExecucao}
+                    onChange={handleFieldChange}
+                    name="periodoDebitoExecucao"
                     className="input"
                   />
                 </div>
@@ -1117,8 +1016,9 @@ export const FormularioSubmissao = () => {
                   <input
                     type="text"
                     placeholder='Ex: "R$ 3.250,00"'
-                    value={valorTotalDebitoExecucao}
-                    onChange={(e) => setValorTotalDebitoExecucao(e.target.value)}
+                    value={formState.valorTotalDebitoExecucao}
+                    onChange={handleFieldChange}
+                    name="valorTotalDebitoExecucao"
                     className="input"
                   />
                 </div>
@@ -1134,21 +1034,24 @@ export const FormularioSubmissao = () => {
                   <label className="label">Regime de Bens</label>
                   <select
                     className="input"
-                    value={regimeBens}
-                    onChange={(e) => setRegimeBens(e.target.value)}
+                    value={formState.regimeBens}
+                    onChange={handleFieldChange}
+                    name="regimeBens"
                   >
                     <option value="">Selecione...</option>
                     <option value="comunhao_parcial">Comunhão Parcial de Bens</option>
                     <option value="comunhao_universal">Comunhão Universal</option>
                     <option value="separacao_total">Separação Total de Bens</option>
+                    <option value="participacao_final_nos_aquestos">Participação Final nos Aquestos</option>
                   </select>
                 </div>
                 <div>
                   <label className="label">Nome de Solteira</label>
                   <select
                     className="input"
-                    value={retornoNomeSolteira}
-                    onChange={(e) => setRetornoNomeSolteira(e.target.value)}
+                    value={formState.retornoNomeSolteira}
+                    onChange={handleFieldChange}
+                    name="retornoNomeSolteira"
                   >
                     <option value="">Selecione...</option>
                     <option value="sim">Sim, desejo voltar a usar o nome de solteira</option>
@@ -1159,8 +1062,9 @@ export const FormularioSubmissao = () => {
                   <label className="label">Pensão para o Cônjuge</label>
                   <select
                     className="input"
-                    value={alimentosParaExConjuge}
-                    onChange={(e) => setAlimentosParaExConjuge(e.target.value)}
+                    value={formState.alimentosParaExConjuge}
+                    onChange={handleFieldChange}
+                    name="alimentosParaExConjuge"
                   >
                     <option value="">Selecione...</option>
                     <option value="sim">Sim, preciso de pensão para mim</option>
@@ -1174,13 +1078,14 @@ export const FormularioSubmissao = () => {
           <div>
             <textarea
               placeholder="Relate seu caso aqui..."
-              value={relato}
-              onChange={(e) => setRelato(e.target.value)}
+              value={formState.relato}
+              onChange={handleFieldChange}
+              name="relato"
               rows="5"
               className="input"
             ></textarea>
           </div>
-          {acaoEspecifica && (
+          {formState.acaoEspecifica && (
             <div className="space-y-3 bg-surface p-4 rounded-lg border border-soft">
               <h3 className="heading-3">
                 3. Marque os documentos que você possui:
@@ -1207,7 +1112,7 @@ export const FormularioSubmissao = () => {
             <p className="font-semibold">Anexos (Opcional)</p>
             {/* GravaÃ§Ã£o de Ãudio */}
             <div className="bg-surface p-4 rounded-lg border border-dashed border-soft">
-              {!isRecording && !audioBlob && (
+              {!isRecording && !formState.audioBlob && (
                 <button
                   type="button"
                   onClick={startRecording}
@@ -1225,10 +1130,10 @@ export const FormularioSubmissao = () => {
                   <Square size={20} /> Parar Gravação
                 </button>
               )}
-              {audioBlob && (
+              {formState.audioBlob && (
                 <div className="flex items-center gap-4">
                   <audio
-                    src={URL.createObjectURL(audioBlob)}
+                    src={URL.createObjectURL(formState.audioBlob)}
                     controls
                     className="flex-gro w"
                   />
@@ -1259,7 +1164,7 @@ export const FormularioSubmissao = () => {
                 etc.)
               </button>
               <div className="mt-2 space-y-1 text-sm">
-                {documentFiles.map((file) => (
+                {formState.documentFiles.map((file) => (
                   <div
                     key={file.name}
                     className="flex items-center justify-between bg-surface p-1 rounded border border-soft"
@@ -1294,7 +1199,3 @@ export const FormularioSubmissao = () => {
     </motion.div>
   );
 };
-
-
-
-
