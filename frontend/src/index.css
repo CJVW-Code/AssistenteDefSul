@@ -130,6 +130,12 @@
     box-shadow: var(--shadow-soft);
   }
 
+  /* Seções do Formulário */
+  .form-section {
+    @apply card space-y-4 border-l-4;
+  }
+
+
   /* Inputs */
   .input {
     @apply w-full px-4 py-3 rounded-xl text-sm transition;
