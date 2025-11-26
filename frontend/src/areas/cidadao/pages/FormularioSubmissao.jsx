@@ -104,7 +104,6 @@ const initialState = {
   alimentosParaExConjuge: "",
 
   // Processual Geral
-  varaCompetente: "",
   cidadeAssinatura: "",
   valorCausa: "",
   valorCausaExtenso: "",
@@ -318,7 +317,6 @@ export const FormularioSubmissao = () => {
       alimentosParaExConjuge: "alimentos_para_ex_conjuge",
 
       // Geral Doc
-      varaCompetente: "vara_competente",
       cidadeAssinatura: "cidade_assinatura",
       valorCausa: "valor_causa",
       valorCausaExtenso: "valor_causa_extenso",
@@ -391,6 +389,7 @@ export const FormularioSubmissao = () => {
   const isFixacaoOuOferta = acaoNorm.includes("fixa") || acaoNorm.includes("oferta");
   const isExecucao = acaoNorm.includes("execu");
   const isDivorcio = acaoNorm.includes("divór") || acaoNorm.includes("divor");
+  const isAlvara = acaoNorm.includes("alvar");
   const showFixacaoBaseFields = isFixacaoOuOferta || isExecucao;
   
   // Lógica de Representação (CRUCIAL para organização)
@@ -529,11 +528,11 @@ export const FormularioSubmissao = () => {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                <input type="text" placeholder="Endereço Residencial Completo" name="enderecoAssistido" value={formState.enderecoAssistido} onChange={handleFieldChange} required className="input" />
-               <input type="email" placeholder="Email (opcional)" name="emailAssistido" value={formState.emailAssistido} onChange={handleFieldChange} className="input" />
+               <input type="text" placeholder="Endereço Profissional (se houver)" name="enderecoProfissionalAssistido" value={formState.enderecoProfissionalAssistido} onChange={handleFieldChange} className="input" />
             </div>
-             {/* Contato é sempre importante */}
-             <div className="grid grid-cols-1">
-                <div className="relative">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+               <input type="email" placeholder="Email (opcional)" name="emailAssistido" value={formState.emailAssistido} onChange={handleFieldChange} className="input" />
+               <div className="relative">
                   <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={18} />
                   <input type="tel" placeholder="Telefone/WhatsApp para contato" name="telefone" value={formState.telefone} onChange={handleNumericInput} required className="input pl-10" />
                 </div>
@@ -561,8 +560,9 @@ export const FormularioSubmissao = () => {
                  <input type="text" placeholder="Sua Profissão" name="representanteOcupacao" value={formState.representanteOcupacao} onChange={handleFieldChange} className="input" />
               </div>
 
-              <div className="grid grid-cols-1 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                  <input type="text" placeholder="Seu Endereço Residencial" name="representanteEnderecoResidencial" value={formState.representanteEnderecoResidencial} onChange={handleFieldChange} className="input" />
+                 <input type="text" placeholder="Seu Endereço Profissional (se houver)" name="representanteEnderecoProfissional" value={formState.representanteEnderecoProfissional} onChange={handleFieldChange} className="input" />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                  <input type="email" placeholder="Seu Email" name="representanteEmail" value={formState.representanteEmail} onChange={handleFieldChange} className="input" />
@@ -573,31 +573,44 @@ export const FormularioSubmissao = () => {
         </section>
 
         {/* --- ETAPA 3: DADOS DA OUTRA PARTE (REQUERIDO) --- */}
-        <section className="card space-y-4 border-l-4 border-l-red-500">
-          <div className="flex items-center gap-2 border-b border-soft pb-2">
-            <Users className="text-red-400" />
-            <h2 className="heading-2">3. Contra quem é a ação? (Requerido)</h2>
-          </div>
-          <p className="text-sm text-muted">Preencha com o máximo de informações que você souber.</p>
+        {!isAlvara && (
+          <section className="card space-y-4 border-l-4 border-l-red-500">
+            <div className="flex items-center gap-2 border-b border-soft pb-2">
+              <Users className="text-red-400" />
+              <h2 className="heading-2">3. Contra quem é a ação? (Requerido)</h2>
+            </div>
+            <p className="text-sm text-muted">Preencha com o máximo de informações que você souber.</p>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <input type="text" placeholder="Nome Completo da outra parte" name="nomeRequerido" value={formState.nomeRequerido} onChange={handleFieldChange} className="input" />
-            <input type="text" placeholder="CPF (se souber)" name="cpfRequerido" value={formState.cpfRequerido} onChange={handleNumericInput} className="input" />
-          </div>
-          
-          <input type="text" placeholder="Endereço Residencial (se souber)" name="enderecoRequerido" value={formState.enderecoRequerido} onChange={handleFieldChange} className="input" />
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <input type="tel" placeholder="Telefone (se souber)" name="requeridoTelefone" value={formState.requeridoTelefone} onChange={handleNumericInput} className="input" />
-              <input type="text" placeholder="Profissão (se souber)" name="requeridoOcupacao" value={formState.requeridoOcupacao} onChange={handleFieldChange} className="input" />
-              <input type="text" placeholder="Endereço de Trabalho (se souber)" name="requeridoEnderecoProfissional" value={formState.requeridoEnderecoProfissional} onChange={handleFieldChange} className="input" />
-          </div>
-          
-          <div>
-             <label className="label">Outros dados (RG, Nacionalidade, Estado Civil, etc - Se souber)</label>
-             <textarea name="dadosAdicionaisRequerido" value={formState.dadosAdicionaisRequerido} onChange={handleFieldChange} rows="2" className="input"></textarea>
-          </div>
-        </section>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <input type="text" placeholder="Nome Completo da outra parte" name="nomeRequerido" value={formState.nomeRequerido} onChange={handleFieldChange} className="input" />
+              <input type="text" placeholder="CPF (se souber)" name="cpfRequerido" value={formState.cpfRequerido} onChange={handleNumericInput} className="input" />
+            </div>
+            
+            <input type="text" placeholder="Endereço Residencial (se souber)" name="enderecoRequerido" value={formState.enderecoRequerido} onChange={handleFieldChange} className="input" />
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <input type="tel" placeholder="Telefone (se souber)" name="requeridoTelefone" value={formState.requeridoTelefone} onChange={handleNumericInput} className="input" />
+                <input type="email" placeholder="Email (se souber)" name="requeridoEmail" value={formState.requeridoEmail} onChange={handleFieldChange} className="input" />
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <input type="text" placeholder="Profissão (se souber)" name="requeridoOcupacao" value={formState.requeridoOcupacao} onChange={handleFieldChange} className="input" />
+                 <select name="requeridoNacionalidade" value={formState.requeridoNacionalidade} onChange={handleFieldChange} className="input">
+                   {nacionalidadeOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                 </select>
+                 <select name="requeridoEstadoCivil" value={formState.requeridoEstadoCivil} onChange={handleFieldChange} className="input">
+                   {estadoCivilOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                 </select>
+            </div>
+            
+            <input type="text" placeholder="Endereço de Trabalho (se souber)" name="requeridoEnderecoProfissional" value={formState.requeridoEnderecoProfissional} onChange={handleFieldChange} className="input" />
+            
+            <div>
+               <label className="label">Outros dados (RG, etc - Se souber)</label>
+               <textarea name="dadosAdicionaisRequerido" value={formState.dadosAdicionaisRequerido} onChange={handleFieldChange} rows="2" className="input"></textarea>
+            </div>
+          </section>
+        )}
 
         {/* --- ETAPA 4: DETALHES ESPECÍFICOS (CONDICIONAL) --- */}
         {formState.acaoEspecifica && (
@@ -607,27 +620,41 @@ export const FormularioSubmissao = () => {
               <h2 className="heading-2">4. Detalhes do Caso</h2>
             </div>
 
-            {/* CAMPOS DE FIXAÇÃO DE ALIMENTOS / OFERTA */}
+            {/* CAMPOS DE FIXAÇÃO / OFERTA / EXECUÇÃO (VALORES) */}
             {showFixacaoBaseFields && (
               <div className="space-y-4">
-                <h4 className="font-semibold text-primary">Valores e Pagamento</h4>
+                <h4 className="font-semibold text-primary">Valores e Pagamento (Pedido Principal)</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="label">Quanto você quer/pode pagar? (R$ ou %)</label>
+                      <label className="label">Valor de Pensão Requerido (R$ ou %)</label>
                       <input type="text" name="percentualSmRequerido" value={formState.percentualSmRequerido} onChange={handleFieldChange} placeholder="Ex: 30% do salário mínimo ou R$ 400,00" className="input" />
                     </div>
                     <div>
-                      <label className="label">Data de pagamento desejada</label>
-                      <input type="text" name="diaPagamentoRequerido" value={formState.diaPagamentoRequerido} onChange={handleFieldChange} placeholder="Ex: Todo dia 10" className="input" />
+                      <label className="label">Percentual Adicional para Despesas Extras</label>
+                      <input type="text" name="percentualDespesasExtra" value={formState.percentualDespesasExtra} onChange={handleFieldChange} placeholder="Ex: 50% de material escolar/farmácia" className="input" />
                     </div>
                 </div>
-                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="label">Data de pagamento desejada</label>
+                    <input type="text" name="diaPagamentoRequerido" value={formState.diaPagamentoRequerido} onChange={handleFieldChange} placeholder="Ex: Todo dia 10 do mês" className="input" />
+                  </div>
+                  <div>
+                    <label className="label">Valor para Alimentos Provisórios (se diferente)</label>
+                    <input type="text" name="valorProvisorioReferencia" value={formState.valorProvisorioReferencia} onChange={handleFieldChange} placeholder="Ex: R$ 300,00" className="input" />
+                  </div>
+                </div>
                 <div>
                    <label className="label">Dados Bancários para depósito (Banco, Agência, Conta, PIX)</label>
                    <textarea name="dadosBancariosDeposito" value={formState.dadosBancariosDeposito} onChange={handleFieldChange} rows="2" className="input" placeholder="Ex: Banco do Brasil, Ag 0000, Cc 00000-0, PIX: cpf..."></textarea>
                 </div>
-
-                <h4 className="font-semibold text-primary mt-4">Sobre o Emprego da Outra Parte</h4>
+              </div>
+            )}
+            
+            {/* EMPREGO DO REQUERIDO */}
+            {showFixacaoBaseFields && (
+              <div className="space-y-4 pt-4 border-t border-soft">
+                <h4 className="font-semibold text-primary">Sobre o Emprego da Outra Parte</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="label">A outra parte tem carteira assinada?</label>
@@ -642,6 +669,7 @@ export const FormularioSubmissao = () => {
                     <>
                       <input type="text" placeholder="Nome da Empresa" name="empregadorRequeridoNome" value={formState.empregadorRequeridoNome} onChange={handleFieldChange} className="input" />
                       <input type="text" placeholder="Endereço da Empresa" name="empregadorRequeridoEndereco" value={formState.empregadorRequeridoEndereco} onChange={handleFieldChange} className="input md:col-span-2" />
+                      <input type="email" placeholder="Email da Empresa (para ofício)" name="empregadorEmail" value={formState.empregadorEmail} onChange={handleFieldChange} className="input md:col-span-2" />
                     </>
                   )}
                 </div>
@@ -650,22 +678,63 @@ export const FormularioSubmissao = () => {
 
             {/* CAMPOS DE EXECUÇÃO */}
             {isExecucao && (
-               <div className="space-y-4">
-                 <h4 className="font-semibold text-primary">Dados do Processo Anterior</h4>
+               <div className="space-y-4 pt-4 border-t border-soft">
+                 <h4 className="font-semibold text-primary">Dados do Processo de Alimentos Original</h4>
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <input type="text" placeholder="Número do Processo Originário" name="numeroProcessoOriginario" value={formState.numeroProcessoOriginario} onChange={handleFieldChange} className="input" />
-                    <input type="text" placeholder="Vara onde tramitou" name="varaOriginaria" value={formState.varaOriginaria} onChange={handleFieldChange} className="input" />
+                    <input type="text" placeholder="Número do Processo Original" name="numeroProcessoOriginario" value={formState.numeroProcessoOriginario} onChange={handleFieldChange} className="input" />
+                    <input type="text" placeholder="Nº do Título (se houver)" name="processoTituloNumero" value={formState.processoTituloNumero} onChange={handleFieldChange} className="input" />
                  </div>
                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <input type="text" placeholder="Período da Dívida (Meses)" name="periodoDebitoExecucao" value={formState.periodoDebitoExecucao} onChange={handleFieldChange} className="input" />
+                    <input type="text" placeholder="Vara onde tramitou" name="varaOriginaria" value={formState.varaOriginaria} onChange={handleFieldChange} className="input" />
+                    <input type="text" placeholder="Valor/Percentual Fixado" name="percentualOuValorFixado" value={formState.percentualOuValorFixado} onChange={handleFieldChange} className="input" />
+                    <input type="text" placeholder="Dia de Pagamento Fixado" name="diaPagamentoFixado" value={formState.diaPagamentoFixado} onChange={handleFieldChange} className="input" />
+                 </div>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <input type="text" placeholder="Período da Dívida (ex: Jan/2023 a Dez/2023)" name="periodoDebitoExecucao" value={formState.periodoDebitoExecucao} onChange={handleFieldChange} className="input" />
                     <input type="text" placeholder="Valor Total da Dívida (R$)" name="valorTotalDebitoExecucao" value={formState.valorTotalDebitoExecucao} onChange={handleFieldChange} className="input" />
                  </div>
+                 {/* Fields for "definitivo" values can also be useful in execution cases */}
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     <div>
+                      <label className="label">Pensão Definitiva (% Sal. Mínimo)</label>
+                      <input type="text" name="percentualDefinitivoSalarioMin" value={formState.percentualDefinitivoSalarioMin} onChange={handleFieldChange} className="input" />
+                     </div>
+                     <div>
+                      <label className="label">Pensão Definitiva (% Desp. Extras)</label>
+                      <input type="text" name="percentualDefinitivoExtras" value={formState.percentualDefinitivoExtras} onChange={handleFieldChange} className="input" />
+                     </div>
+                 </div>
+               </div>
+            )}
+
+            {/* CAMPOS DE DIVÓRCIO */}
+            {isDivorcio && (
+               <div className="space-y-4 pt-4 border-t border-soft">
+                  <h4 className="font-semibold text-primary">Dados do Divórcio</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="label">Regime de Bens do Casamento</label>
+                      <input type="text" name="regimeBens" value={formState.regimeBens} onChange={handleFieldChange} placeholder="Ex: Comunhão Parcial de Bens" className="input" />
+                    </div>
+                    <div>
+                      <label className="label">Deseja voltar a usar o nome de solteira?</label>
+                      <select name="retornoNomeSolteira" value={formState.retornoNomeSolteira} onChange={handleFieldChange} className="input">
+                        <option value="">Selecione...</option>
+                        <option value="sim">Sim</option>
+                        <option value="nao">Não</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="label">Haverá pedido de pensão para o(a) ex-cônjuge?</label>
+                    <input type="text" name="alimentosParaExConjuge" value={formState.alimentosParaExConjuge} onChange={handleFieldChange} placeholder="Ex: Sim, no valor de R$ 500" className="input" />
+                  </div>
                </div>
             )}
 
             {/* CAMPOS GERAIS DE FAMÍLIA (Filhos, Bens, Datas) */}
             <div className="space-y-4 pt-4 border-t border-soft">
-              <h4 className="font-semibold text-primary">Vínculos e Bens</h4>
+              <h4 className="font-semibold text-primary">Vínculos, Guarda e Bens</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                  <div>
                    <label className="label">Data Início da Relação</label>
@@ -681,14 +750,39 @@ export const FormularioSubmissao = () => {
                 <label className="label">Filhos (Nome e Data de Nascimento)</label>
                 <textarea name="filhosInfo" value={formState.filhosInfo} onChange={handleFieldChange} rows="2" placeholder="Ex: João (10/05/2015); Maria (20/01/2018)" className="input"></textarea>
               </div>
-              
+               <div>
+                <label className="label">Como a guarda dos filhos é exercida hoje?</label>
+                <textarea name="descricaoGuarda" value={formState.descricaoGuarda} onChange={handleFieldChange} rows="2" placeholder="Ex: A guarda de fato é minha, e o pai visita aos fins de semana." className="input"></textarea>
+              </div>
               <div>
                 <label className="label">Bens a Partilhar (Carros, Casas, Móveis)</label>
-                <textarea name="bensPartilha" value={formState.bensPartilha} onChange={handleFieldChange} rows="2" placeholder="Descreva os bens se houver partilha" className="input"></textarea>
+                <textarea name="bensPartilha" value={formState.bensPartilha} onChange={handleFieldChange} rows="2" placeholder="Descreva os bens e se há acordo sobre a divisão" className="input"></textarea>
+              </div>
+               <div>
+                <label className="label">Situação Financeira de quem cuida dos filhos</label>
+                <textarea name="situacaoFinanceiraGenitora" value={formState.situacaoFinanceiraGenitora} onChange={handleFieldChange} rows="2" placeholder="Descreva brevemente sua situação financeira (renda, ajuda de familiares, etc.)" className="input"></textarea>
               </div>
             </div>
           </section>
         )}
+
+        {/* --- DADOS PROCESSUAIS GERAIS --- */}
+        <section className="card space-y-4 border-l-4 border-l-purple-500">
+          <div className="flex items-center gap-2 mb-2">
+            <DollarSign className="text-purple-400" />
+            <h2 className="heading-2">Dados Processuais</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="label">Valor da Causa (se souber)</label>
+              <input type="text" name="valorCausa" value={formState.valorCausa} onChange={handleFieldChange} placeholder="Ex: R$ 15.000,00" className="input" />
+            </div>
+            <div>
+              <label className="label">Cidade para assinatura do documento</label>
+              <input type="text" name="cidadeAssinatura" value={formState.cidadeAssinatura} onChange={handleFieldChange} placeholder="Ex: Porto Alegre" className="input" />
+            </div>
+          </div>
+        </section>
 
         {/* --- ETAPA 5: RELATO E DOCUMENTOS --- */}
         <section className="card space-y-6 border-l-4 border-l-indigo-500">

@@ -132,7 +132,10 @@
 
   /* Seções do Formulário */
   .form-section {
-    @apply card space-y-4 border-l-4;
+    @apply p-6 rounded-2xl space-y-4 border-l-4;
+    border: 1px solid var(--color-border);
+    background-color: var(--color-surface);
+    box-shadow: var(--shadow-soft);
   }
 
 

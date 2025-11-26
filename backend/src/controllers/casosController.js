@@ -12,6 +12,7 @@ import {
   generateDosFatos,
   normalizePromptData,
 } from "../services/geminiService.js";
+import { getVaraByTipoAcao } from "../config/varasMapping.js";
 // Tempo de expiraÃ§Ã£o (em segundos) para URLs assinadas do Supabase
 // Pode ser configurado pela env var SIGNED_URL_EXPIRES; padrÃ£o 24h (86400s)
 const signedExpires = Number.parseInt(
@@ -247,7 +248,6 @@ export const criarNovoCaso = async (req, res) => {
       bens_partilha,
       descricao_guarda,
       situacao_financeira_genitora,
-      vara_competente,
       assistido_eh_incapaz,
       assistido_nacionalidade,
       assistido_estado_civil,
@@ -302,6 +302,9 @@ export const criarNovoCaso = async (req, res) => {
     const documentosInformadosArray = JSON.parse(documentos_informados || "[]");
     const { protocolo, chaveAcesso } = generateCredentials(tipoAcao);
     const chaveAcessoHash = hashKeyWithSalt(chaveAcesso);
+    
+    // Determina a vara automaticamente
+    const varaAutomatica = getVaraByTipoAcao(tipoAcao);
 
     console.log("\n--- DEBUG: CRIAÃ‡ÃƒO DO CASO ---");
     console.log("Chave de Acesso (Texto Puro):", chaveAcesso);
@@ -352,8 +355,7 @@ export const criarNovoCaso = async (req, res) => {
       relato_texto: relato,
       documentos_informados: documentosInformadosArray,
       resumo_ia,
-      vara: vara_competente || vara_originaria,
-      vara_competente,
+      vara: varaAutomatica || vara_originaria,
       endereco_assistido,
       email_assistido,
       dados_adicionais_requerente,
@@ -495,7 +497,7 @@ export const criarNovoCaso = async (req, res) => {
       valor_causa,
       valor_causa_extenso,
       cidade_assinatura,
-      vara_competente,
+      vara_competente: varaAutomatica,
       regime_bens,
       retorno_nome_solteira,
       alimentos_para_ex_conjuge,
