@@ -80,7 +80,7 @@ export const Login = () => {
               />
             </div>
             {error && (
-              <p className="text-red-600 text-sm bg-red-50 border border-red-100 rounded-xl p-3">
+              <p className="alert alert-error">
                 {error}
               </p>
             )}

@@ -228,7 +228,7 @@ export const DetalhesCaso = () => {
 
       <section className="card space-y-4">
         <h2 className="heading-2">Rascunho da petição inicial</h2>
-        <div className="rounded-2xl border border-dashed border-soft bg-slate-950 text-slate-100 p-5 max-h-[480px] overflow-y-auto text-sm">
+        <div className="rounded-2xl border border-dashed border-soft bg-slate-900 text-slate-100 dark:bg-slate-100 dark:text-slate-900 p-5 max-h-[480px] overflow-y-auto text-sm">
           {caso.peticao_inicial_rascunho ||
             "Rascunho não disponível ou ainda não gerado."}
         </div>

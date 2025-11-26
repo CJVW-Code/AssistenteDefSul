@@ -235,7 +235,7 @@ export const Dashboard = () => {
       <section className="card p-0 overflow-hidden">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between border-b border-soft px-6 py-4">
           <div>
-            <h2 className="heading-2">Casos mais recentes</h2>
+            <h2 className="heading-2 text-primary">Casos mais recentes</h2>
             <p className="text-sm text-muted">
               Últimos atendimentos enviados pelo portal do cidadão.
             </p>
@@ -271,7 +271,7 @@ export const Dashboard = () => {
                 <li key={caso.id}>
                   <Link
                     to={`/painel/casos/${caso.id}`}
-                    className="block px-6 py-4 hover:bg-slate-50 dark:hover:bg-slate-900 transition"
+                    className="block px-6 py-4 hover:bg-slate-100 dark:hover:bg-slate-900 transition"
                   >
                     <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                       <div className="flex items-start gap-4">
@@ -279,7 +279,7 @@ export const Dashboard = () => {
                           <FileText size={20} />
                         </div>
                         <div>
-                          <p className="heading-3">{caso.nome_assistido}</p>
+                          <p className="heading-3 text-slate-800 dark:text-slate-200">{caso.nome_assistido}</p>
                           <p className="text-sm text-muted">
                             Protocolo: {caso.protocolo}
                           </p>

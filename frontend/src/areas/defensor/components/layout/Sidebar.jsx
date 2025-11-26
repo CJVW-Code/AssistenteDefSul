@@ -10,7 +10,7 @@ const navItems = [
 export const Sidebar = () => {
   return (
     <>
-      <aside className="hidden lg:flex w-72 bg-surface/90 border-r border-soft backdrop-blur flex-col text-slate-900 dark:text-white">
+      <aside className="hidden lg:flex w-72 bg-surface/90 border-r border-soft backdrop-blur flex-col">
         <div className="px-6 py-7 border-b border-soft">
           <p className="text-xs uppercase text-muted tracking-[0.45em]">
             Assistente

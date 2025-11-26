@@ -114,12 +114,12 @@ export const Cadastro = () => {
             </div>
 
             {error && (
-              <p className="text-red-600 text-sm bg-red-50 border border-red-100 rounded-xl p-3">
+              <p className="alert alert-error">
                 {error}
               </p>
             )}
             {success && (
-              <p className="text-emerald-600 text-sm bg-emerald-50 border border-emerald-100 rounded-xl p-3">
+              <p className="alert alert-success">
                 {success}
               </p>
             )}
