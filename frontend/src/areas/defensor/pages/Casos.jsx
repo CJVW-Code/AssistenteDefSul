@@ -1,10 +1,20 @@
-﻿// Arquivo: frontend-defensor/src/components/Casos.jsx
+// Arquivo: frontend-defensor/src/components/Casos.jsx
 
 import React, { useEffect, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { Link } from "react-router-dom";
 import { Eye } from "lucide-react";
 import { API_BASE } from "../../../utils/apiBase";
+
+const statusStyles = {
+  recebido: "bg-amber-100 text-amber-800 border-amber-200",
+  em_analise: "bg-sky-100 text-sky-800 border-sky-200",
+  aguardando_docs: "bg-purple-100 text-purple-800 border-purple-200",
+  finalizado: "bg-emerald-100 text-emerald-800 border-emerald-200",
+  default: "bg-slate-100 text-slate-700 border-slate-200",
+};
+
+const normalizeStatus = (value) => (value || "recebido").toLowerCase();
 
 export const Casos = () => {
   const [casos, setCasos] = useState([]);
@@ -15,7 +25,6 @@ export const Casos = () => {
   useEffect(() => {
     const fetchCasos = async () => {
       try {
-        // A rota do backend Ã© a mesma que usamos no Dashboard
         const response = await fetch(`${API_BASE}/casos`, {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -38,67 +47,106 @@ export const Casos = () => {
     }
   }, [token]);
 
-  if (loading) return <p className="text-center p-8">Carregando casos...</p>;
-  if (error) return <p className="text-center p-8 text-red-400">{error}</p>;
+  if (loading) {
+    return (
+      <div className="card text-center text-muted">
+        Carregando listagem de casos...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="card border-l-4 border-l-red-500 text-red-600">
+        {error}
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-3xl text-[#dae2db] font-bold">
-        Todos os Casos Recebidos
-      </h1>
+    <div className="space-y-8 pb-24">
+      <section className="card space-y-2 border-l-4 border-l-primary/70">
+        <p className="text-sm text-muted uppercase tracking-[0.3em]">
+          Protocolo digital
+        </p>
+        <h1 className="heading-1">Todos os casos recebidos</h1>
+        <p className="text-muted">
+          Consulte rapidamente o status dos atendimentos enviados pelo portal do
+          cidadão e avance as tratativas.
+        </p>
+      </section>
 
-      <div className="bg-slate-800/50 rounded-xl border border-green-500 overflow-hidden">
-        <table className="w-full text-left">
-          <thead className="bg-slate-700/70">
-            <tr className="text-[#dae2db]">
-              <th className="p-4 font-semibold">Protocolo</th>
-              <th className="p-4 font-semibold">Nome do Cidadão</th>
-              <th className="p-4 font-semibold">Data de Abertura</th>
-              <th className="p-4 font-semibold">Status</th>
-              <th className="p-4 font-semibold">Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {casos.length === 0 ? (
-              <tr>
-                <td colSpan="5" className="text-center p-8 text-[#dae2db]">
-                  Nenhum caso encontrado.
-                </td>
+      <section className="card p-0 overflow-hidden">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between border-b border-soft px-6 py-4">
+          <div>
+            <h2 className="heading-2">Listagem oficial</h2>
+            <p className="text-sm text-muted">
+              {casos.length} registros importados do Assistente Def Sul.
+            </p>
+          </div>
+          <Link to="/painel" className="btn btn-secondary text-sm">
+            Voltar ao dashboard
+          </Link>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="table text-sm">
+            <thead className="bg-slate-50 dark:bg-slate-900">
+              <tr className="text-muted uppercase text-xs tracking-wide">
+                <th className="px-4 py-3">Protocolo</th>
+                <th className="px-4 py-3">Nome do cidadão</th>
+                <th className="px-4 py-3">Data de abertura</th>
+                <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3 text-right">Ações</th>
               </tr>
-            ) : (
-              casos.map((caso) => (
-                <tr
-                  key={caso.id}
-                  className="border-t border-slate-800 hover:bg-slate-600/50"
-                >
-                  <td className="p-4 font-mono text-sm text-[#dae2db]">
-                    {caso.protocolo}
-                  </td>
-                  <td className="p-4 text-[#dae2db]">{caso.nome_assistido}</td>
-                  <td className="p-4 text-[#dae2db]">
-                    {new Date(caso.created_at).toLocaleDateString()}
-                  </td>
-                  <td className="p-4">
-                    <span className="px-2 py-1 text-xs font-semibold bg-[#350088] text-[#e3ddff] rounded-full capitalize">
-                      {caso.status.replace("_", " ")}
-                    </span>
-                  </td>
-                  <td className="p-4">
-                    <Link
-                      to={`/painel/casos/${caso.id}`}
-                      className="flex items-center gap-2 text-blue-400 hover:text-blue-200"
-                      title="Ver Detalhes"
-                    >
-                      <Eye size={18} />
-                      Ver Detalhes
-                    </Link>
+            </thead>
+            <tbody>
+              {casos.length === 0 ? (
+                <tr>
+                  <td colSpan="5" className="text-center p-8 text-muted">
+                    Nenhum caso encontrado.
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              ) : (
+                casos.map((caso) => {
+                  const statusKey = normalizeStatus(caso.status);
+                  const badgeStyle =
+                    statusStyles[statusKey] || statusStyles.default;
+                  return (
+                    <tr
+                      key={caso.id}
+                      className="border-t border-soft hover:bg-slate-50 dark:hover:bg-slate-900/60 transition"
+                    >
+                      <td className="p-4 font-mono text-xs text-muted">
+                        {caso.protocolo}
+                      </td>
+                      <td className="p-4 font-medium">{caso.nome_assistido}</td>
+                      <td className="p-4 text-muted">
+                        {new Date(caso.created_at).toLocaleDateString("pt-BR")}
+                      </td>
+                      <td className="p-4">
+                        <span className={`badge capitalize ${badgeStyle}`}>
+                          {statusKey.replace("_", " ")}
+                        </span>
+                      </td>
+                      <td className="p-4 text-right">
+                        <Link
+                          to={`/painel/casos/${caso.id}`}
+                          className="inline-flex items-center gap-2 text-primary hover:text-primary-600 font-medium"
+                          title="Ver detalhes"
+                        >
+                          <Eye size={18} />
+                          Ver detalhes
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
   );
 };
