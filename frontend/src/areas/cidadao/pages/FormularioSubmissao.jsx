@@ -16,7 +16,8 @@ import {
   Users,
   DollarSign,
   Calendar,
-  Scale
+  Scale,
+  Plus
 } from "lucide-react";
 import { documentosPorAcao } from "../../../data/documentos.js";
 import { API_BASE } from "../../../utils/apiBase";
@@ -38,7 +39,8 @@ const initialState = {
   enderecoAssistido: "", // Residencial
   emailAssistido: "",
   telefone: "",
-  assistido_RG: "",
+  assistidoRgNumero: "",
+  assistidoRgOrgao: "",
   enderecoProfissionalAssistido: "",
 
   // Representante Legal (apenas se assistidoEhIncapaz === 'sim')
@@ -62,10 +64,16 @@ const initialState = {
   requeridoEstadoCivil: "",
   requeridoOcupacao: "",
   requeridoEnderecoProfissional: "",
-  dadosAdicionaisRequerido: "",
+  requeridoOutrosSelecionados: [],
+  requeridoRgNumero: "",
+  requeridoRgOrgao: "",
+  requeridoDataNascimento: "",
+  requeridoNomeMae: "",
+  requeridoNomePai: "",
+  requeridoOutrosDetalhes: "",
 
   // Dados Específicos (Família/Alimentos)
-  filhosInfo: "",
+  filhos: [{ nome: "", dataNascimento: "" }],
   dataInicioRelacao: "",
   dataSeparacao: "",
   bensPartilha: "",
@@ -121,7 +129,13 @@ function formReducer(state, action) {
     case 'UPDATE_FIELD':
       return { ...state, [action.field]: action.value };
     case 'RESET_FORM':
-      return { ...initialState, documentFiles: [], documentosMarcados: [] };
+      return {
+        ...initialState,
+        documentFiles: [],
+        documentosMarcados: [],
+        filhos: [{ nome: "", dataNascimento: "" }],
+        requeridoOutrosSelecionados: []
+      };
     case 'SET_ACAO':
        // Limpa campos específicos ao trocar a ação para evitar confusão
        return { 
@@ -150,20 +164,153 @@ const estadoCivilOptions = [
   { value: "uniao_estavel", label: "União Estável" },
 ];
 
+const orgaoEmissorOptions = [
+  { value: "", label: "Órgão emissor" },
+  { value: "SSP/AC", label: "SSP/AC" },
+  { value: "SSP/AL", label: "SSP/AL" },
+  { value: "SSP/AP", label: "SSP/AP" },
+  { value: "SSP/AM", label: "SSP/AM" },
+  { value: "SSP/BA", label: "SSP/BA" },
+  { value: "SSP/CE", label: "SSP/CE" },
+  { value: "SSP/DF", label: "SSP/DF" },
+  { value: "SSP/ES", label: "SSP/ES" },
+  { value: "SSP/GO", label: "SSP/GO" },
+  { value: "SSP/MA", label: "SSP/MA" },
+  { value: "SSP/MT", label: "SSP/MT" },
+  { value: "SSP/MS", label: "SSP/MS" },
+  { value: "SSP/MG", label: "SSP/MG" },
+  { value: "SSP/PA", label: "SSP/PA" },
+  { value: "SSP/PB", label: "SSP/PB" },
+  { value: "SSP/PR", label: "SSP/PR" },
+  { value: "SSP/PE", label: "SSP/PE" },
+  { value: "SSP/PI", label: "SSP/PI" },
+  { value: "SSP/RJ", label: "SSP/RJ" },
+  { value: "SSP/RN", label: "SSP/RN" },
+  { value: "SSP/RS", label: "SSP/RS" },
+  { value: "SSP/RO", label: "SSP/RO" },
+  { value: "SSP/RR", label: "SSP/RR" },
+  { value: "SSP/SC", label: "SSP/SC" },
+  { value: "SSP/SP", label: "SSP/SP" },
+  { value: "SSP/SE", label: "SSP/SE" },
+  { value: "SSP/TO", label: "SSP/TO" },
+  { value: "DETRAN", label: "Detran" },
+  { value: "OUTRO", label: "Outro" },
+];
+
+const stripNonDigits = (value = "") => value.replace(/\D/g, "");
+
+const formatCpf = (value = "") => {
+  const digits = stripNonDigits(value).slice(0, 11);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`;
+  if (digits.length <= 9) {
+    return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
+  }
+  return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
+};
+
+const formatPhone = (value = "") => {
+  const digits = stripNonDigits(value).slice(0, 11);
+  if (!digits) return "";
+  if (digits.length <= 2) return `(${digits}`;
+  if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  if (digits.length <= 10) {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  }
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+};
+
+const formatRgNumber = (value = "") => stripNonDigits(value).slice(0, 12);
+
+const formatDateToBr = (isoDate = "") => {
+  if (!isoDate) return "";
+  const [year, month, day] = isoDate.split("-");
+  if (!year || !month || !day) return isoDate;
+  return `${day.padStart(2, "0")}/${month.padStart(2, "0")}/${year}`;
+};
+
+const outrosDadosRequeridoConfig = [
+  { key: "requeridoRg", label: "RG e órgão emissor", renderType: "rg" },
+  { key: "requeridoDataNascimento", label: "Data de nascimento", renderType: "date", field: "requeridoDataNascimento" },
+  { key: "requeridoNomeMae", label: "Nome da mãe", renderType: "text", field: "requeridoNomeMae", placeholder: "Nome completo da mãe" },
+  { key: "requeridoNomePai", label: "Nome do pai", renderType: "text", field: "requeridoNomePai", placeholder: "Nome completo do pai" },
+  { key: "requeridoOutrosDetalhes", label: "Outros detalhes relevantes", renderType: "textarea", field: "requeridoOutrosDetalhes", placeholder: "Ex: Nome do advogado, redes sociais, etc." },
+];
+
+const outrosDadosRequeridoFieldMap = {
+  requeridoRg: ["requeridoRgNumero", "requeridoRgOrgao"],
+  requeridoDataNascimento: ["requeridoDataNascimento"],
+  requeridoNomeMae: ["requeridoNomeMae"],
+  requeridoNomePai: ["requeridoNomePai"],
+  requeridoOutrosDetalhes: ["requeridoOutrosDetalhes"],
+};
+
+const sanitizeDecimalInput = (value = "", { decimalPlaces = 2, maxIntegerDigits = 9 } = {}) => {
+  if (!value) return "";
+  const allowed = value.replace(/[^0-9,]/g, "");
+  const [intPartRaw, ...decimalParts] = allowed.split(",");
+  const integerPart = (intPartRaw || "").slice(0, maxIntegerDigits);
+  if (decimalParts.length === 0) {
+    return integerPart;
+  }
+  const decimalPart = decimalParts.join("").slice(0, decimalPlaces);
+  return `${integerPart},${decimalPart}`;
+};
+
+const normalizeDecimalForSubmit = (value = "", decimals = 2) => {
+  if (!value) return "";
+  const normalized = value.replace(/\./g, "").replace(",", ".");
+  const number = Number(normalized);
+  if (Number.isNaN(number)) {
+    return "";
+  }
+  return number.toFixed(decimals);
+};
+
+const currencyFields = new Set(["valorProvisorioReferencia", "valorTotalDebitoExecucao", "valorCausa"]);
+const percentFields = new Set([
+  "percentualSmRequerido",
+  "percentualDespesasExtra",
+  "percentualDefinitivoSalarioMin",
+  "percentualDefinitivoExtras"
+]);
+
 export const FormularioSubmissao = () => {
   const [formState, dispatch] = useReducer(formReducer, initialState);
   const [statusMessage, setStatusMessage] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [loading, setLoading] = useState(false);
   const [generatedCredentials, setGeneratedCredentials] = useState(null);
+  const [formErrors, setFormErrors] = useState({});
+  const [checklistWarningOpen, setChecklistWarningOpen] = useState(false);
   
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const documentInputRef = useRef(null);
 
+  const clearFieldError = (field) => {
+    setFormErrors((prev) => {
+      const hasFieldError = Boolean(prev[field]);
+      const shouldClearContato = (field === "enderecoRequerido" || field === "requeridoTelefone") && prev.requeridoContato;
+      if (!hasFieldError && !shouldClearContato) {
+        return prev;
+      }
+      const updated = { ...prev };
+      if (hasFieldError) {
+        delete updated[field];
+      }
+      if (shouldClearContato) {
+        delete updated.requeridoContato;
+      }
+      return updated;
+    });
+  };
+
   // Handler genérico
   const handleFieldChange = (e) => {
-    dispatch({ type: 'UPDATE_FIELD', field: e.target.name, value: e.target.value });
+    const { name, value } = e.target;
+    dispatch({ type: 'UPDATE_FIELD', field: name, value });
+    clearFieldError(name);
   };
 
   const handleNumericInput = (e) => {
@@ -171,6 +318,63 @@ export const FormularioSubmissao = () => {
     if (/^[0-9]*$/.test(value)) {
       handleFieldChange(e);
     }
+  };
+
+  const handleMaskedChange = (formatter, field) => (event) => {
+    const formattedValue = formatter(event.target.value);
+    dispatch({ type: 'UPDATE_FIELD', field, value: formattedValue });
+    clearFieldError(field);
+  };
+
+  const handleCpfChange = (field) => handleMaskedChange(formatCpf, field);
+  const handlePhoneChange = (field) => handleMaskedChange(formatPhone, field);
+  const handleRgChange = (field) => (event) => {
+    dispatch({ type: 'UPDATE_FIELD', field, value: formatRgNumber(event.target.value) });
+    clearFieldError(field);
+  };
+
+  const toggleRequeridoDetalhe = (key) => {
+    const selecionados = formState.requeridoOutrosSelecionados || [];
+    const jaSelecionado = selecionados.includes(key);
+    if (jaSelecionado) {
+      const atualizados = selecionados.filter((item) => item !== key);
+      dispatch({ type: 'UPDATE_FIELD', field: 'requeridoOutrosSelecionados', value: atualizados });
+      (outrosDadosRequeridoFieldMap[key] || []).forEach((field) => {
+        dispatch({ type: 'UPDATE_FIELD', field, value: "" });
+      });
+    } else {
+      dispatch({ type: 'UPDATE_FIELD', field: 'requeridoOutrosSelecionados', value: [...selecionados, key] });
+    }
+  };
+
+  const addFilho = () => {
+    dispatch({
+      type: 'UPDATE_FIELD',
+      field: 'filhos',
+      value: [...formState.filhos, { nome: "", dataNascimento: "" }]
+    });
+  };
+
+  const updateFilhoField = (index, field, value) => {
+    const atualizados = formState.filhos.map((filho, idx) => (idx === index ? { ...filho, [field]: value } : filho));
+    dispatch({ type: 'UPDATE_FIELD', field: 'filhos', value: atualizados });
+  };
+
+  const removeFilho = (index) => {
+    const atualizados = formState.filhos.filter((_, idx) => idx !== index);
+    dispatch({
+      type: 'UPDATE_FIELD',
+      field: 'filhos',
+      value: atualizados.length ? atualizados : [{ nome: "", dataNascimento: "" }]
+    });
+  };
+
+  const handleDecimalFieldChange = (field, options = {}) => (event) => {
+    dispatch({
+      type: 'UPDATE_FIELD',
+      field,
+      value: sanitizeDecimalInput(event.target.value, options)
+    });
   };
 
   // --- LÓGICA DE GRAVAÇÃO ---
@@ -222,8 +426,37 @@ export const FormularioSubmissao = () => {
   };
 
   // --- LÓGICA DE SUBMISSÃO ---
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const processSubmission = async ({
+    bypassChecklist = false,
+    isAlvaraContext = false,
+    requiredDocs = []
+  } = {}) => {
+    const validationErrors = {};
+    const nomeRequeridoTrim = (formState.nomeRequerido || "").trim();
+    const enderecoRequeridoTrim = (formState.enderecoRequerido || "").trim();
+    const telefoneRequeridoDigits = stripNonDigits(formState.requeridoTelefone || "");
+
+    if (!isAlvaraContext) {
+      if (!nomeRequeridoTrim) {
+        validationErrors.nomeRequerido = "Informe o nome completo da outra parte.";
+      }
+      if (!enderecoRequeridoTrim && !telefoneRequeridoDigits) {
+        validationErrors.requeridoContato = "Informe pelo menos um endereço ou telefone da outra parte.";
+      }
+    }
+
+    if (Object.keys(validationErrors).length > 0) {
+      setFormErrors(validationErrors);
+      return;
+    }
+
+    if (requiredDocs.length > 0 && formState.documentosMarcados.length === 0 && !bypassChecklist) {
+      setChecklistWarningOpen(true);
+      return;
+    }
+
+    setChecklistWarningOpen(false);
+    setFormErrors({});
     setLoading(true);
     setGeneratedCredentials(null);
     
@@ -246,7 +479,6 @@ export const FormularioSubmissao = () => {
       telefone: "telefone",
       enderecoAssistido: "endereco_assistido",
       emailAssistido: "email_assistido",
-      assistido_RG: "dados_adicionais_requerente", // Fallback parcial
       assistidoEhIncapaz: "assistido_eh_incapaz",
       assistidoNacionalidade: "assistido_nacionalidade",
       assistidoEstadoCivil: "assistido_estado_civil",
@@ -275,10 +507,8 @@ export const FormularioSubmissao = () => {
       requeridoEstadoCivil: "requerido_estado_civil",
       requeridoOcupacao: "requerido_ocupacao",
       requeridoEnderecoProfissional: "requerido_endereco_profissional",
-      dadosAdicionaisRequerido: "dados_adicionais_requerido",
 
       // Família Geral
-      filhosInfo: "filhos_info",
       dataInicioRelacao: "data_inicio_relacao",
       dataSeparacao: "data_separacao",
       bensPartilha: "bens_partilha",
@@ -323,10 +553,31 @@ export const FormularioSubmissao = () => {
       relato: "relato"
     };
 
+    const digitsOnlyFields = new Set([
+      "cpf",
+      "telefone",
+      "representanteCpf",
+      "representanteTelefone",
+      "cpfRequerido",
+      "requeridoTelefone"
+    ]);
+
     // Preenche o FormData usando o mapeamento
     Object.keys(fieldMapping).forEach(key => {
-      if (formState[key]) {
-        formData.append(fieldMapping[key], formState[key]);
+      const rawValue = formState[key];
+      if (!rawValue) {
+        return;
+      }
+      let normalizedValue = rawValue;
+      if (digitsOnlyFields.has(key)) {
+        normalizedValue = stripNonDigits(rawValue);
+      } else if (currencyFields.has(key)) {
+        normalizedValue = normalizeDecimalForSubmit(rawValue);
+      } else if (percentFields.has(key)) {
+        normalizedValue = normalizeDecimalForSubmit(rawValue);
+      }
+      if (normalizedValue) {
+        formData.append(fieldMapping[key], normalizedValue);
       }
     });
 
@@ -338,13 +589,49 @@ export const FormularioSubmissao = () => {
     // 3. Construção de Campos Compostos para a IA (Gemini)
     // A IA usa 'dados_adicionais_requerente' para criar o resumo, então montamos uma string rica
     const dadosAdicionaisRequerenteString = `
-      RG: ${formState.assistido_RG || 'Não inf.'}, 
+      RG: ${formState.assistidoRgNumero ? `${formState.assistidoRgNumero}${formState.assistidoRgOrgao ? ` ${formState.assistidoRgOrgao}` : ""}` : 'Não inf.'}, 
       Nacionalidade: ${formState.assistidoNacionalidade || 'Não inf.'}, 
       Estado Civil: ${formState.assistidoEstadoCivil || 'Não inf.'}, 
       Profissão: ${formState.assistidoOcupacao || 'Não inf.'},
       Data Nascimento: ${formState.dataNascimentoAssistido || 'Não inf.'}
     `;
     formData.append("dados_adicionais_requerente", dadosAdicionaisRequerenteString);
+
+    const detalhesRequerido = [];
+    if (formState.requeridoOutrosSelecionados?.includes("requeridoRg") && formState.requeridoRgNumero) {
+      detalhesRequerido.push(
+        `RG: ${formState.requeridoRgNumero}${formState.requeridoRgOrgao ? ` ${formState.requeridoRgOrgao}` : ""}`
+      );
+    }
+    if (formState.requeridoOutrosSelecionados?.includes("requeridoDataNascimento") && formState.requeridoDataNascimento) {
+      detalhesRequerido.push(`Data de nascimento: ${formatDateToBr(formState.requeridoDataNascimento)}`);
+    }
+    if (formState.requeridoOutrosSelecionados?.includes("requeridoNomeMae") && formState.requeridoNomeMae) {
+      detalhesRequerido.push(`Nome da mãe: ${formState.requeridoNomeMae}`);
+    }
+    if (formState.requeridoOutrosSelecionados?.includes("requeridoNomePai") && formState.requeridoNomePai) {
+      detalhesRequerido.push(`Nome do pai: ${formState.requeridoNomePai}`);
+    }
+    if (formState.requeridoOutrosSelecionados?.includes("requeridoOutrosDetalhes") && formState.requeridoOutrosDetalhes) {
+      detalhesRequerido.push(`Observações: ${formState.requeridoOutrosDetalhes}`);
+    }
+    if (detalhesRequerido.length > 0) {
+      formData.append("dados_adicionais_requerido", detalhesRequerido.join(" | "));
+    }
+
+    const filhosValidos = (formState.filhos || []).filter(
+      (filho) => (filho.nome || "").trim() || filho.dataNascimento
+    );
+    if (filhosValidos.length > 0) {
+      const filhosTexto = filhosValidos
+        .map((filho) => {
+          const nome = (filho.nome || "").trim() || "Nome não informado";
+          const data = filho.dataNascimento ? formatDateToBr(filho.dataNascimento) : "Data não informada";
+          return `${nome} (${data})`;
+        })
+        .join("; ");
+      formData.append("filhos_info", filhosTexto);
+    }
 
     // Arquivos e Arrays
     formData.append("documentos_informados", JSON.stringify(formState.documentosMarcados));
@@ -365,6 +652,7 @@ export const FormularioSubmissao = () => {
       setStatusMessage("");
     }
   };
+
 
   // --- LISTAS E CONDICIONAIS ---
   const acoesFallbackFamilia = [
@@ -397,6 +685,24 @@ export const FormularioSubmissao = () => {
   const labelAutor = isRepresentacao ? "Dados da Criança/Adolescente (Beneficiário)" : "Seus Dados (Você é o autor da ação)";
   const mostrarEmpregador = formState.requeridoTemEmpregoFormal === "sim";
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    await processSubmission({ isAlvaraContext: isAlvara, requiredDocs: listaDeDocumentos });
+  };
+
+  const handleChecklistConfirm = async () => {
+    setChecklistWarningOpen(false);
+    await processSubmission({
+      bypassChecklist: true,
+      isAlvaraContext: isAlvara,
+      requiredDocs: listaDeDocumentos
+    });
+  };
+
+  const handleChecklistReview = () => {
+    setChecklistWarningOpen(false);
+  };
+
   if (generatedCredentials) {
     return (
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="card text-center p-8">
@@ -419,6 +725,7 @@ export const FormularioSubmissao = () => {
           onClick={() => { 
             dispatch({ type: 'RESET_FORM' });
             setGeneratedCredentials(null);
+            setFormErrors({});
           }} 
           className="mt-6 btn btn-primary w-full"
         >
@@ -429,7 +736,7 @@ export const FormularioSubmissao = () => {
   }
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-4xl mx-auto">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-4xl mx-auto px-3 sm:px-0">
       <form onSubmit={handleSubmit} className="space-y-8">
         
         {/* --- ETAPA 1: DEFINIÇÃO DA AÇÃO --- */}
@@ -511,7 +818,16 @@ export const FormularioSubmissao = () => {
             <h3 className="heading-3 text-primary">{labelAutor}</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <input type="text" placeholder="Nome Completo" name="nome" value={formState.nome} onChange={handleFieldChange} required className="input" />
-              <input type="text" placeholder="CPF (apenas números)" name="cpf" value={formState.cpf} onChange={handleNumericInput} required className="input" />
+              <input
+                type="text"
+                inputMode="numeric"
+                placeholder="CPF"
+                name="cpf"
+                value={formState.cpf}
+                onChange={handleCpfChange('cpf')}
+                required
+                className="input"
+              />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <input type="date" placeholder="Data de Nascimento" name="dataNascimentoAssistido" value={formState.dataNascimentoAssistido} onChange={handleFieldChange} className="input" />
@@ -522,9 +838,29 @@ export const FormularioSubmissao = () => {
                  {estadoCivilOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-               <input type="text" placeholder="Profissão" name="assistidoOcupacao" value={formState.assistidoOcupacao} onChange={handleFieldChange} className="input" />
-               <input type="text" placeholder="RG (Ex: 00.000.000-00 SSP/BA)" name="assistido_RG" value={formState.assistido_RG} onChange={handleFieldChange} className="input" />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+               <input type="text" placeholder="Profissão" name="assistidoOcupacao" value={formState.assistidoOcupacao} onChange={handleFieldChange} className="input md:col-span-1" />
+               <input
+                 type="text"
+                 inputMode="numeric"
+                 placeholder="RG (apenas números)"
+                 name="assistidoRgNumero"
+                 value={formState.assistidoRgNumero}
+                 onChange={handleRgChange('assistidoRgNumero')}
+                 className="input"
+               />
+               <select
+                 name="assistidoRgOrgao"
+                 value={formState.assistidoRgOrgao}
+                 onChange={handleFieldChange}
+                 className="input"
+               >
+                 {orgaoEmissorOptions.map((option) => (
+                   <option key={option.value} value={option.value}>
+                     {option.label}
+                   </option>
+                 ))}
+               </select>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                <input type="text" placeholder="Endereço Residencial Completo" name="enderecoAssistido" value={formState.enderecoAssistido} onChange={handleFieldChange} required className="input" />
@@ -534,7 +870,16 @@ export const FormularioSubmissao = () => {
                <input type="email" placeholder="Email (opcional)" name="emailAssistido" value={formState.emailAssistido} onChange={handleFieldChange} className="input" />
                <div className="relative">
                   <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={18} />
-                  <input type="tel" placeholder="Telefone/WhatsApp para contato" name="telefone" value={formState.telefone} onChange={handleNumericInput} required className="input pl-10" />
+                  <input
+                    type="text"
+                    inputMode="tel"
+                    placeholder="Telefone/WhatsApp para contato"
+                    name="telefone"
+                    value={formState.telefone}
+                    onChange={handlePhoneChange('telefone')}
+                    required
+                    className="input pl-10"
+                  />
                 </div>
             </div>
           </div>
@@ -547,7 +892,15 @@ export const FormularioSubmissao = () => {
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <input type="text" placeholder="Seu Nome Completo" name="representanteNome" value={formState.representanteNome} onChange={handleFieldChange} className="input" />
-                <input type="text" placeholder="Seu CPF" name="representanteCpf" value={formState.representanteCpf} onChange={handleNumericInput} className="input" />
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="Seu CPF"
+                  name="representanteCpf"
+                  value={formState.representanteCpf}
+                  onChange={handleCpfChange('representanteCpf')}
+                  className="input"
+                />
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -566,7 +919,15 @@ export const FormularioSubmissao = () => {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                  <input type="email" placeholder="Seu Email" name="representanteEmail" value={formState.representanteEmail} onChange={handleFieldChange} className="input" />
-                 <input type="tel" placeholder="Seu Telefone" name="representanteTelefone" value={formState.representanteTelefone} onChange={handleNumericInput} className="input" />
+                 <input
+                   type="text"
+                   inputMode="tel"
+                   placeholder="Seu Telefone"
+                   name="representanteTelefone"
+                   value={formState.representanteTelefone}
+                   onChange={handlePhoneChange('representanteTelefone')}
+                   className="input"
+                 />
               </div>
             </div>
           )}
@@ -582,16 +943,65 @@ export const FormularioSubmissao = () => {
             <p className="text-sm text-muted">Preencha com o máximo de informações que você souber.</p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <input type="text" placeholder="Nome Completo da outra parte" name="nomeRequerido" value={formState.nomeRequerido} onChange={handleFieldChange} className="input" />
-              <input type="text" placeholder="CPF (se souber)" name="cpfRequerido" value={formState.cpfRequerido} onChange={handleNumericInput} className="input" />
+              <div>
+                <input
+                  type="text"
+                  placeholder="Nome Completo da outra parte"
+                  name="nomeRequerido"
+                  value={formState.nomeRequerido}
+                  onChange={handleFieldChange}
+                  className="input"
+                  aria-invalid={Boolean(formErrors.nomeRequerido)}
+                />
+                {formErrors.nomeRequerido && (
+                  <p className="text-xs text-red-500 mt-1">{formErrors.nomeRequerido}</p>
+                )}
+              </div>
+              <div>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="CPF (se souber)"
+                  name="cpfRequerido"
+                  value={formState.cpfRequerido}
+                  onChange={handleCpfChange('cpfRequerido')}
+                  className="input"
+                />
+              </div>
             </div>
             
-            <input type="text" placeholder="Endereço Residencial (se souber)" name="enderecoRequerido" value={formState.enderecoRequerido} onChange={handleFieldChange} className="input" />
+            <div>
+              <input
+                type="text"
+                placeholder="Endereço Residencial (se souber)"
+                name="enderecoRequerido"
+                value={formState.enderecoRequerido}
+                onChange={handleFieldChange}
+                className="input"
+                aria-invalid={Boolean(formErrors.requeridoContato)}
+              />
+            </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <input type="tel" placeholder="Telefone (se souber)" name="requeridoTelefone" value={formState.requeridoTelefone} onChange={handleNumericInput} className="input" />
-                <input type="email" placeholder="Email (se souber)" name="requeridoEmail" value={formState.requeridoEmail} onChange={handleFieldChange} className="input" />
+                <div>
+                  <input
+                    type="text"
+                    inputMode="tel"
+                    placeholder="Telefone (se souber)"
+                    name="requeridoTelefone"
+                    value={formState.requeridoTelefone}
+                    onChange={handlePhoneChange('requeridoTelefone')}
+                    className="input"
+                    aria-invalid={Boolean(formErrors.requeridoContato)}
+                  />
+                </div>
+                <div>
+                  <input type="email" placeholder="Email (se souber)" name="requeridoEmail" value={formState.requeridoEmail} onChange={handleFieldChange} className="input" />
+                </div>
             </div>
+            {formErrors.requeridoContato && (
+              <p className="text-xs text-red-500">{formErrors.requeridoContato}</p>
+            )}
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <input type="text" placeholder="Profissão (se souber)" name="requeridoOcupacao" value={formState.requeridoOcupacao} onChange={handleFieldChange} className="input" />
@@ -605,9 +1015,84 @@ export const FormularioSubmissao = () => {
             
             <input type="text" placeholder="Endereço de Trabalho (se souber)" name="requeridoEnderecoProfissional" value={formState.requeridoEnderecoProfissional} onChange={handleFieldChange} className="input" />
             
-            <div>
-               <label className="label">Outros dados (RG, etc - Se souber)</label>
-               <textarea name="dadosAdicionaisRequerido" value={formState.dadosAdicionaisRequerido} onChange={handleFieldChange} rows="2" className="input"></textarea>
+            <div className="border border-dashed border-soft rounded-xl p-4 space-y-3 bg-app/40">
+               <p className="label mb-0">Quais dessas informações adicionais você possui?</p>
+               <div className="space-y-2">
+                 {outrosDadosRequeridoConfig.map((item) => {
+                   const selecionado = formState.requeridoOutrosSelecionados.includes(item.key);
+                   return (
+                     <div key={item.key} className="bg-surface rounded-lg border border-soft/60 p-3 space-y-2">
+                       <label className="flex items-center gap-2 cursor-pointer text-sm font-medium">
+                         <input
+                           type="checkbox"
+                           className="w-4 h-4 accent-primary"
+                           checked={selecionado}
+                           onChange={() => toggleRequeridoDetalhe(item.key)}
+                         />
+                         <span>{item.label}</span>
+                       </label>
+                       {selecionado && (
+                         <>
+                           {item.renderType === "rg" && (
+                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                               <input
+                                 type="text"
+                                 inputMode="numeric"
+                                 placeholder="Número do RG"
+                                 name="requeridoRgNumero"
+                                 value={formState.requeridoRgNumero}
+                                 onChange={handleRgChange('requeridoRgNumero')}
+                                 className="input"
+                               />
+                               <select
+                                 name="requeridoRgOrgao"
+                                 value={formState.requeridoRgOrgao}
+                                 onChange={handleFieldChange}
+                                 className="input"
+                               >
+                                 {orgaoEmissorOptions.map((option) => (
+                                   <option key={option.value} value={option.value}>
+                                     {option.label}
+                                   </option>
+                                 ))}
+                               </select>
+                             </div>
+                           )}
+                           {item.renderType === "date" && (
+                             <input
+                               type="date"
+                               name={item.field}
+                               value={formState[item.field]}
+                               onChange={handleFieldChange}
+                               className="input"
+                             />
+                           )}
+                           {item.renderType === "text" && (
+                             <input
+                               type="text"
+                               name={item.field}
+                               value={formState[item.field]}
+                               onChange={handleFieldChange}
+                               className="input"
+                               placeholder={item.placeholder}
+                             />
+                           )}
+                           {item.renderType === "textarea" && (
+                             <textarea
+                               name={item.field}
+                               value={formState[item.field]}
+                               onChange={handleFieldChange}
+                               className="input"
+                               rows="2"
+                               placeholder={item.placeholder}
+                             />
+                           )}
+                         </>
+                       )}
+                     </div>
+                   );
+                 })}
+               </div>
             </div>
           </section>
         )}
@@ -626,22 +1111,61 @@ export const FormularioSubmissao = () => {
                 <h4 className="font-semibold text-primary">Valores e Pagamento (Pedido Principal)</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="label">Valor de Pensão Requerido (R$ ou %)</label>
-                      <input type="text" name="percentualSmRequerido" value={formState.percentualSmRequerido} onChange={handleFieldChange} placeholder="Ex: 30% do salário mínimo ou R$ 400,00" className="input" />
+                      <label className="label">Percentual de Pensão Requerido</label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          name="percentualSmRequerido"
+                          value={formState.percentualSmRequerido}
+                          onChange={handleDecimalFieldChange('percentualSmRequerido', { maxIntegerDigits: 3 })}
+                          placeholder="0,00"
+                          className="input pr-12"
+                        />
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-muted font-semibold">%</span>
+                      </div>
                     </div>
                     <div>
                       <label className="label">Percentual Adicional para Despesas Extras</label>
-                      <input type="text" name="percentualDespesasExtra" value={formState.percentualDespesasExtra} onChange={handleFieldChange} placeholder="Ex: 50% de material escolar/farmácia" className="input" />
+                      <div className="relative">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          name="percentualDespesasExtra"
+                          value={formState.percentualDespesasExtra}
+                          onChange={handleDecimalFieldChange('percentualDespesasExtra', { maxIntegerDigits: 3 })}
+                          placeholder="0,00"
+                          className="input pr-12"
+                        />
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-muted font-semibold">%</span>
+                      </div>
                     </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="label">Data de pagamento desejada</label>
-                    <input type="text" name="diaPagamentoRequerido" value={formState.diaPagamentoRequerido} onChange={handleFieldChange} placeholder="Ex: Todo dia 10 do mês" className="input" />
+                    <input
+                      type="date"
+                      name="diaPagamentoRequerido"
+                      value={formState.diaPagamentoRequerido}
+                      onChange={handleFieldChange}
+                      className="input"
+                    />
                   </div>
                   <div>
                     <label className="label">Valor para Alimentos Provisórios (se diferente)</label>
-                    <input type="text" name="valorProvisorioReferencia" value={formState.valorProvisorioReferencia} onChange={handleFieldChange} placeholder="Ex: R$ 300,00" className="input" />
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted font-semibold">R$</span>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        name="valorProvisorioReferencia"
+                        value={formState.valorProvisorioReferencia}
+                        onChange={handleDecimalFieldChange('valorProvisorioReferencia', { maxIntegerDigits: 8 })}
+                        placeholder="0,00"
+                        className="input pl-12"
+                      />
+                    </div>
                   </div>
                 </div>
                 <div>
@@ -687,21 +1211,54 @@ export const FormularioSubmissao = () => {
                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <input type="text" placeholder="Vara onde tramitou" name="varaOriginaria" value={formState.varaOriginaria} onChange={handleFieldChange} className="input" />
                     <input type="text" placeholder="Valor/Percentual Fixado" name="percentualOuValorFixado" value={formState.percentualOuValorFixado} onChange={handleFieldChange} className="input" />
-                    <input type="text" placeholder="Dia de Pagamento Fixado" name="diaPagamentoFixado" value={formState.diaPagamentoFixado} onChange={handleFieldChange} className="input" />
+                    <input type="date" name="diaPagamentoFixado" value={formState.diaPagamentoFixado} onChange={handleFieldChange} className="input" />
                  </div>
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <input type="text" placeholder="Período da Dívida (ex: Jan/2023 a Dez/2023)" name="periodoDebitoExecucao" value={formState.periodoDebitoExecucao} onChange={handleFieldChange} className="input" />
-                    <input type="text" placeholder="Valor Total da Dívida (R$)" name="valorTotalDebitoExecucao" value={formState.valorTotalDebitoExecucao} onChange={handleFieldChange} className="input" />
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted font-semibold">R$</span>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="0,00"
+                        name="valorTotalDebitoExecucao"
+                        value={formState.valorTotalDebitoExecucao}
+                        onChange={handleDecimalFieldChange('valorTotalDebitoExecucao', { maxIntegerDigits: 10 })}
+                        className="input pl-12"
+                      />
+                    </div>
                  </div>
                  {/* Fields for "definitivo" values can also be useful in execution cases */}
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                      <div>
                       <label className="label">Pensão Definitiva (% Sal. Mínimo)</label>
-                      <input type="text" name="percentualDefinitivoSalarioMin" value={formState.percentualDefinitivoSalarioMin} onChange={handleFieldChange} className="input" />
+                      <div className="relative">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          name="percentualDefinitivoSalarioMin"
+                          value={formState.percentualDefinitivoSalarioMin}
+                          onChange={handleDecimalFieldChange('percentualDefinitivoSalarioMin', { maxIntegerDigits: 3 })}
+                          className="input pr-12"
+                          placeholder="0,00"
+                        />
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-muted font-semibold">%</span>
+                      </div>
                      </div>
                      <div>
                       <label className="label">Pensão Definitiva (% Desp. Extras)</label>
-                      <input type="text" name="percentualDefinitivoExtras" value={formState.percentualDefinitivoExtras} onChange={handleFieldChange} className="input" />
+                      <div className="relative">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          name="percentualDefinitivoExtras"
+                          value={formState.percentualDefinitivoExtras}
+                          onChange={handleDecimalFieldChange('percentualDefinitivoExtras', { maxIntegerDigits: 3 })}
+                          className="input pr-12"
+                          placeholder="0,00"
+                        />
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-muted font-semibold">%</span>
+                      </div>
                      </div>
                  </div>
                </div>
@@ -748,7 +1305,45 @@ export const FormularioSubmissao = () => {
               
               <div>
                 <label className="label">Filhos (Nome e Data de Nascimento)</label>
-                <textarea name="filhosInfo" value={formState.filhosInfo} onChange={handleFieldChange} rows="2" placeholder="Ex: João (10/05/2015); Maria (20/01/2018)" className="input"></textarea>
+                <div className="space-y-3">
+                  {formState.filhos.map((filho, index) => (
+                    <div key={`filho-${index}`} className="grid grid-cols-1 md:grid-cols-7 gap-3 items-end">
+                      <div className="md:col-span-4">
+                        <input
+                          type="text"
+                          placeholder="Nome completo"
+                          value={filho.nome}
+                          onChange={(e) => updateFilhoField(index, "nome", e.target.value)}
+                          className="input"
+                        />
+                      </div>
+                      <div className="md:col-span-2">
+                        <input
+                          type="date"
+                          value={filho.dataNascimento}
+                          onChange={(e) => updateFilhoField(index, "dataNascimento", e.target.value)}
+                          className="input"
+                        />
+                      </div>
+                      {formState.filhos.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeFilho(index)}
+                          className="btn btn-ghost text-red-500 border border-red-200 hover:text-red-600 hover:border-red-400"
+                        >
+                          Remover
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={addFilho}
+                    className="btn btn-secondary w-full sm:w-auto"
+                  >
+                    <Plus size={16} /> Adicionar outro filho
+                  </button>
+                </div>
               </div>
                <div>
                 <label className="label">Como a guarda dos filhos é exercida hoje?</label>
@@ -775,7 +1370,18 @@ export const FormularioSubmissao = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="label">Valor da Causa (se souber)</label>
-              <input type="text" name="valorCausa" value={formState.valorCausa} onChange={handleFieldChange} placeholder="Ex: R$ 15.000,00" className="input" />
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted font-semibold">R$</span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  name="valorCausa"
+                  value={formState.valorCausa}
+                  onChange={handleDecimalFieldChange('valorCausa', { maxIntegerDigits: 9 })}
+                  placeholder="0,00"
+                  className="input pl-12"
+                />
+              </div>
             </div>
             <div>
               <label className="label">Cidade para assinatura do documento</label>
@@ -880,6 +1486,28 @@ export const FormularioSubmissao = () => {
         </div>
 
       </form>
+      {checklistWarningOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 px-4">
+          <div className="bg-surface max-w-md w-full rounded-2xl p-6 border border-soft shadow-xl space-y-4">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="text-amber-500" />
+              <h3 className="text-lg font-semibold">Documentos obrigatórios</h3>
+            </div>
+            <p className="text-sm text-muted">
+              Você está enviando o caso sem marcar nenhum documento obrigatório para esta ação.
+              Confirme que está ciente para continuar ou volte para revisar a lista.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button type="button" onClick={handleChecklistReview} className="btn btn-ghost border border-soft flex-1">
+                Revisar checklist
+              </button>
+              <button type="button" onClick={handleChecklistConfirm} className="btn btn-primary flex-1">
+                OK, enviar assim mesmo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 };

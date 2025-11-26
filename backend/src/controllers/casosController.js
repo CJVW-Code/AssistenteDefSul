@@ -92,6 +92,29 @@ const ensureText = (value, fallback = "[PREENCHER]") => {
   return text.length ? text : fallback;
 };
 
+const formatDateBr = (value) => {
+  if (!value) return value;
+  const parts = value.split("-");
+  if (parts.length !== 3) return value;
+  const [year, month, day] = parts;
+  if (!year || year.length !== 4) return value;
+  return `${day.padStart(2, "0")}/${month.padStart(2, "0")}/${year}`;
+};
+
+const formatCurrencyBr = (value) => {
+  if (value === null || value === undefined || value === "") return value;
+  const number = Number(value);
+  if (Number.isNaN(number)) return value;
+  return number
+    .toLocaleString("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })
+    .replace(/\u00A0/g, " ");
+};
+
 const buildDocxTemplatePayload = (
   normalizedData,
   dosFatosTexto,
@@ -299,6 +322,22 @@ export const criarNovoCaso = async (req, res) => {
       retorno_nome_solteira,
       alimentos_para_ex_conjuge,
     } = req.body;
+    const formattedAssistidoNascimento = formatDateBr(
+      assistido_data_nascimento
+    );
+    const formattedDataInicioRelacao = formatDateBr(data_inicio_relacao);
+    const formattedDataSeparacao = formatDateBr(data_separacao);
+    const formattedDiaPagamentoRequerido = formatDateBr(
+      dia_pagamento_requerido
+    );
+    const formattedDiaPagamentoFixado = formatDateBr(dia_pagamento_fixado);
+    const formattedValorProvisorioReferencia = formatCurrencyBr(
+      valor_provisorio_referencia
+    );
+    const formattedValorTotalDebitoExecucao = formatCurrencyBr(
+      valor_total_debito_execucao
+    );
+    const formattedValorCausa = formatCurrencyBr(valor_causa);
     const documentosInformadosArray = JSON.parse(documentos_informados || "[]");
     const { protocolo, chaveAcesso } = generateCredentials(tipoAcao);
     const chaveAcessoHash = hashKeyWithSalt(chaveAcesso);
@@ -363,7 +402,7 @@ export const criarNovoCaso = async (req, res) => {
       assistido_nacionalidade,
       assistido_estado_civil,
       assistido_ocupacao,
-      assistido_data_nascimento,
+      assistido_data_nascimento: formattedAssistidoNascimento,
       assistido_endereco_profissional,
       representante_nome,
       representante_nacionalidade,
@@ -385,24 +424,24 @@ export const criarNovoCaso = async (req, res) => {
       requerido_email,
       requerido_telefone,
       filhos_info,
-      data_inicio_relacao,
-      data_separacao,
+      data_inicio_relacao: formattedDataInicioRelacao,
+      data_separacao: formattedDataSeparacao,
       bens_partilha,
       descricao_guarda,
       situacao_financeira_genitora,
       processo_titulo_numero,
-      valor_causa,
+      valor_causa: formattedValorCausa,
       valor_causa_extenso,
       cidade_assinatura,
       cidadeDataAssinatura: cidade_assinatura,
       valor_total_extenso,
       valor_debito_extenso,
-      valor_provisorio_referencia,
+      valor_provisorio_referencia: formattedValorProvisorioReferencia,
       percentual_definitivo_salario_min,
       percentual_definitivo_extras,
       percentual_sm_requerido,
       percentual_despesas_extra,
-      dia_pagamento_requerido,
+      dia_pagamento_requerido: formattedDiaPagamentoRequerido,
       dados_bancarios_deposito,
       requerido_tem_emprego_formal,
       empregador_requerido_nome,
@@ -411,9 +450,9 @@ export const criarNovoCaso = async (req, res) => {
       numero_processo_originario,
       vara_originaria,
       percentual_ou_valor_fixado,
-      dia_pagamento_fixado,
+      dia_pagamento_fixado: formattedDiaPagamentoFixado,
       periodo_debito_execucao,
-      valor_total_debito_execucao,
+      valor_total_debito_execucao: formattedValorTotalDebitoExecucao,
       regime_bens,
       retorno_nome_solteira,
       alimentos_para_ex_conjuge,
@@ -469,16 +508,16 @@ export const criarNovoCaso = async (req, res) => {
       requerido_email,
       requerido_telefone,
       filhos_info,
-      data_inicio_relacao,
-      data_separacao,
+      data_inicio_relacao: formattedDataInicioRelacao,
+      data_separacao: formattedDataSeparacao,
       bens_partilha,
       descricao_guarda,
       situacao_financeira_genitora,
       percentual_sm_requerido,
       percentual_despesas_extra,
-      dia_pagamento_requerido,
+      dia_pagamento_requerido: formattedDiaPagamentoRequerido,
       dados_bancarios_deposito,
-      valor_provisorio_referencia,
+      valor_provisorio_referencia: formattedValorProvisorioReferencia,
       percentual_definitivo_salario_min,
       percentual_definitivo_extras,
       requerido_tem_emprego_formal,
@@ -489,12 +528,12 @@ export const criarNovoCaso = async (req, res) => {
       vara_originaria,
       processo_titulo_numero,
       percentual_ou_valor_fixado,
-      dia_pagamento_fixado,
+      dia_pagamento_fixado: formattedDiaPagamentoFixado,
       periodo_debito_execucao,
-      valor_total_debito_execucao,
+      valor_total_debito_execucao: formattedValorTotalDebitoExecucao,
       valor_total_extenso,
       valor_debito_extenso,
-      valor_causa,
+      valor_causa: formattedValorCausa,
       valor_causa_extenso,
       cidade_assinatura,
       vara_competente: varaAutomatica,
