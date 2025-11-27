@@ -16,9 +16,9 @@
   --color-secondary-600: #c98600;
 
   /* Surfaces & text */
-  --color-bg: #f5f7f8;
-  --color-surface: #ffffff;
-  --color-border: #9fa0a0;
+  --color-bg: #dddddd;
+  --color-surface: #cfcfcf;
+  --color-border: #b6b6b6;
 
   --color-text: #000000;
   --color-text-muted: #4f5152;
@@ -222,8 +222,8 @@
   /* Badges */
   .badge {
     @apply inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-lg;
-    background: color-mix(in oklab, var(--color-text) 10%, transparent);
-    color: var(--color-text);
+    background-color: color-mix(in oklab, var(--color-text) 10%, transparent);
+    color: currentColor;
     border: 1px solid var(--color-border);
   }
 
@@ -266,12 +266,12 @@
   }
   .table thead th {
     @apply text-left font-semibold px-4 py-3;
-    color: var(--color-text);
+    color: inherit;
   }
   .table tbody td {
     @apply px-4 py-3 border-t;
     border-color: var(--color-border);
-    color: var(--color-text);
+    color: inherit;
   }
 }
 

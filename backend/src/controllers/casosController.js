@@ -1,4 +1,5 @@
 ﻿import { supabase } from "../config/supabase.js";
+import mammoth from "mammoth";
 import {
   generateCredentials,
   hashKeyWithSalt,
@@ -250,6 +251,7 @@ const buildDocxTemplatePayload = (
 // --- FUNÃ‡ÃƒO DE CRIAÃ‡ÃƒO (VERSÃƒO FINAL E COMPLETA) ---
 export const criarNovoCaso = async (req, res) => {
   try {
+    const dados_formulario = req.body;
     const {
       nome,
       cpf,
@@ -321,7 +323,7 @@ export const criarNovoCaso = async (req, res) => {
       regime_bens,
       retorno_nome_solteira,
       alimentos_para_ex_conjuge,
-    } = req.body;
+    } = dados_formulario;
     const formattedAssistidoNascimento = formatDateBr(
       assistido_data_nascimento
     );
@@ -468,89 +470,15 @@ export const criarNovoCaso = async (req, res) => {
 
     // ... (O cÃ³digo de upload dos arquivos originais continua aqui) ...
     // --- GERAÃ‡ÃƒO E UPLOAD DO DOCX GERADO ---
+    let peticao_completa_texto = null;
     try {
-      // Monta os dados para o template .docx (ajuste conforme placeholders do template)
-    const baseDocxData = {
-      acao_especifica: acaoEspecifica,
-      protocolo,
-      nome_assistido: nome,
-      cpf_assistido: cpf,
-      telefone_assistido: telefone,
-      tipo_acao: tipoAcao,
-      relato_texto: relato,
-      resumo_ia,
-      endereco_assistido,
-      email_assistido,
-      dados_adicionais_requerente,
-      assistido_eh_incapaz,
-      assistido_nacionalidade,
-      assistido_estado_civil,
-      assistido_ocupacao,
-      assistido_data_nascimento,
-      assistido_endereco_profissional,
-      representante_nome,
-      representante_nacionalidade,
-      representante_estado_civil,
-      representante_ocupacao,
-      representante_cpf,
-      representante_endereco_residencial,
-      representante_endereco_profissional,
-      representante_email,
-      representante_telefone,
-      nome_requerido,
-      cpf_requerido,
-      endereco_requerido,
-      dados_adicionais_requerido,
-      requerido_nacionalidade,
-      requerido_estado_civil,
-      requerido_ocupacao,
-      requerido_endereco_profissional,
-      requerido_email,
-      requerido_telefone,
-      filhos_info,
-      data_inicio_relacao: formattedDataInicioRelacao,
-      data_separacao: formattedDataSeparacao,
-      bens_partilha,
-      descricao_guarda,
-      situacao_financeira_genitora,
-      percentual_sm_requerido,
-      percentual_despesas_extra,
-      dia_pagamento_requerido: formattedDiaPagamentoRequerido,
-      dados_bancarios_deposito,
-      valor_provisorio_referencia: formattedValorProvisorioReferencia,
-      percentual_definitivo_salario_min,
-      percentual_definitivo_extras,
-      requerido_tem_emprego_formal,
-      empregador_requerido_nome,
-      empregador_requerido_endereco,
-      empregador_email,
-      numero_processo_originario,
-      vara_originaria,
-      processo_titulo_numero,
-      percentual_ou_valor_fixado,
-      dia_pagamento_fixado: formattedDiaPagamentoFixado,
-      periodo_debito_execucao,
-      valor_total_debito_execucao: formattedValorTotalDebitoExecucao,
-      valor_total_extenso,
-      valor_debito_extenso,
-      valor_causa: formattedValorCausa,
-      valor_causa_extenso,
-      cidade_assinatura,
-      vara_competente: varaAutomatica,
-      regime_bens,
-      retorno_nome_solteira,
-      alimentos_para_ex_conjuge,
-      peticao_texto: peticao_inicial_rascunho,
-    };
-    const normalizedTemplateData = normalizePromptData(caseDataForPetition);
-    const docxData = buildDocxTemplatePayload(
-      normalizedTemplateData,
-      dosFatosTexto,
-      baseDocxData
-    );
-
       const docxBuffer = await generateDocx(docxData);
       const docxPath = `${protocolo}/peticao_inicial_${protocolo}.docx`;
+
+      const { value: extractedText } = await mammoth.extractRawText({
+        buffer: docxBuffer,
+      });
+      peticao_completa_texto = extractedText;
 
       const { error: uploadDocxErr } = await supabase.storage
         .from("peticoes")
@@ -617,7 +545,9 @@ export const criarNovoCaso = async (req, res) => {
       resumo_ia,
       url_documento_gerado,
       documentos_informados: documentosInformadosArray,
-      peticao_inicial_rascunho: peticao_inicial_rascunho,
+      peticao_inicial_rascunho,
+      dados_formulario,
+      peticao_completa_texto,
     });
 
     if (dbError) {

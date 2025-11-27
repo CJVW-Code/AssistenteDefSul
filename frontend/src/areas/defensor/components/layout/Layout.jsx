@@ -5,7 +5,7 @@ import { Header } from "./Header";
 
 export const Layout = () => {
   return (
-    <div className="min-h-screen bg-app text-slate-900 dark:text-white flex">
+    <div className="min-h-screen bg-app flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-h-screen">
         <Header />

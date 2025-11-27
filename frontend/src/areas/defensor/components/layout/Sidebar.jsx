@@ -41,7 +41,7 @@ export const Sidebar = () => {
 
         <div className="px-6 py-6 border-t border-soft text-sm text-muted">
           <p>Precisa de ajuda?</p>
-          <p className="font-semibold text-slate-900 dark:text-white">
+          <p className="font-semibold ">
             suporte@defsul.app
           </p>
         </div>
@@ -65,7 +65,7 @@ export const Sidebar = () => {
                   className={`h-10 w-10 rounded-2xl flex items-center justify-center ${
                     isActive
                       ? "bg-primary/15 text-primary"
-                      : "bg-slate-100 dark:bg-slate-800"
+                      : ""
                   }`}
                 >
                   <item.icon size={18} />

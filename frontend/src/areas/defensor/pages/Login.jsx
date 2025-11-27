@@ -29,16 +29,16 @@ export const Login = () => {
   return (
     <div className="min-h-screen bg-app flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-5xl grid gap-8 md:grid-cols-2 items-center">
-        <div className="hidden md:flex card bg-gradient-to-br from-primary to-primary-600 text-white h-full">
+        <div className="hidden md:flex card bg-gradient-to-br from-primary to-primary-600 h-full">
           <div className="space-y-4">
             <Shield className="w-10 h-10" />
-            <h1 className="heading-1">Painel do Defensor</h1>
-            <p className="text-white/80">
+            <h1 className="heading-1  ">Painel do Defensor</h1>
+            <p className="">
               Acesse o painel exclusivo para acompanhar casos submetidos via
               Assistente Def Sul, solicitar documentos e gerar minutas com o
               mesmo visual do nosso novo portal.
             </p>
-            <p className="text-sm text-white/70">
+            <p className="text-sm">
               Suporte: suporte@defsul.app
             </p>
           </div>

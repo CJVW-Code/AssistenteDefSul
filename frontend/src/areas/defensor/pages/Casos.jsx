@@ -91,7 +91,7 @@ export const Casos = () => {
 
         <div className="overflow-x-auto">
           <table className="table text-sm">
-            <thead className="bg-slate-100 dark:bg-slate-800">
+            <thead className="">
               <tr className="text-muted uppercase text-xs tracking-wide">
                 <th className="px-4 py-3">Protocolo</th>
                 <th className="px-4 py-3">Nome do cidadão</th>
@@ -115,7 +115,7 @@ export const Casos = () => {
                   return (
                     <tr
                       key={caso.id}
-                      className="border-t border-soft hover:bg-slate-100 dark:hover:bg-slate-800/60 transition"
+                      className="border-t border-soft hover:bg-slate-100 dark:hover:bg-slate-400/60 transition"
                     >
                       <td className="p-4 font-mono text-xs text-muted">
                         {caso.protocolo}

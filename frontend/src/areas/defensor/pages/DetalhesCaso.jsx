@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { ChevronLeft, Download, FileText, Mic } from "lucide-react";
+import { ChevronLeft, Download, FileText, Mic, Eye } from "lucide-react";
 import { API_BASE } from "../../../utils/apiBase";
 
 const statusOptions = [
@@ -18,12 +18,45 @@ const statusBadges = {
   finalizado: "bg-emerald-100 text-emerald-800 border-emerald-200",
 };
 
+const CollapsibleText = ({ text, maxLength = 350, isPre = false, defaultCollapsed = true }) => {
+  const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
+
+  if (!text || text.length === 0) {
+    return <p className="text-sm text-muted">Nenhuma informação fornecida.</p>;
+  }
+
+  const textToShow = isCollapsed && text.length > maxLength ? text.substring(0, maxLength) + "..." : text;
+
+  const Wrapper = ({ children }) => 
+    isPre ? (
+      <pre className="text-sm whitespace-pre-wrap font-sans p-4 bg-slate-50 dark:bg-slate-900 rounded-lg">{children}</pre>
+    ) : (
+      <p className="text-muted whitespace-pre-wrap">{children}</p>
+    );
+
+  return (
+    <div>
+      <Wrapper>{textToShow}</Wrapper>
+      {text.length > maxLength && (
+        <button
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className="btn btn-ghost btn-sm mt-2"
+        >
+          {isCollapsed ? "Ler mais" : "Ler menos"}
+        </button>
+      )}
+    </div>
+  );
+};
+
+
 export const DetalhesCaso = () => {
   const { id } = useParams();
   const { token } = useAuth();
   const [caso, setCaso] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [showReview, setShowReview] = useState(false);
 
   useEffect(() => {
     const fetchDetalhes = async () => {
@@ -87,7 +120,37 @@ export const DetalhesCaso = () => {
 
   const statusKey = (caso.status || "recebido").toLowerCase();
   const badgeClass =
-    statusBadges[statusKey] || "bg-slate-100 text-slate-700 border-slate-200";
+    statusBadges[statusKey] || "";
+    
+  const renderDataField = (label, value) => (
+    <div>
+      <p className="text-xs text-muted uppercase tracking-wide">{label}</p>
+      <p className="font-semibold break-words">{value || "—"}</p>
+    </div>
+  );
+
+  const handleGenerateFatos = async () => {
+  try {
+    const response = await fetch(`${API_BASE}/casos/${id}/gerar-fatos`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error("Falha ao gerar a sessão dos fatos.");
+    }
+
+    const updatedCaso = await response.json();
+    setCaso(updatedCaso);
+    alert("Sessão dos fatos gerada com sucesso!");
+  } catch (error) {
+    console.error(error);
+    alert(error.message);
+  }
+};
 
   return (
     <div className="space-y-8 pb-24">
@@ -105,29 +168,6 @@ export const DetalhesCaso = () => {
             Protocolo {caso.protocolo} • {caso.tipo_acao}
           </p>
         </div>
-        <div className="card space-y-2 lg:w-80">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-muted">Status atual</p>
-            <span className={`badge capitalize ${badgeClass}`}>
-              {statusKey.replace("_", " ")}
-            </span>
-          </div>
-          <select
-            className="input"
-            onChange={(e) => handleStatusChange(e.target.value)}
-            value={statusKey}
-            disabled={isUpdating}
-          >
-            {statusOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          {isUpdating && (
-            <p className="text-xs text-muted">Atualizando status...</p>
-          )}
-        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -135,46 +175,69 @@ export const DetalhesCaso = () => {
           <div className="card space-y-4">
             <h2 className="heading-2">Dados do assistido</h2>
             <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <p className="text-xs text-muted uppercase tracking-wide">
-                  Nome completo
-                </p>
-                <p className="font-semibold">{caso.nome_assistido}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted uppercase tracking-wide">
-                  CPF
-                </p>
-                <p className="font-semibold">{caso.cpf_assistido || "—"}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted uppercase tracking-wide">
-                  Telefone
-                </p>
-                <p className="font-semibold">
-                  {caso.telefone_assistido || "—"}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-muted uppercase tracking-wide">
-                  Tipo de ação
-                </p>
-                <p className="font-semibold">
-                  {caso.tipo_acao?.replace("_", " ") || "—"}
-                </p>
-              </div>
+              {renderDataField("Nome completo", caso.nome_assistido)}
+              {renderDataField("CPF", caso.cpf_assistido)}
+              {renderDataField("Telefone", caso.telefone_assistido)}
+              {renderDataField("Tipo de ação", caso.tipo_acao?.replace("_", " "))}
+            </div>
+             <div className="pt-4">
+                <button 
+                    onClick={() => setShowReview(!showReview)}
+                    className="btn btn-secondary w-full justify-start"
+                >
+                    <Eye size={18} />
+                    Revisar dados preenchidos
+                </button>
+                {showReview && (
+                    <div className="mt-4 space-y-4 border-t border-soft pt-4">
+                        <h3 className="heading-3">Formulário do Assistido</h3>
+                        <div className="grid gap-4 md:grid-cols-2">
+                           {Object.entries(caso.dados_formulario || {}).map(([key, value]) =>
+                              renderDataField(
+                                key.replace(/_/g, " "),
+                                formatValue(value) // CORREÇÃO LÓGICA: Usa a função que trata booleanos
+                              )
+                            )}
+                        </div>
+                    </div>
+                )}
             </div>
           </div>
 
           <div className="card space-y-4">
             <div className="flex items-center gap-3">
-              <FileText className="text-primary" />
+              <FileText  />
               <h2 className="heading-2">Relato do caso</h2>
             </div>
-            <p className="text-muted whitespace-pre-wrap">
-              {caso.relato_texto || "Nenhum relato textual fornecido."}
-            </p>
+            <CollapsibleText className="text-primary" text={caso.relato_texto} />
           </div>
+          
+          <section className="card space-y-4 ">
+            <h2 className="heading-2 text-primary">Seção DOS FATOS</h2>
+              <div><CollapsibleText 
+              className="text-primary"
+                text={caso.peticao_inicial_rascunho || "Rascunho não disponível ou ainda não gerado."} 
+                isPre={true} 
+                maxLength={500}
+                defaultCollapsed={true}
+            />
+            </div>
+            <button 
+              onClick={handleGenerateFatos}
+              className="btn btn-primary w-full mt-4">
+              Gerar sessão dos fatos
+            </button>
+          </section>
+
+          <section className="card space-y-4">
+            <h2 className="heading-2">Visualizar petição completa</h2>
+             <CollapsibleText 
+                text={caso.peticao_completa_texto || "Petição completa não disponível ou ainda não gerada."} 
+                isPre={true} 
+                maxLength={700}
+                defaultCollapsed={true}
+            />
+          </section>
         </section>
 
         <section className="space-y-6">
@@ -223,16 +286,31 @@ export const DetalhesCaso = () => {
               )}
             </div>
           </div>
+          <div className="card space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted">Status atual</p>
+              <span className={`badge capitalize ${badgeClass}`}>
+                {statusKey.replace(/_/g, " ")}
+              </span>
+            </div>
+            <select
+              className="input"
+              onChange={(e) => handleStatusChange(e.target.value)}
+              value={statusKey}
+              disabled={isUpdating}
+            >
+              {statusOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            {isUpdating && (
+              <p className="text-xs text-muted">Atualizando status...</p>
+            )}
+          </div>
         </section>
       </div>
-
-      <section className="card space-y-4">
-        <h2 className="heading-2">Rascunho da petição inicial</h2>
-        <div className="rounded-2xl border border-dashed border-soft bg-slate-900 text-slate-100 dark:bg-slate-100 dark:text-slate-900 p-5 max-h-[480px] overflow-y-auto text-sm">
-          {caso.peticao_inicial_rascunho ||
-            "Rascunho não disponível ou ainda não gerado."}
-        </div>
-      </section>
     </div>
   );
 };
