@@ -1,8 +1,9 @@
 // Arquivo: frontend-defensor/src/components/Cadastro.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { UserPlus, Shield } from "lucide-react";
+import { UserPlus, Shield, ArrowLeft  } from "lucide-react";
 import { API_BASE } from "../../../utils/apiBase";
+import { ThemeToggle } from "../../../components/ThemeToggle";
 
 export const Cadastro = () => {
   const [nome, setNome] = useState("");
@@ -12,6 +13,16 @@ export const Cadastro = () => {
   const [success, setSuccess] = useState(null);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    let timer;
+    if (success) {
+      timer = setTimeout(() => {
+        navigate("/painel/login");
+      }, 1500);
+    }
+    return () => clearTimeout(timer); // Função de limpeza
+  }, [success, navigate]); // Roda o efeito quando 'success' ou 'navigate' mudam
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -39,7 +50,6 @@ export const Cadastro = () => {
       setSuccess(
         "Cadastro realizado com sucesso! Você será redirecionado para o login."
       );
-      setTimeout(() => navigate("/painel/login"), 1500);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -48,9 +58,20 @@ export const Cadastro = () => {
   };
 
   return (
-    <div className="min-h-screen bg-app flex items-center justify-center px-4 py-10">
+    <div className="min-h-screen bg-app flex flex-col items-center justify-center px-4 py-10 relative">
+      <div className="absolute top-4 left-4">
+        <button onClick={() => navigate("/")} className=" btn btn-ghost">
+          <ArrowLeft size={18} />
+          Voltar para o início
+        </button>
+      </div>
+      <div className="absolute top-4 right-4">
+              <button>
+                <ThemeToggle />
+              </button>
+            </div>
       <div className="w-full max-w-5xl grid gap-8 md:grid-cols-2 items-center">
-        <div className="hidden md:flex card bg-gradient-to-br from-secondary to-amber-600 text-slate-900 h-full">
+        <div className="hidden md:flex card bg-gradient-to-br from-primary to-green-700 h-full">
           <div className="space-y-4">
             <Shield className="w-10 h-10" />
             <h1 className="heading-1">Cadastro de defensor</h1>

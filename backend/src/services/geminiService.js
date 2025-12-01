@@ -164,19 +164,6 @@ const cleanText = (value, fallback = "") => {
   return text.length ? text : fallback;
 };
 
-const formatDocumentList = (docs = []) => {
-  if (!Array.isArray(docs) || !docs.length) {
-    return "Nenhum documento ou prova informado.";
-  }
-  const filtered = docs
-    .map((doc) => cleanText(doc))
-    .filter((doc) => Boolean(doc));
-  if (!filtered.length) {
-    return "Nenhum documento ou prova informado.";
-  }
-  return filtered.map((doc, index) => `${index + 1}. ${doc}`).join("\n");
-};
-
 export const analyzeCase = async (fullText) => {
   if (!process.env.GEMINI_API_KEY) {
     throw new Error(
@@ -215,7 +202,7 @@ export const analyzeCase = async (fullText) => {
 export const generateDosFatos = async (caseData = {}) => {
   if (!process.env.GEMINI_API_KEY) {
     throw new Error(
-      "A chave da API do Gemini n\u00e3o foi configurada no arquivo .env"
+      "A chave da API do Gemini não foi configurada no arquivo .env"
     );
   }
 
@@ -226,14 +213,25 @@ export const generateDosFatos = async (caseData = {}) => {
       cleanText(
         caseData.relato_texto ||
           caseData.relato ||
-          normalized.relato ||
-          caseData.relatoBruto,
-        "Relato detalhado n\u00e3o informado."
-      ) || "Relato detalhado n\u00e3o informado.";
-    const documentosList = formatDocumentList(caseData.documentos_informados);
+          normalized.relato,
+        "Relato detalhado não informado."
+      ) || "Relato detalhado não informado.";
+
+    const formatDocumentList = (docs = []) => {
+      // Esta função foi movida para cá na refatoração anterior.
+      if (!Array.isArray(docs) || !docs.length) {
+        return "Nenhum documento ou prova informado.";
+      }
+      const filtered = docs
+        .map((doc) => cleanText(doc))
+        .filter((doc) => Boolean(doc));
+      if (!filtered.length) return "Nenhum documento ou prova informado.";
+      return filtered.map((doc, index) => `${index + 1}. ${doc}`).join("\n");
+    };
+    const documentosList = formatDocumentList(caseData.documentos_informados);    
     const filhosInfo = cleanText(
       caseData.filhos_info,
-      "Informa\u00e7\u00f5es sobre filhos n\u00e3o foram apresentadas."
+      "Informações sobre filhos não foram apresentadas."
     );
     const situacaoAssistido = cleanText(
       caseData.dados_adicionais_requerente,
@@ -246,50 +244,54 @@ export const generateDosFatos = async (caseData = {}) => {
     const percentualPretendido = cleanText(
       caseData.percentual_sm_requerido ||
         normalized.valorPercentualSalMin,
-      "Percentual n\u00e3o informado"
+      "Percentual não informado"
     );
     const percentualExtras = cleanText(
       caseData.percentual_despesas_extra,
-      "Percentual de despesas adicionais n\u00e3o informado"
+      "Percentual de despesas adicionais não informado"
     );
-    const prompt = `Voc\u00ea \u00e9 um redator jur\u00eddico da Defensoria P\u00fablica e precisa escrever a se\u00e7\u00e3o \"DOS FATOS\" de uma peti\u00e7\u00e3o de alimentos, com base apenas nos dados a seguir.
+    const prompt = `**Persona:**
+Você é um assistente jurídico especialista em Direito de Família da Defensoria Pública da Bahia. Sua tarefa é redigir a seção "DOS FATOS" de uma petição de alimentos.
 
-Regras obrigat\u00f3rias:
-1. Identifique o problema logo no primeiro par\u00e1grafo com uma s\u00edntese do ocorrido.
-2. Narre os fatos em ordem cronol\u00f3gica, conectando causa e efeito.
-3. Mantenha clareza e objetividade; use linguagem simples, mas formal.
-4. Relacione a narrativa com a necessidade do pedido e a capacidade contributiva do requerido.
-5. Destaque apenas fatos relevantes ao conflito e \u00e0 solu\u00e7\u00e3o judicial.
-6. Indique, ao final, as provas/documentos existentes que sustentam os fatos.
-7. Produza entre 3 e 5 par\u00e1grafos e evite repetir informa\u00e7\u00f5es.
-8. N\u00e3o utilize termos como \"menor\" ou \"incapaz\" para se referir \u00e0 pessoa em desenvolvimento; prefira \"crian\u00e7a\" ou \"adolescente\", conforme a idade indicada nos dados do caso.
+**Tarefa Principal:**
+Com base exclusivamente nos dados fornecidos abaixo, escreva um texto claro, conciso e juridicamente sólido para a seção "DOS FATOS".
 
-Dados do caso:
+Regras obrigatórias:
+1. **Não invente informações.** Utilize apenas os dados fornecidos.
+2. **Estilo:** Adote um tom formal, técnico e objetivo.
+3. **Estrutura:** Inicie com um parágrafo de síntese. Depois, narre os fatos em ordem cronológica.
+4. **Foco:** Destaque apenas fatos relevantes para o pedido de alimentos (filiação, necessidades do alimentando, possibilidades do alimentante, falta de auxílio).
+5. **Terminologia:** Não use "menor" ou "incapaz". Use "criança" ou "adolescente".
+6. **Tamanho:** Produza um texto conciso, entre 3 e 5 parágrafos.
+7. **Provas:** Ao final, se houver documentos, mencione de forma sutil que a narrativa é corroborada pela documentação anexa.
+
+--- DADOS DO CASO (Fonte Exclusiva) ---
 - Assistido: ${cleanText(
       normalized.requerente?.nome,
-      "Nome do assistido n\u00e3o informado"
+      "Nome do assistido não informado"
     )} (${cleanText(
       normalized.requerente?.cpf,
-      "CPF n\u00e3o informado"
+      "CPF não informado"
     )}), nascimento: ${cleanText(
       normalized.requerente?.dataNascimento,
       "sem data informada"
     )}.
 - Requerido: ${cleanText(
       normalized.requerido?.nome,
-      "Nome do requerido n\u00e3o informado"
-    )}, CPF ${cleanText(normalized.requerido?.cpf, "n\u00e3o informado")}.
-- Situa\u00e7\u00e3o econ\u00f4mica do assistido: ${situacaoAssistido}
-- Situa\u00e7\u00e3o econ\u00f4mica do requerido: ${situacaoRequerido}
-- Percentual pretendido sobre o sal\u00e1rio m\u00ednimo: ${percentualPretendido}%
-- Percentual para despesas extras (sa\u00fade, educa\u00e7\u00e3o, vestu\u00e1rio): ${percentualExtras}%
-- Informa\u00e7\u00f5es sobre filhos/dependentes: ${filhosInfo}
+      "Nome do requerido não informado"
+    )}, CPF ${cleanText(normalized.requerido?.cpf, "não informado")}.
+- Situação econômica do assistido: ${situacaoAssistido}
+- Situação econômica do requerido: ${situacaoRequerido}
+- Percentual pretendido sobre o salário mínimo: ${percentualPretendido}%
+- Percentual para despesas extras (saúde, educação, vestuário): ${percentualExtras}%
+- Informações sobre filhos/dependentes: ${filhosInfo}
 - Relato fornecido pelo assistido:
 \"\"\"${relatoBase}\"\"\"
 - Provas/documentos mencionados:
 ${documentosList}
 
-Escreva apenas o texto da se\u00e7\u00e3o \"DOS FATOS\" seguindo as regras acima, sem incluir o t\u00edtulo ou qualquer instru\u00e7\u00e3o adicional.`;
+--- FIM DOS DADOS ---
+Agora, gere apenas o texto da seção "DOS FATOS", sem o título "DOS FATOS" e sem qualquer comentário adicional.`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
@@ -297,516 +299,13 @@ Escreva apenas o texto da se\u00e7\u00e3o \"DOS FATOS\" seguindo as regras acima
     return sanitizeLegalAbbreviations(texto.trim());
   } catch (error) {
     console.error(
-      "Erro ao gerar a se\u00e7\u00e3o 'Dos Fatos' com o Gemini:",
+      "Erro ao gerar a seção 'Dos Fatos' com o Gemini:",
       error
     );
-    throw new Error("Falha ao gerar a se\u00e7\u00e3o 'Dos Fatos' com a IA.");
+    throw new Error("Falha ao gerar a seção 'Dos Fatos' com a IA.");
   }
 };
-
-export const generatePetitionText = async (caseData) => {
-  if (!process.env.GEMINI_API_KEY) {
-    throw new Error(
-      "A chave da API do Gemini não foi configurada no arquivo .env"
-    );
-  }
-
-  try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-    const normalized = normalizePromptData(caseData);
-    const action = getActionFromTipoAcao(normalized);
-    let prompt = "";
-
-    switch (action.type) {
-      case "fixacao":
-      case "oferta":
-        prompt = promptFixacaoAlimentos(normalized);
-        break;
-      case "execucao_prisao":
-        prompt = promptExecucaoPrisao(normalized);
-        break;
-      case "execucao_penhora":
-        prompt = promptExecucaoPenhora(normalized);
-        break;
-      case "execucao":
-        prompt = buildPromptExecucao(caseData, "generico");
-        break;
-      default:
-        prompt = buildPromptGenericoFamilia(caseData);
-    }
-
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const raw = response.text() || "";
-    return sanitizeLegalAbbreviations(raw);
-  } catch (error) {
-    console.error(
-      "Ocorreu um erro durante a geração da petição com o Gemini:",
-      error
-    );
-    throw new Error("Falha ao gerar o rascunho da petição inicial com a IA.");
-  }
-};
-
-function getActionFromTipoAcao(data = {}) {
-  const tipo =
-    (data.acao_especifica || data.tipo_acao || data.tipoAcao || "").toLowerCase();
-  if (tipo.includes("fixa")) return { type: "fixacao" };
-  if (tipo.includes("oferta")) return { type: "oferta" };
-  if (tipo.includes("execu")) {
-    if (tipo.includes("pris")) return { type: "execucao_prisao" };
-    if (tipo.includes("penhor")) return { type: "execucao_penhora" };
-    return { type: "execucao" };
-  }
-  return { type: "generico" };
-}
 
 function sanitizeLegalAbbreviations(text) {
   return text.replace(/\b(art)\/\s*/gi, "$1. ");
-}
-
-export function promptFixacaoAlimentos(rawData = {}) {
-  const data = normalizePromptData(rawData);
-  const pagamento = formatPaymentDestination(data.dadosBancarios);
-  const percentualBase = percentOrPlaceholder(
-    data.valorPercentualSalMin,
-    "[PERCENTUAL]"
-  );
-  const percentualExtras = percentOrPlaceholder(
-    data.valorPercentualExtrasSaudeEducVestu,
-    "[PERCENTUAL]"
-  );
-  const diaPagamento = valueOrPlaceholder(
-    data.diaPagamentoMensal,
-    "[DIA DO PAGAMENTO]"
-  );
-  const nascimentoAssistido = valueOrPlaceholder(
-    data.requerente.dataNascimento,
-    "[DATA]"
-  );
-  const representante = valueOrPlaceholder(
-    data.requerente.representante,
-    "[NOME DO REPRESENTANTE]"
-  );
-  const relatoBruto = valueOrPlaceholder(
-    data.relato,
-    "[RELATO DO CASO PENDENTE]"
-  );
-
-  return `
-Você é um assistente jurídico. Gere a PETIÇÃO INICIAL exatamente no formato a seguir, usando linguagem formal, com a mesma estrutura, títulos, ordem e redação do modelo. Substitua os colchetes por dados. Não invente fatos. Onde não houver dado, mantenha o campo entre [COLCHETES] para edição humana.
-
-===== TEXTO-MODELO (REPRODUZIR FIELMENTE) =====
-
-AO JUÍZO DA ${valueOrPlaceholder(
-    data.vara,
-    DEFAULT_VARA
-  )} DA COMARCA DE ${valueOrPlaceholder(data.comarca, DEFAULT_COMARCA)}
-
-TRIAGEM SIGAD/SOLAR Nº ${valueOrPlaceholder(
-    data.triagemNumero,
-    DEFAULT_TRIAGEM
-  )}
-
-[Número de distribuição/Dependência: ${valueOrPlaceholder(
-    data.processoDependencia,
-    DEFAULT_PROCESSO
-  )}]
-
-[${valueOrPlaceholder(
-    data.requerente.nome,
-    "[NOME DO REQUERENTE]"
-  )}, incapaz, nascido(a) em ${nascimentoAssistido}, CPF ${valueOrPlaceholder(
-    data.requerente.cpf,
-    "[CPF]"
-  )}], neste ato representado(a)(s) por [${representante}], vem, perante esse Juízo, assistido(a) pela DEFENSORIA PÚBLICA DO ESTADO DA BAHIA, por um dos seus membros que a esta subscreve, na forma do artigo 134 da Constituição Federal, da Lei Complementar Federal nº 80/94 e da Lei Complementar Estadual nº 26/06, ajuizar a presente
-
-Ação de Fixação de Alimentos
-Com Pedido de Alimentos Provisórios
-
-em face de [${valueOrPlaceholder(
-    data.requerido.nome,
-    "[NOME DO REQUERIDO]"
-  )}, CPF ${valueOrPlaceholder(
-    data.requerido.cpf,
-    "[CPF]"
-  )}], pelos motivos de fato e de direito a seguir expostos:
-
-I. DAS PRERROGATIVAS INSTITUCIONAIS
-(Manter a redação e citações legais do modelo)
-
-II. DA GRATUIDADE DE JUSTIÇA
-(Manter a redação do modelo)
-
-III. DOS FATOS
-[INSTRUÇÃO PARA IA: Replique o texto-base abaixo como referência obrigatória, adaptando nomes, pronomes, datas e circunstâncias com base no Relato do Caso. A narrativa deve ser formal, lógica e cronológica, deixando claro filiação, guarda de fato, insuficiência de recursos maternos, corresponsabilidade parental e tentativas extrajudiciais.]
-
-TEXTO-BASE:
-"O autor é filho do requerido, conforme é possível aduzir do seu documento de identificação em anexo. Encontra-se a parte alimentanda sob a guarda de fato da genitora, sendo livre e desimpedido o direito de convivência exercido pelo pai.
-
-Ocorre que, no caso em tela, os recursos financeiros da genitora vêm se mostrando insuficientes para arcar de forma satisfatória com as despesas básicas e comuns a qualquer criança ou adolescente, como alimentação, vestuário, moradia, saúde, lazer, educação, dentre outras.
-
-Como é sabido, o dispêndio com a criação dos filhos não pode ser suportado apenas pela genitora, sendo obrigação de ambos os pais conceder assistência material. Assim, certo é que a parte autora (credora), face às circunstâncias do caso concreto, não pode deixar de exercer o direito a alimentos devidos pela parte requerida (devedora).
-
-Insta salientar que a genitora da parte requerente solicitou por diversas vezes o auxílio financeiro do requerido, porém não obteve êxito, restando como alternativa recorrer ao Poder Judiciário com a pretensão de compelir a parte requerida a cumprir com a obrigação de prestar alimentos."
-
-Relato do Caso: ${relatoBruto}
-
-IV. DO DIREITO
-(Manter a fundamentação do modelo: CRFB, ECA, CC, Lei 5.478/68, presunção de necessidade, binômio necessidade/possibilidade)
-
-V. DOS PEDIDOS
-(Manter exatamente a lista do modelo, adaptando valores)
-- Arbitramento liminar de alimentos provisórios no valor de ${percentualBase} do salário mínimo vigente, além de ${percentualExtras} dos gastos extraordinários com saúde, educação e vestuário, até o dia ${diaPagamento} de cada mês, a ser creditado em:
-${pagamento}
-- DEMAIS PEDIDOS: copiar integralmente do modelo (INSS/CEF art. 529 CPC, eventual desconto em folha, citação, alimentos definitivos ≥ ${percentualBase}, custas/honorários FAJDPE/BA, intimação pessoal, provas).
-
-Dá-se à causa o valor de R$ [00,00].
-
-${valueOrPlaceholder(
-    data.cidadeDataAssinatura,
-    DEFAULT_CIDADE_ASSINATURA
-  )}, datado e assinado eletronicamente.
-
-${valueOrPlaceholder(data.defensoraNome, DEFAULT_DEFENSORA)}
-Defensora Pública do Estado da Bahia
-
-${valueOrPlaceholder(data.enderecoDPE, DEFAULT_ENDERECO_DPE)}
-Tel.: ${valueOrPlaceholder(data.telefoneDPE, DEFAULT_TELEFONE_DPE)}
-
-===== INSTRUÇÕES DE SAÍDA =====
-- Sem comentários. Sem marcas “###”.
-- Mantenha o português formal e a mesma formatação de títulos do modelo.
-- Preserve todas as referências legais e trechos literais.
-`.trim();
-}
-
-export function promptExecucaoPrisao(rawData = {}) {
-  const data = normalizePromptData(rawData);
-  const pagamento = formatPaymentDestination(data.dadosBancarios);
-  const periodo = valueOrPlaceholder(
-    data.periodoDevedor,
-    "[PERÍODO DO DÉBITO]"
-  );
-  const valor = valueOrPlaceholder(
-    data.valorTotalDebito,
-    "[VALOR DO DÉBITO]"
-  );
-  const representante = valueOrPlaceholder(
-    data.exequente.representante,
-    "[NOME DO REPRESENTANTE]"
-  );
-  const relatoBruto = valueOrPlaceholder(
-    data.relato,
-    "[RELATO DO CASO PENDENTE]"
-  );
-
-  return `
-Você é um assistente jurídico. Produza a petição de CUMPRIMENTO DE SENTENÇA (execução de alimentos – rito da prisão civil) com a MESMA redação, estrutura e ordem do modelo abaixo, substituindo somente campos variáveis. Se faltar dado, mantenha [COLCHETES].
-
-===== TEXTO-MODELO (REPRODUZIR FIELMENTE) =====
-
-AO JUÍZO DA ${valueOrPlaceholder(
-    data.vara,
-    DEFAULT_VARA
-  )} DA COMARCA DE ${valueOrPlaceholder(data.comarca, DEFAULT_COMARCA)} - BAHIA
-
-TRIAGEM SIGAD/SOLAR Nº ${valueOrPlaceholder(
-    data.triagemNumero,
-    DEFAULT_TRIAGEM
-  )}
-
-Distribuição por dependência ao processo nº ${valueOrPlaceholder(
-    data.processoDependencia,
-    DEFAULT_PROCESSO
-  )}
-
-[${valueOrPlaceholder(data.exequente.nome, "[NOME DO EXEQUENTE]")}${
-    data.exequente.dataNascimento
-      ? `, nascido(a) em ${valueOrPlaceholder(
-          data.exequente.dataNascimento,
-          "[DATA]"
-        )}`
-      : ""
-  }, CPF ${valueOrPlaceholder(
-    data.exequente.cpf,
-    "[CPF]"
-  )}], neste ato representado(a) por [${representante}], assistido(a) pela DEFENSORIA PÚBLICA DO ESTADO DA BAHIA, com fundamento no art. 528, §§ 1º a 7º, do CPC, requerer o
-
-CUMPRIMENTO DE SENTENÇA
-(execução de alimentos - rito da prisão civil)
-
-em face de [${valueOrPlaceholder(
-    data.executado.nome,
-    "[NOME DO EXECUTADO]"
-  )}, CPF ${valueOrPlaceholder(
-    data.executado.cpf,
-    "[CPF]"
-  )}], pelos motivos a seguir:
-
-I. DAS PRERROGATIVAS INSTITUCIONAIS
-(Manter integralmente o texto do modelo)
-
-II. DA GRATUIDADE DE JUSTIÇA
-(Manter o texto do modelo)
-
-III. DA SÍNTESE DOS FATOS
-[INSTRUÇÃO PARA IA: Reescreva esta seção em linguagem jurídica formal, seguindo o texto-base do modelo e incorporando o Relato do Caso abaixo. Explicite o título executivo, a obrigação imposta, o inadimplemento referente a ${periodo}, o valor atualizado de ${valor} e qualquer tentativa prévia de composição.]
-
-Relato do Caso: ${relatoBruto}
-
-IV. DOS FUNDAMENTOS JURÍDICOS
-(Manter literalidade do modelo: art. 528 caput e §§, regime fechado, Súmula 309/STJ, CF art. 5º, LXVII)
-
-V. DOS PEDIDOS
-(Manter lista igual ao modelo, adaptando valores)
-- Citação pessoal do executado para, em 3 dias, pagar o débito de ${valor}, referente ao período ${periodo}, bem como as prestações vincendas; pagar por:
-${pagamento}
-- Protesto do pronunciamento judicial; inclusão em cadastros de inadimplentes (SPC/Serasa); demais meios executivos eficazes; ofícios INSS/CEF e, havendo vínculo, desconto em folha (art. 529 CPC); custas/honorários FAJDPE/BA; intimação pessoal; provas.
-
-Dá-se à causa o valor de R$ [00,00].
-
-${valueOrPlaceholder(
-    data.cidadeDataAssinatura,
-    DEFAULT_CIDADE_ASSINATURA
-  )}, datado e assinado eletronicamente.
-
-${valueOrPlaceholder(data.defensoraNome, DEFAULT_DEFENSORA)}
-Defensora Pública do Estado da Bahia
-
-${valueOrPlaceholder(data.enderecoDPE, DEFAULT_ENDERECO_DPE)}
-Tel.: ${valueOrPlaceholder(data.telefoneDPE, DEFAULT_TELEFONE_DPE)}
-
-===== INSTRUÇÕES DE SAÍDA =====
-- Sem comentários. Sem bullets extras além dos do texto do modelo.
-- Reproduza a formatação/títulos do modelo.
-`.trim();
-}
-
-export function promptExecucaoPenhora(rawData = {}) {
-  const data = normalizePromptData(rawData);
-  const pagamento = formatPaymentDestination(data.dadosBancarios);
-  const periodo = valueOrPlaceholder(
-    data.periodoDevedor,
-    "[PERÍODO DO DÉBITO]"
-  );
-  const valor = valueOrPlaceholder(
-    data.valorTotalDebito,
-    "[VALOR DO DÉBITO]"
-  );
-  const representante = valueOrPlaceholder(
-    data.exequente.representante,
-    "[NOME DO REPRESENTANTE]"
-  );
-  const relatoBruto = valueOrPlaceholder(
-    data.relato,
-    "[RELATO DO CASO PENDENTE]"
-  );
-
-  return `
-Você é um assistente jurídico. Produza a petição de CUMPRIMENTO DE SENTENÇA (execução de alimentos – rito da expropriação/penhora) com a MESMA redação, estrutura e ordem do modelo abaixo, alterando apenas campos variáveis. Se faltar dado, mantenha [COLCHETES].
-
-===== TEXTO-MODELO (REPRODUZIR FIELMENTE) =====
-
-AO JUÍZO DA ${valueOrPlaceholder(
-    data.vara,
-    DEFAULT_VARA
-  )} DA COMARCA DE ${valueOrPlaceholder(data.comarca, DEFAULT_COMARCA)} - BAHIA
-
-TRIAGEM SIGAD/SOLAR Nº ${valueOrPlaceholder(
-    data.triagemNumero,
-    DEFAULT_TRIAGEM
-  )}
-
-Distribuição por dependência ao processo nº ${valueOrPlaceholder(
-    data.processoDependencia,
-    DEFAULT_PROCESSO
-  )}
-
-[${valueOrPlaceholder(data.exequente.nome, "[NOME DO EXEQUENTE]")}${
-    data.exequente.dataNascimento
-      ? `, nascido(a) em ${valueOrPlaceholder(
-          data.exequente.dataNascimento,
-          "[DATA]"
-        )}`
-      : ""
-  }, CPF ${valueOrPlaceholder(
-    data.exequente.cpf,
-    "[CPF]"
-  )}], representado(a) por [${representante}], assistido(a) pela DEFENSORIA PÚBLICA DO ESTADO DA BAHIA, com base no art. 528 c/c arts. 523 e 530 do CPC, requerer o
-
-CUMPRIMENTO DE SENTENÇA
-(execução de alimentos - rito da expropriação)
-
-em face de [${valueOrPlaceholder(
-    data.executado.nome,
-    "[NOME DO EXECUTADO]"
-  )}, CPF ${valueOrPlaceholder(
-    data.executado.cpf,
-    "[CPF]"
-  )}], pelos motivos a seguir:
-
-I. DAS PRERROGATIVAS INSTITUCIONAIS
-(Manter o texto do modelo)
-
-II. DA GRATUIDADE DE JUSTIÇA
-(Manter o texto do modelo)
-
-III. DA SÍNTESE DOS FATOS
-[INSTRUÇÃO PARA IA: Reescreva esta seção com base no texto do modelo e no Relato do Caso abaixo, demonstrando o título executivo, o inadimplemento superior a três meses, o período ${periodo}, o valor de ${valor} e qualquer diligência prévia empreendida.]
-
-Relato do Caso: ${relatoBruto}
-
-IV. DOS FUNDAMENTOS JURÍDICOS
-(Manter literalidade do modelo: art. 523; art. 528; art. 530; multa 10%; honorários 10%; penhora/avaliação; protesto; SPC/Serasa; precedentes STJ; medidas atípicas art. 139 IV; ECA/CF/Convenção)
-
-V. DOS PEDIDOS
-(Manter lista do modelo, adaptando valores)
-- Intimar executado para pagar as parcelas de ${periodo}, total ${valor}, na forma:
-${pagamento}
-- Multa 10% + honorários 10% (FAJDPE/BA); ofícios INSS/CEF (art. 529 CPC) e eventual desconto em folha; penhora via SISBAJUD, e, se frustrada, RENAJUD; penhora de FGTS conforme precedente; protesto e negativação; medidas atípicas (suspensão CNH/apreensão passaporte – REsp 1782418/RJ); descrição de bens (art. 836 §1º); intimação pessoal; provas.
-
-Dá-se à causa o valor de R$ [00,00].
-
-${valueOrPlaceholder(
-    data.cidadeDataAssinatura,
-    DEFAULT_CIDADE_ASSINATURA
-  )}, datado e assinado eletronicamente.
-
-${valueOrPlaceholder(data.defensoraNome, DEFAULT_DEFENSORA)}
-Defensora Pública do Estado da Bahia
-
-${valueOrPlaceholder(data.enderecoDPE, DEFAULT_ENDERECO_DPE)}
-Tel.: ${valueOrPlaceholder(data.telefoneDPE, DEFAULT_TELEFONE_DPE)}
-
-===== INSTRUÇÕES DE SAÍDA =====
-- Não resuma; replique a formatação do modelo.
-- Mantenha citações legais e jurisprudência do modelo.
-`.trim();
-}
-
-function buildPromptFixacao(d) {
-  return `
-Você é um assistente jurídico especializado em Direito de Família (DPE/BA – Teixeira de Freitas).
-Sua tarefa é redigir a petição inicial de Fixação (ou Oferta) de Alimentos, pronta para revisão, com linguagem formal, objetiva e alinhada às práticas da Defensoria.
-
-Instruções:
-- Siga estritamente os dados fornecidos entre --- DADOS ---.
-- Na seção "DOS FATOS", reescreva o relato em linguagem jurídica formal e cronológica, sem inventar informações, integrando nomes, datas e contexto.
-- Inclua pedidos compatíveis (fixação do valor/percentual, despesas extraordinárias, data de pagamento, gratuidade, citação, MP se incapaz, desconto em folha se houver emprego formal).
-- Se houver {requerido_tem_emprego_formal} = "sim", incluir pedido de desconto em folha e qualificar empregador.
-- Texto final em formato puro.
-
-Estrutura sugerida:
-1) Endereçamento (Vara de Família de Teixeira de Freitas – BA)
-2) Qualificação das partes
-3) Dos Fatos (reformular relato)
-4) Do Direito (fundamentação sucinta)
-5) Dos Alimentos (valor/percentual; despesas extras; data de pagamento; dados bancários)
-6) Dos Pedidos
-7) Valor da Causa
-8) Fechamento
-
---- DADOS ---
-Requerente: ${d.nome_assistido || "[pendente]"}; CPF: ${
-    d.cpf_assistido || "[pendente]"
-  }; Endereço: ${d.endereco_assistido || "[pendente]"}; Contato: ${
-    d.telefone_assistido || "[pendente]"
-  }; Email: ${d.email_assistido || "[pendente]"}
-Requerido: ${d.nome_requerido || "[pendente]"}; CPF: ${
-    d.cpf_requerido || "[pendente]"
-  }; Endereço: ${d.endereco_requerido || "[pendente]"}
-Filhos: ${d.filhos_info || "[pendente]"}
-Relação: início ${d.data_inicio_relacao || "[pendente]"}, separação ${
-    d.data_separacao || "[pendente]"
-  }
-Relato (bruto): ${d.relato_texto || "[pendente]"}
-
-Proposta de Alimentos: ${d.percentual_sm_requerido || "[pendente]"}
-Despesas Extras: ${d.percentual_despesas_extra || "[pendente]"}
-Data de Pagamento: ${d.dia_pagamento_requerido || "[pendente]"}
-Dados Bancários p/ Depósito: ${d.dados_bancarios_deposito || "[pendente]"}
-
-Emprego Formal do Requerido: ${d.requerido_tem_emprego_formal || "[pendente]"}
-Empregador: ${d.empregador_requerido_nome || "[pendente]"}, ${
-    d.empregador_requerido_endereco || ""
-  }
-
-Documentos informados: ${(d.documentos_informados || []).join("; ") || "[nenhum]"}
-Resumo IA: ${d.resumo_ia || "[n/d]"}
---- FIM DOS DADOS ---
-
-Gere a petição inicial completa conforme a estrutura e instruções.
-  `.trim();
-}
-
-function buildPromptExecucao(d, rito) {
-  const ritoLabel =
-    rito === "prisao" ? "Prisão" : rito === "penhora" ? "Penhora" : "Execução";
-  return `
-Você é um assistente jurídico (DPE/BA – Teixeira de Freitas).
-Redija a petição de Execução de Alimentos – Rito ${ritoLabel}, com linguagem formal e objetiva.
-
-Instruções:
-- Siga apenas os dados entre --- DADOS ---.
-- "DOS FATOS": contextualize a origem (processo, vara, valor/percentual fixado, dia de pagamento) e descreva o débito (período e valor total).
-- Inclua pedidos compatíveis ao rito:
-  - Prisão: intimação para pagar em 3 dias (últimas 3 parcelas e vincendas), sob pena de prisão civil.
-  - Penhora: penhora/online, Sisbajud, Infojud, Renajud, exibição de bens, protesto, etc.
-- Sempre incluir gratuidade, citação, intimação do MP (se incapaz), custas FADEP.
-- Use os dados bancários para indicar forma de pagamento.
-- Texto final em formato puro.
-
---- DADOS ---
-Requerente: ${d.nome_assistido || "[pendente]"}; CPF: ${
-    d.cpf_assistido || "[pendente]"
-  }; Endereço: ${d.endereco_assistido || "[pendente]"}; Contato: ${
-    d.telefone_assistido || "[pendente]"
-  }
-Requerido: ${d.nome_requerido || "[pendente]"}; CPF: ${
-    d.cpf_requerido || "[pendente]"
-  }; Endereço: ${d.endereco_requerido || "[pendente]"}
-
-Processo Originário: ${d.numero_processo_originario || "[pendente]"}
-Vara Originária: ${d.vara_originaria || "[pendente]"}
-Valor/Percentual Fixado: ${d.percentual_ou_valor_fixado || "[pendente]"}
-Dia de Pagamento (fixado): ${d.dia_pagamento_fixado || "[pendente]"}
-Período em Atraso: ${d.periodo_debito_execucao || "[pendente]"}
-Valor Total do Débito: ${d.valor_total_debito_execucao || "[pendente]"}
-Dados Bancários p/ Depósito: ${d.dados_bancarios_deposito || "[pendente]"}
-
-Relato (bruto): ${d.relato_texto || "[n/d]"}
---- FIM DOS DADOS ---
-
-Estrutura sugerida: Endereçamento; Qualificação; Dos Fatos; Do Direito; Dos Pedidos (conforme rito); Valor da Causa; Fechamento.
-Gere a petição completa.
-  `.trim();
-}
-
-function buildPromptGenericoFamilia(d) {
-  return `
-Você é um assistente jurídico de Família (DPE/BA – Teixeira de Freitas).
-Redija a petição inicial completa conforme dados abaixo, com “DOS FATOS” reescrito em linguagem jurídica formal. Não invente informações.
-
---- DADOS ---
-Tipo de Ação: ${d.tipo_acao || d.acao_especifica || "[pendente]"}
-Requerente: ${d.nome_assistido || "[pendente]"}; CPF: ${
-    d.cpf_assistido || "[pendente]"
-  }; Endereço: ${d.endereco_assistido || "[pendente]"}; Email: ${
-    d.email_assistido || "[pendente]"
-  }
-Requerido: ${d.nome_requerido || "[pendente]"}; CPF: ${
-    d.cpf_requerido || "[pendente]"
-  }; Endereço: ${d.endereco_requerido || "[pendente]"}
-Filhos: ${d.filhos_info || "[pendente]"}
-Relação: início ${d.data_inicio_relacao || "[pendente]"}, separação ${
-    d.data_separacao || "[pendente]"
-  }
-Bens: ${d.bens_partilha || "[pendente]"}
-Relato (bruto): ${d.relato_texto || "[pendente]"}
---- FIM DOS DADOS ---
-
-Estrutura: Endereçamento; Qualificação; Dos Fatos; Do Direito; Dos Pedidos; Valor da Causa; Fechamento.
-Gere a petição completa.
-  `.trim();
 }

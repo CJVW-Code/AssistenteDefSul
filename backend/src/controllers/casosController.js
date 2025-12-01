@@ -14,8 +14,8 @@ import {
   normalizePromptData,
 } from "../services/geminiService.js";
 import { getVaraByTipoAcao } from "../config/varasMapping.js";
-// Tempo de expiraÃ§Ã£o (em segundos) para URLs assinadas do Supabase
-// Pode ser configurado pela env var SIGNED_URL_EXPIRES; padrÃ£o 24h (86400s)
+// Tempo de expiração (em segundos) para URLs assinadas do Supabase
+// Pode ser configurado pela env var SIGNED_URL_EXPIRES; padrão 24h (86400s)
 const signedExpires = Number.parseInt(
   process.env.SIGNED_URL_EXPIRES || "86400",
   10
@@ -38,7 +38,7 @@ const extractObjectPath = (storedValue) => {
     const match = decodedPath.match(/\/object\/(?:sign|public)\/[^/]+\/(.+)/);
     return match?.[1] || null;
   } catch (err) {
-    console.warn("NÃ£o foi possÃ­vel interpretar URL armazenada:", err?.message);
+    console.warn("Não foi possível interpretar URL armazenada:", err?.message);
     return null;
   }
 };
@@ -132,7 +132,6 @@ const buildDocxTemplatePayload = (
     baseData.cidade_assinatura || normalizedData.cidadeDataAssinatura;
   const percentualBase =
     baseData.percentual_ou_valor_fixado ??
-    baseData.percentual_sm_requerido ??
     normalizedData.valorPercentualSalMin;
   const diaPagamentoBase =
     baseData.dia_pagamento_fixado || baseData.dia_pagamento_requerido;
@@ -166,9 +165,6 @@ const buildDocxTemplatePayload = (
     requerente_email: ensureText(baseData.email_assistido),
     requerente_telefone: ensureText(baseData.telefone_assistido),
     requerente_endereco_residencial: ensureText(baseData.endereco_assistido),
-    requerente_endereco_profissional: ensureText(
-      baseData.assistido_endereco_profissional
-    ),
     requerente_representante: ensureText(requerente.representante),
     representante_nome: ensureText(baseData.representante_nome),
     representante_nacionalidade: ensureText(
@@ -179,6 +175,7 @@ const buildDocxTemplatePayload = (
     ),
     representante_ocupacao: ensureText(baseData.representante_ocupacao),
     representante_cpf: ensureText(baseData.representante_cpf),
+    representante_rg: ensureText(baseData.representante_rg_numero ? `${baseData.representante_rg_numero} ${baseData.representante_rg_orgao}` : ''),
     representante_endereco_residencial: ensureText(
       baseData.representante_endereco_residencial
     ),
@@ -212,13 +209,7 @@ const buildDocxTemplatePayload = (
     executado_telefone: ensureText(baseData.requerido_telefone),
     valorPercentualSalMin: ensureText(percentualBase),
     percentual_salario_minimo: ensureText(percentualBase),
-    percentual_provisorio_salario_min: ensureText(
-      baseData.percentual_sm_requerido
-    ),
-    valor_provisorio_referencia: ensureText(
-      baseData.valor_provisorio_referencia
-    ),
-    percentual_despesas_extras: ensureText(baseData.percentual_despesas_extra),
+    valor_pensao: ensureText(baseData.valor_pensao),
     percentual_definitivo_salario_min: ensureText(
       baseData.percentual_definitivo_salario_min
     ),
@@ -231,8 +222,6 @@ const buildDocxTemplatePayload = (
     valor_total_extenso: ensureText(baseData.valor_total_extenso),
     valor_debito: ensureText(baseData.valor_total_debito_execucao),
     valor_debito_extenso: ensureText(baseData.valor_debito_extenso),
-    valor_causa: ensureText(baseData.valor_causa),
-    valor_causa_extenso: ensureText(baseData.valor_causa_extenso),
     dados_bancarios_exequente: ensureText(dadosBancarios),
     dados_bancarios_requerente: ensureText(dadosBancarios),
     empregador_nome: ensureText(baseData.empregador_requerido_nome),
@@ -248,7 +237,7 @@ const buildDocxTemplatePayload = (
       "[DESCREVER OS FATOS]",
   };
 };
-// --- FUNÃ‡ÃƒO DE CRIAÃ‡ÃƒO (VERSÃƒO FINAL E COMPLETA) ---
+// --- FUNÇÃO DE CRIAÇÃO (VERSÃO FINAL E COMPLETA) ---
 export const criarNovoCaso = async (req, res) => {
   try {
     const dados_formulario = req.body;
@@ -278,7 +267,6 @@ export const criarNovoCaso = async (req, res) => {
       assistido_estado_civil,
       assistido_ocupacao,
       assistido_data_nascimento,
-      assistido_endereco_profissional,
       representante_nome,
       representante_nacionalidade,
       representante_estado_civil,
@@ -288,6 +276,8 @@ export const criarNovoCaso = async (req, res) => {
       representante_endereco_profissional,
       representante_email,
       representante_telefone,
+      representante_rg_numero,
+      representante_rg_orgao,
       requerido_nacionalidade,
       requerido_estado_civil,
       requerido_ocupacao,
@@ -295,31 +285,27 @@ export const criarNovoCaso = async (req, res) => {
       requerido_email,
       requerido_telefone,
       processo_titulo_numero,
-      valor_causa,
-      valor_causa_extenso,
       cidade_assinatura,
       valor_total_extenso,
       valor_debito_extenso,
-      valor_provisorio_referencia,
       percentual_definitivo_salario_min,
       percentual_definitivo_extras,
-      // FIXAÃ‡ÃƒO/OFERTA
-      percentual_sm_requerido,
-      percentual_despesas_extra,
+      // FIXAÇÃO/OFERTA
+      valor_pensao,
       dia_pagamento_requerido,
       dados_bancarios_deposito,
       requerido_tem_emprego_formal,
       empregador_requerido_nome,
       empregador_requerido_endereco,
       empregador_email,
-      // EXECUÃ‡ÃƒO
+      // EXECUÇÃO
       numero_processo_originario,
       vara_originaria,
       percentual_ou_valor_fixado,
       dia_pagamento_fixado,
       periodo_debito_execucao,
       valor_total_debito_execucao,
-      // DIVÃ“RCIO
+      // DIVÓRCIO
       regime_bens,
       retorno_nome_solteira,
       alimentos_para_ex_conjuge,
@@ -333,13 +319,10 @@ export const criarNovoCaso = async (req, res) => {
       dia_pagamento_requerido
     );
     const formattedDiaPagamentoFixado = formatDateBr(dia_pagamento_fixado);
-    const formattedValorProvisorioReferencia = formatCurrencyBr(
-      valor_provisorio_referencia
-    );
+    const formattedValorPensao = formatCurrencyBr(valor_pensao);
     const formattedValorTotalDebitoExecucao = formatCurrencyBr(
       valor_total_debito_execucao
     );
-    const formattedValorCausa = formatCurrencyBr(valor_causa);
     const documentosInformadosArray = JSON.parse(documentos_informados || "[]");
     const { protocolo, chaveAcesso } = generateCredentials(tipoAcao);
     const chaveAcessoHash = hashKeyWithSalt(chaveAcesso);
@@ -347,9 +330,9 @@ export const criarNovoCaso = async (req, res) => {
     // Determina a vara automaticamente
     const varaAutomatica = getVaraByTipoAcao(tipoAcao);
 
-    console.log("\n--- DEBUG: CRIAÃ‡ÃƒO DO CASO ---");
+    console.log("\n--- DEBUG: CRIAÇÃO DO CASO ---");
     console.log("Chave de Acesso (Texto Puro):", chaveAcesso);
-    console.log("Hash que serÃ¡ salvo no Banco:", chaveAcessoHash);
+    console.log("Hash que será salvo no Banco:", chaveAcessoHash);
     console.log("---------------------------------\n");
 
     let textoCompleto = relato || "";
@@ -362,19 +345,19 @@ export const criarNovoCaso = async (req, res) => {
     // --- ETAPA 1: PROCESSAMENTO ---
     if (req.files) {
       if (req.files.audio) {
-        // Bloco de transcriÃ§Ã£o de Ã¡udio
+        // Bloco de transcrição de áudio
         /*
-        console.log("Iniciando transcriÃ§Ã£o de Ã¡udio...");
+        console.log("Iniciando transcrição de áudio...");
         const textoDoAudio = await transcribeAudio(req.files.audio[0].path);
-        textoCompleto += `\n\n--- TRANSCRIÃ‡ÃƒO DO ÃUDIO ---\n${textoDoAudio}`;
-        console.log("TranscriÃ§Ã£o concluÃ­da.");
+        textoCompleto += `\n\n--- TRANSCRIÇÃO DO ÁUDIO ---\n${textoDoAudio}`;
+        console.log("Transcrição concluída.");
         */
       }
       if (req.files.documentos) {
         for (const docFile of req.files.documentos) {
           if (["image/jpeg", "image/png"].includes(docFile.mimetype)) {
             const textoDaImagem = await extractTextFromImage(docFile.path);
-            textoCompleto += `\n\n--- TEXTO EXTRAÃDO DE: ${docFile.originalname} ---\n${textoDaImagem}`;
+            textoCompleto += `\n\n--- TEXTO EXTRAÍDO DE: ${docFile.originalname} ---\n${textoDaImagem}`;
           }
         }
       }
@@ -383,7 +366,7 @@ export const criarNovoCaso = async (req, res) => {
     console.log("Gerando resumo com IA...");
     resumo_ia = await analyzeCase(textoCompleto);
     console.log("Resumo gerado.");
-    console.log("Gerando seÃ§Ã£o 'Dos Fatos' com IA...");
+    console.log("Gerando seção 'Dos Fatos' com IA...");
     const acaoEspecifica =
       (tipoAcao || "").split(" - ")[1]?.trim() || (tipoAcao || "").trim();
     const caseDataForPetition = {
@@ -405,7 +388,6 @@ export const criarNovoCaso = async (req, res) => {
       assistido_estado_civil,
       assistido_ocupacao,
       assistido_data_nascimento: formattedAssistidoNascimento,
-      assistido_endereco_profissional,
       representante_nome,
       representante_nacionalidade,
       representante_estado_civil,
@@ -415,6 +397,8 @@ export const criarNovoCaso = async (req, res) => {
       representante_endereco_profissional,
       representante_email,
       representante_telefone,
+      representante_rg_numero,
+      representante_rg_orgao,
       nome_requerido,
       cpf_requerido,
       endereco_requerido,
@@ -432,17 +416,13 @@ export const criarNovoCaso = async (req, res) => {
       descricao_guarda,
       situacao_financeira_genitora,
       processo_titulo_numero,
-      valor_causa: formattedValorCausa,
-      valor_causa_extenso,
       cidade_assinatura,
       cidadeDataAssinatura: cidade_assinatura,
       valor_total_extenso,
       valor_debito_extenso,
-      valor_provisorio_referencia: formattedValorProvisorioReferencia,
       percentual_definitivo_salario_min,
       percentual_definitivo_extras,
-      percentual_sm_requerido,
-      percentual_despesas_extra,
+      valor_pensao: formattedValorPensao,
       dia_pagamento_requerido: formattedDiaPagamentoRequerido,
       dados_bancarios_deposito,
       requerido_tem_emprego_formal,
@@ -461,15 +441,15 @@ export const criarNovoCaso = async (req, res) => {
     };
     const dosFatosTexto = await generateDosFatos(caseDataForPetition);
     const peticao_inicial_rascunho = `DOS FATOS\n\n${dosFatosTexto || ""}`;
-    console.log("SeÃ§Ã£o 'Dos Fatos' gerada.");
+    console.log("Seção 'Dos Fatos' gerada.");
     // --- FIM DA CHAMADA ---
 
 
-    // ... (O cÃ³digo de geraÃ§Ã£o do .docx continua aqui, se vocÃª ainda o quiser) ...
+    // ... (O código de geração do .docx continua aqui, se você ainda o quiser) ...
     console.log("Gerando documento .docx..."); // Linha existente
 
-    // ... (O cÃ³digo de upload dos arquivos originais continua aqui) ...
-    // --- GERAÃ‡ÃƒO E UPLOAD DO DOCX GERADO ---
+    // ... (O código de upload dos arquivos originais continua aqui) ...
+    // --- GERAÇÃO E UPLOAD DO DOCX GERADO ---
     let peticao_completa_texto = null;
     try {
       const docxBuffer = await generateDocx(docxData);
@@ -527,7 +507,7 @@ export const criarNovoCaso = async (req, res) => {
         }
       }
     }
-    console.log("Upload dos arquivos originais concluÃ­do.");
+    console.log("Upload dos arquivos originais concluído.");
 
     // --- ETAPA 3: SALVAR TUDO NO BANCO DE DADOS ---
     console.log('Inserindo dados na tabela "casos"...');
@@ -576,11 +556,11 @@ export const criarNovoCaso = async (req, res) => {
         }
       }
     }
-    res.status(500).json({ error: "Falha ao processar a solicitaÃ§Ã£o." });
+    res.status(500).json({ error: "Falha ao processar a solicitação." });
   }
 };
 
-// --- FUNÃ‡ÃƒO PARA LISTAR TODOS OS CASOS ---
+// --- FUNÇÃO PARA LISTAR TODOS OS CASOS ---
 export const listarCasos = async (req, res) => {
   try {
     const { data, error } = await supabase
@@ -598,7 +578,7 @@ export const listarCasos = async (req, res) => {
   }
 };
 
-// --- FUNÃ‡ÃƒO PARA OBTER DETALHES DE UM CASO ---
+// --- FUNÇÃO PARA OBTER DETALHES DE UM CASO ---
 export const obterDetalhesCaso = async (req, res) => {
   try {
     const { id } = req.params;
@@ -608,7 +588,7 @@ export const obterDetalhesCaso = async (req, res) => {
       .eq("id", id)
       .single();
     if (error) throw error;
-    if (!caso) return res.status(404).json({ error: "Caso nÃ£o encontrado." });
+    if (!caso) return res.status(404).json({ error: "Caso não encontrado." });
     const casoComLinks = await attachSignedUrls(caso);
     res.status(200).json(casoComLinks);
   } catch (err) {
@@ -619,9 +599,9 @@ export const obterDetalhesCaso = async (req, res) => {
 export const atualizarStatusCaso = async (req, res) => {
   try {
     const { id } = req.params; // Pega o ID do caso da URL
-    const { status } = req.body; // Pega o novo status do corpo da requisiÃ§Ã£o
+    const { status } = req.body; // Pega o novo status do corpo da requisição
 
-    // ValidaÃ§Ã£o simples para garantir que o status Ã© um dos valores esperados
+    // Validação simples para garantir que o status é um dos valores esperados
     const statusPermitidos = [
       "recebido",
       "em_analise",
@@ -629,7 +609,7 @@ export const atualizarStatusCaso = async (req, res) => {
       "finalizado",
     ];
     if (!status || !statusPermitidos.includes(status)) {
-      return res.status(400).json({ error: "Status invÃ¡lido." });
+      return res.status(400).json({ error: "Status inválido." });
     }
 
     // Atualiza o caso no Supabase onde o 'id' corresponde
@@ -641,7 +621,7 @@ export const atualizarStatusCaso = async (req, res) => {
       .single();
 
     if (error) throw error;
-    if (!data) return res.status(404).json({ error: "Caso nÃ£o encontrado." });
+    if (!data) return res.status(404).json({ error: "Caso não encontrado." });
 
     res.status(200).json(data); // Retorna o caso atualizado
   } catch (err) {

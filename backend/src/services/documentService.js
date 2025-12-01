@@ -1,4 +1,4 @@
-// Arquivo: backend/src/services/documentService.js
+
 
 import Tesseract from "tesseract.js";
 

@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useReducer, useEffect } from "react";
+import React, { useState, useRef, useReducer, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   User,

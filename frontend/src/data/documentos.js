@@ -12,6 +12,16 @@ export const documentosPorAcao = {
       "A depender das possibilidades do (a) assistido (a), solicitar que leve os comprovantes de despesas da criança, por exemplo: com farmácia, alimentação, vestuário, tratamento médico e dentário, escolar… A parte pode escrever todos os gastos de forma detalhada.",
       "Caso possua, levar o nome de 03 (três) testemunhas que saibam das condições financeiras do pai das crianças (que não sejam parentes)",
     ],
+    "Execução de Alimentos Rito Penhora/Prisão": [
+      "Cópia da carteira de identidade (RG) e CPF",
+      "Cópia do comprovante de residência e de renda (caso possua)",
+      "Certidão de nascimento ou RG do alimentando",
+      "Cópia da sentença do processo de alimentos, ou acordo realizado em balcão de justiça com homologação judicial",
+      "Endereço da residência do (a) pai/mãe da criança",
+      "Cópia do extrato bancário (caso tenha sido determinado que a pensão seria depositada em conta)",
+      "Número da conta e agência ou cópia do cartão bancário para depósito de pensão alimentícia.",
+    ],
+    /*
     "Divórcio Litigioso": [
       "Cópia da carteira de identidade (RG) e CPF do requerente",
       "Cópia do comprovante de residência do requerente",
@@ -97,15 +107,7 @@ export const documentosPorAcao = {
       "Certidão de Débito do IPTU – quando houver bem imóvel (no SAC, na SEFAZ SALVADOR ou site da SEFAZ)",
       "Certidão Negativa de Testamento (CNT) (no site www.censec.org.br)",
     ],
-    "Execução de Alimentos Rito Penhora/Prisão": [
-      "Cópia da carteira de identidade (RG) e CPF",
-      "Cópia do comprovante de residência e de renda (caso possua)",
-      "Certidão de nascimento ou RG do alimentando",
-      "Cópia da sentença do processo de alimentos, ou acordo realizado em balcão de justiça com homologação judicial",
-      "Endereço da residência do (a) pai/mãe da criança",
-      "Cópia do extrato bancário (caso tenha sido determinado que a pensão seria depositada em conta)",
-      "Número da conta e agência ou cópia do cartão bancário para depósito de pensão alimentícia.",
-    ],
+    
     "Revisao de Alimentos (Majoração)": [
       "Cópia da carteira de identidade (RG) e CPF",
       "Cópia do comprovante de residência e de renda (caso possua)",
@@ -127,7 +129,7 @@ export const documentosPorAcao = {
       "Endereço residencial do menor e da sua genitora",
       "Nome e endereço de 03 testemunhas que comprovem a situação do requerente ou do réu (caso consiga)",
     ],
-
+    */
     // Adicionar outras ações de família aqui...
   },
   /*
@@ -216,4 +218,5 @@ export const documentosPorAcao = {
 
   // Adicionar outras áreas como 'civel', 'fazenda_publica', etc. aqui
   */
+  
 };
