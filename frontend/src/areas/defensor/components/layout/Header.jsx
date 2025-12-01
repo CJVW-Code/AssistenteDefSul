@@ -8,28 +8,44 @@ import { ThemeToggle } from "../../../../components/ThemeToggle";
 export const Header = () => {
   const { token, logout } = useAuth();
   const defensor = token ? jwtDecode(token) : null;
+  const defensorName = defensor?.nome || "Defensor";
+  const avatarLetter = defensorName.charAt(0)?.toUpperCase() || "D";
 
   return (
-    <header className="flex justify-between items-center p-6 bg-slate-900 border-b border-green-800">
-      <Link
-        to="/"
-        rel="noopener noreferrer"
-        className="flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-colors"
-      >
-        <ExternalLink size={16} />
-        Ver Portal do Cidadão
-      </Link>
-      <div className="flex items-center gap-4">
-        <ThemeToggle />
-        <span className="font-semibold text-[#dae2db]">
-          Dr(a). {defensor?.nome || "Defensor"}
-        </span>
-        <button
-          onClick={logout}
-          className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg text-sm font-semibold"
-        >
-          Sair
-        </button>
+    <header className="sticky top-0 z-40 bg-surface/95 border-b border-soft backdrop-blur">
+      <div className="container-app py-4 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex items-center gap-4">
+          <div className="h-12 w-12 rounded-2xl bg-primary/15 text-primary font-semibold flex items-center justify-center shadow-inner">
+            {avatarLetter}
+          </div>
+          <div>
+            <p className="text-xs uppercase text-muted tracking-[0.3em]">
+              Painel do Defensor
+            </p>
+            <p className="text-lg font-semibold mt-1">
+              Dr(a). {defensorName}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 flex-wrap">
+          <Link
+            to="/"
+            rel="noopener noreferrer"
+            className="btn btn-secondary text-sm"
+          >
+            <ExternalLink size={16} />
+            Portal do Cidadão
+          </Link>
+          <ThemeToggle />
+          <button
+            type="button"
+            onClick={logout}
+            className="btn btn-ghost border border-soft text-red-600 dark:text-red-400"
+          >
+            Sair
+          </button>
+        </div>
       </div>
     </header>
   );

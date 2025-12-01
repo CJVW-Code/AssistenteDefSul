@@ -16,12 +16,12 @@
   --color-secondary-600: #c98600;
 
   /* Surfaces & text */
-  --color-bg: #f5f7f8;
-  --color-surface: #ffffff;
-  --color-border: #d8dee4;
+  --color-bg: #dddddd;
+  --color-surface: #cfcfcf;
+  --color-border: #b6b6b6;
 
-  --color-text: #1e2a33;
-  --color-text-muted: #555f6a;
+  --color-text: #000000;
+  --color-text-muted: #4f5152;
 
   /* Feedback */
   --color-success: #1fa97c;
@@ -130,6 +130,15 @@
     box-shadow: var(--shadow-soft);
   }
 
+  /* Seções do Formulário */
+  .form-section {
+    @apply p-6 rounded-2xl space-y-4 border-l-4;
+    border: 1px solid var(--color-border);
+    background-color: var(--color-surface);
+    box-shadow: var(--shadow-soft);
+  }
+
+
   /* Inputs */
   .input {
     @apply w-full px-4 py-3 rounded-xl text-sm transition;
@@ -213,8 +222,8 @@
   /* Badges */
   .badge {
     @apply inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-lg;
-    background: color-mix(in oklab, var(--color-text) 10%, transparent);
-    color: var(--color-text);
+    background-color: color-mix(in oklab, var(--color-text) 10%, transparent);
+    color: currentColor;
     border: 1px solid var(--color-border);
   }
 
@@ -257,12 +266,12 @@
   }
   .table thead th {
     @apply text-left font-semibold px-4 py-3;
-    color: var(--color-text);
+    color: inherit;
   }
   .table tbody td {
     @apply px-4 py-3 border-t;
     border-color: var(--color-border);
-    color: var(--color-text);
+    color: inherit;
   }
 }
 

@@ -1,15 +1,63 @@
-﻿import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { ChevronLeft, Download, FileText, Mic } from "lucide-react";
+import { ChevronLeft, Download, FileText, Mic, Eye } from "lucide-react";
 import { API_BASE } from "../../../utils/apiBase";
 
+const statusOptions = [
+  { value: "recebido", label: "Recebido" },
+  { value: "em_analise", label: "Em análise" },
+  { value: "aguardando_docs", label: "Aguardando documentos" },
+  { value: "finalizado", label: "Finalizado" },
+];
+
+const statusBadges = {
+  recebido: "bg-amber-100 text-amber-800 border-amber-200",
+  em_analise: "bg-sky-100 text-sky-800 border-sky-200",
+  aguardando_docs: "bg-purple-100 text-purple-800 border-purple-200",
+  finalizado: "bg-emerald-100 text-emerald-800 border-emerald-200",
+};
+
+const CollapsibleText = ({ text, maxLength = 350, isPre = false, defaultCollapsed = true }) => {
+  const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
+
+  if (!text || text.length === 0) {
+    return <p className="text-sm text-muted">Nenhuma informação fornecida.</p>;
+  }
+
+  const textToShow = isCollapsed && text.length > maxLength ? text.substring(0, maxLength) + "..." : text;
+
+  const Wrapper = ({ children }) => 
+    isPre ? (
+      <pre className="text-sm whitespace-pre-wrap font-sans p-4 bg-slate-50 dark:bg-slate-900 rounded-lg">{children}</pre>
+    ) : (
+      <p className="text-muted whitespace-pre-wrap">{children}</p>
+    );
+
+  return (
+    <div>
+      <Wrapper>{textToShow}</Wrapper>
+      {text.length > maxLength && (
+        <button
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className="btn btn-ghost btn-sm mt-2"
+        >
+          {isCollapsed ? "Ler mais" : "Ler menos"}
+        </button>
+      )}
+    </div>
+  );
+};
+
+
 export const DetalhesCaso = () => {
-  const { id } = useParams(); // Pega o ID da URL
+  const { id } = useParams();
   const { token } = useAuth();
   const [caso, setCaso] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [showReview, setShowReview] = useState(false);
+
   useEffect(() => {
     const fetchDetalhes = async () => {
       try {
@@ -28,9 +76,8 @@ export const DetalhesCaso = () => {
     fetchDetalhes();
   }, [id, token]);
 
-  // LÃ³gica para atualizar o status (a ser implementada)
   const handleStatusChange = async (novoStatus) => {
-    if (!novoStatus || novoStatus === caso.status) return;
+    if (!caso || !novoStatus || novoStatus === caso.status) return;
 
     setIsUpdating(true);
     try {
@@ -48,9 +95,7 @@ export const DetalhesCaso = () => {
       }
 
       const casoAtualizado = await response.json();
-      // Atualiza o estado local para refletir a mudanÃ§a na UI instantaneamente
       setCaso(casoAtualizado);
-      alert("Status atualizado com sucesso!"); // Feedback simples para o usuÃ¡rio
     } catch (error) {
       console.error(error);
       alert(error.message);
@@ -59,125 +104,212 @@ export const DetalhesCaso = () => {
     }
   };
 
-  if (loading)
-    return <p className="text-center p-8">Carregando detalhes do caso...</p>;
-  if (!caso) return <p className="text-center p-8">Caso não encontrado.</p>;
+  if (loading) {
+    return (
+      <div className="card text-center text-muted">Carregando detalhes...</div>
+    );
+  }
+
+  if (!caso) {
+    return (
+      <div className="card border-l-4 border-l-red-500 text-red-600">
+        Caso não encontrado.
+      </div>
+    );
+  }
+
+  const statusKey = (caso.status || "recebido").toLowerCase();
+  const badgeClass =
+    statusBadges[statusKey] || "";
+    
+  const renderDataField = (label, value) => (
+    <div>
+      <p className="text-xs text-muted uppercase tracking-wide">{label}</p>
+      <p className="font-semibold break-words">{value || "—"}</p>
+    </div>
+  );
+
+  const handleGenerateFatos = async () => {
+  try {
+    const response = await fetch(`${API_BASE}/casos/${id}/gerar-fatos`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error("Falha ao gerar a sessão dos fatos.");
+    }
+
+    const updatedCaso = await response.json();
+    setCaso(updatedCaso);
+    alert("Sessão dos fatos gerada com sucesso!");
+  } catch (error) {
+    console.error(error);
+    alert(error.message);
+  }
+};
 
   return (
-    <div className="p-8 max-w-7xl mx-auto">
-      <Link
-        to="/"
-        className="flex items-center gap-2 text-slate-900 hover:text-slate-900 mb-6"
-      >
-        <ChevronLeft size={20} /> Voltar para o Dashboard
-      </Link>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Coluna Principal */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-slate-800/30 p-6 rounded-xl border border-green-500">
-            <h2 className="text-2xl font-bold mb-4 text-[#e3ddff]">
-              Detalhes do Assistido
-            </h2>
-            <p className="text-amber-400 ">
-              <strong className="text-white">Nome:</strong>{" "}
-              {caso.nome_assistido}
-            </p>
-            <p className="text-amber-400">
-              <strong className="text-white">CPF:</strong> {caso.cpf_assistido}
-            </p>
-            <p className="text-amber-400">
-              <strong className="text-white">Telefone:</strong>{" "}
-              {caso.telefone_assistido}
-            </p>
-            <p className="text-amber-400">
-              <strong className="text-white">Tipo de Ação:</strong>{" "}
-              {caso.tipo_acao}
-            </p>
-          </div>
-          <div className="bg-slate-800/50 p-6 rounded-xl border border-slate-700">
-            <h2 className="text-2xl font-bold text-white mb-4">
-              Relato do Caso
-            </h2>
-            <p className="whitespace-pre-wrap text-[#e3ddff]">
-              {caso.relato_texto || "Nenhum relato textual fornecido."}
-            </p>
-          </div>
-        </div>
-        <div className="bg-slate-900/50 p-6 rounded-xl border border-blue-700">
-          <h2 className="text-xl font-bold text-amber-400 mb-2">
-            Resumo da IA
-          </h2>
-          <p className="text-white">
-            {caso.resumo_ia || "Resumo não disponível."}
+    <div className="space-y-8 pb-24">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <Link
+            to="/painel"
+            className="inline-flex items-center gap-2 text-sm text-primary hover:text-primary-600"
+          >
+            <ChevronLeft size={18} />
+            Voltar para o dashboard
+          </Link>
+          <h1 className="heading-1 mt-3">{caso.nome_assistido}</h1>
+          <p className="text-muted text-sm">
+            Protocolo {caso.protocolo} • {caso.tipo_acao}
           </p>
         </div>
-        <div className="bg-slate-800/50 p-6 rounded-xl border border-slate-700">
-          <h2 className="text-xl text-white font-bold mb-4">Status do Caso</h2>
-          <select
-            onChange={(e) => handleStatusChange(e.target.value)}
-            value={caso.status} // 'value' em vez de 'defaultValue' para controlar o estado
-            disabled={isUpdating}
-            className="w-full p-2 bg-slate-700 rounded-lg disabled:opacity-50"
-          >
-            <option value="recebido">Recebido</option>
-            <option value="em_analise">Em Análise</option>
-            <option value="aguardando_docs">Aguardando Documentos</option>
-            <option value="finalizado">Finalizado</option>
-          </select>
-        </div>
-        <div className="bg-slate-800/50 p-6 rounded-xl border border-slate-700">
-          <h2 className="text-xl text-white font-bold mb-4">
-            Documentos e Anexos
-          </h2>
-          <div className="space-y-3">
-            {caso.url_documento_gerado && (
-              <a
-                href={caso.url_documento_gerado}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-3 p-3 bg-amber-600/80 hover:bg-amber-600 rounded-lg font-semibold"
-              >
-                <Download size={20} /> Baixar Petição Gerada
-              </a>
-            )}
-            {caso.url_audio && (
-              <a
-                href={caso.url_audio}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-3 p-3 bg-slate-700 text-white hover:bg-slate-600 rounded-lg"
-              >
-                <Mic size={20} /> Ouvir Áudio
-              </a>
-            )}
-            {caso.urls_documentos?.map((url, index) => (
-              <a
-                key={index}
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-3 p-3 bg-slate-700 text-white hover:bg-slate-600 rounded-lg"
-              >
-                <FileText size={20} /> Ver Documento {index + 1}
-              </a>
-            ))}
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <section className="space-y-6 lg:col-span-2">
+          <div className="card space-y-4">
+            <h2 className="heading-2">Dados do assistido</h2>
+            <div className="grid gap-4 md:grid-cols-2">
+              {renderDataField("Nome completo", caso.nome_assistido)}
+              {renderDataField("CPF", caso.cpf_assistido)}
+              {renderDataField("Telefone", caso.telefone_assistido)}
+              {renderDataField("Tipo de ação", caso.tipo_acao?.replace("_", " "))}
+            </div>
+             <div className="pt-4">
+                <button 
+                    onClick={() => setShowReview(!showReview)}
+                    className="btn btn-secondary w-full justify-start"
+                >
+                    <Eye size={18} />
+                    Revisar dados preenchidos
+                </button>
+                {showReview && (
+                    <div className="mt-4 space-y-4 border-t border-soft pt-4">
+                        <h3 className="heading-3">Formulário do Assistido</h3>
+                        <div className="grid gap-4 md:grid-cols-2">
+                           {Object.entries(caso.dados_formulario || {}).map(([key, value]) =>
+                              renderDataField(
+                                key.replace(/_/g, " "),
+                                formatValue(value) // CORREÇÃO LÓGICA: Usa a função que trata booleanos
+                              )
+                            )}
+                        </div>
+                    </div>
+                )}
+            </div>
           </div>
-        </div>
-        {/* Coluna Lateral */}
-        <div className="space-y-6">
-          <div className="bg-slate-800/50 p-6 rounded-xl border border-slate-700">
-            <h2 className="text-2xl text-white font-bold mb-4">
-              Rascunho da Petição Inicial (Gerado por IA)
-            </h2>
-            {/* Usamos <pre> para manter a formataÃ§Ã£o do texto gerado pela IA */}
-            <pre className="whitespace-pre-wrap text-sm font-mono bg-slate-900 text-white p-4 rounded-md overflow-x-auto">
-              {caso.peticao_inicial_rascunho ||
-                "Rascunho não disponÃ­vel ou não gerado."}
-            </pre>
-            {/* Futuramente, adicionar um botÃ£o de "Editar" aqui */}
+
+          <div className="card space-y-4">
+            <div className="flex items-center gap-3">
+              <FileText  />
+              <h2 className="heading-2">Relato do caso</h2>
+            </div>
+            <CollapsibleText className="text-primary" text={caso.relato_texto} />
           </div>
-        </div>
+          
+          <section className="card space-y-4 ">
+            <h2 className="heading-2 text-primary">Seção DOS FATOS</h2>
+              <div><CollapsibleText 
+              className="text-primary"
+                text={caso.peticao_inicial_rascunho || "Rascunho não disponível ou ainda não gerado."} 
+                isPre={true} 
+                maxLength={500}
+                defaultCollapsed={true}
+            />
+            </div>
+            <button 
+              onClick={handleGenerateFatos}
+              className="btn btn-primary w-full mt-4">
+              Gerar sessão dos fatos
+            </button>
+          </section>
+
+          <section className="card space-y-4">
+            <h2 className="heading-2">Visualizar petição completa</h2>
+             <CollapsibleText 
+                text={caso.peticao_completa_texto || "Petição completa não disponível ou ainda não gerada."} 
+                isPre={true} 
+                maxLength={700}
+                defaultCollapsed={true}
+            />
+          </section>
+        </section>
+
+        <section className="space-y-6">
+          <div className="card space-y-4">
+            <h2 className="heading-2">Documentos e anexos</h2>
+            <div className="space-y-3">
+              {caso.url_documento_gerado && (
+                <a
+                  href={caso.url_documento_gerado}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-primary w-full justify-start"
+                >
+                  <Download size={18} />
+                  Baixar petição gerada
+                </a>
+              )}
+              {caso.url_audio && (
+                <a
+                  href={caso.url_audio}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-secondary w-full justify-start"
+                >
+                  <Mic size={18} />
+                  Ouvir áudio do relato
+                </a>
+              )}
+              {caso.urls_documentos?.length > 0 ? (
+                caso.urls_documentos.map((url, index) => (
+                  <a
+                    key={url}
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn btn-ghost border border-soft w-full justify-start"
+                  >
+                    <FileText size={18} />
+                    Documento {index + 1}
+                  </a>
+                ))
+              ) : (
+                <p className="text-sm text-muted">
+                  Nenhum documento complementar enviado.
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="card space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted">Status atual</p>
+              <span className={`badge capitalize ${badgeClass}`}>
+                {statusKey.replace(/_/g, " ")}
+              </span>
+            </div>
+            <select
+              className="input"
+              onChange={(e) => handleStatusChange(e.target.value)}
+              value={statusKey}
+              disabled={isUpdating}
+            >
+              {statusOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            {isUpdating && (
+              <p className="text-xs text-muted">Atualizando status...</p>
+            )}
+          </div>
+        </section>
       </div>
     </div>
   );

@@ -11,7 +11,7 @@ export const LayoutCidadao = () => {
           <ThemeToggle />
         </div>
         <div className="flex items-center">
-          <Link to="/painel/login" className="btn btn-secondary">
+          <Link to="/painel" className="btn btn-secondary">
             <LogIn size={16} />
             Painel do Defensor
           </Link>
@@ -28,11 +28,11 @@ export const LayoutCidadao = () => {
           <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">
             Assistente Def Sul
           </h1>
-          <p className="text-slate-400 max-w-2xl mx-auto">
+          <p className="text-muted max-w-2xl mx-auto">
             Olá! Eu sou o Assistente Def Sul e vou te ajudar a registrar seu
             caso
           </p>
-          <p className="text-slate-400 max-w-2xl mx-auto">
+          <p className="text-muted max-w-2xl mx-auto">
             Nosso serviço é totalmente gratuito, garantindo seu acesso à justiça
             de forma gratuita comforme o Art.5º da constituição Federal.
           </p>
