@@ -35,13 +35,11 @@ const initialState = {
   dataNascimentoAssistido: "",
   assistidoNacionalidade: "",
   assistidoEstadoCivil: "",
-  assistidoOcupacao: "",
   enderecoAssistido: "", // Residencial
   emailAssistido: "",
   telefone: "",
   assistidoRgNumero: "",
   assistidoRgOrgao: "",
-  enderecoProfissionalAssistido: "",
 
   // Representante Legal (apenas se assistidoEhIncapaz === 'sim')
   representanteNome: "",
@@ -53,6 +51,8 @@ const initialState = {
   representanteEnderecoProfissional: "",
   representanteEmail: "",
   representanteTelefone: "",
+  representanteRgNumero: "",
+  representanteRgOrgao: "",
 
   // Parte Contrária (Requerido)
   nomeRequerido: "",
@@ -75,23 +75,16 @@ const initialState = {
   // Dados Específicos (Família/Alimentos)
   dataInicioRelacao: "",
   dataSeparacao: "",
-  bensPartilha: "",
+  bensPartilha: "", // Será ocultado para fixação de alimentos
   descricaoGuarda: "",
   situacaoFinanceiraGenitora: "",
   
   // Dados Financeiros/Alimentos
-  percentualSmRequerido: "",
-  percentualDespesasExtra: "",
+  valorMensalPensao: "", // NOVO CAMPO UNIFICADO
   diaPagamentoRequerido: "",
   tipoContaDeposito: "", // 'corrente_poupanca', 'pix', 'outro'
-  bancoDeposito: "",
-  agenciaDeposito: "",
-  contaDeposito: "",
-  chavePixDeposito: "",
-  outrosDadosDeposito: "",
-  valorProvisorioReferencia: "",
-  percentualDefinitivoSalarioMin: "",
-  percentualDefinitivoExtras: "",
+  bancoDeposito: "", agenciaDeposito: "", contaDeposito: "",
+  chavePixDeposito: "", outrosDadosDeposito: "",
   
   // Dados de Emprego do Requerido
   requeridoTemEmpregoFormal: "",
@@ -117,8 +110,6 @@ const initialState = {
 
   // Processual Geral
   cidadeAssinatura: "",
-  valorCausa: "",
-  valorCausaExtenso: "",
 
   // Narrativa e Arquivos
   relato: "",
@@ -300,13 +291,7 @@ const normalizeDecimalForSubmit = (value = "", decimals = 2) => {
   return number.toFixed(decimals);
 };
 
-const currencyFields = new Set(["valorProvisorioReferencia", "valorTotalDebitoExecucao", "valorCausa"]);
-const percentFields = new Set([
-  "percentualSmRequerido",
-  "percentualDespesasExtra",
-  "percentualDefinitivoSalarioMin",
-  "percentualDefinitivoExtras"
-]);
+const currencyFields = new Set(["valorMensalPensao", "valorTotalDebitoExecucao"]);
 
 export const FormularioSubmissao = () => {
   const [formState, dispatch] = useReducer(formReducer, initialState);
@@ -322,6 +307,20 @@ export const FormularioSubmissao = () => {
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const documentInputRef = useRef(null);
+
+  const acaoNorm = (formState.acaoEspecifica || "").toLowerCase();
+  const isFixacaoDeAlimentos = acaoNorm.includes("fixação de pensão alimentícia");
+
+  // Efeito para automatizar a seleção de representação para "Fixação de Alimentos"
+  useEffect(() => {
+    if (isFixacaoDeAlimentos) {
+      if (formState.assistidoEhIncapaz !== 'sim') {
+        dispatch({ type: 'UPDATE_FIELD', field: 'assistidoEhIncapaz', value: 'sim' });
+      }
+    }
+    // Opcional: Se o usuário mudar de "Fixação" para outra ação,
+    // você pode querer resetar a seleção, mas por enquanto vamos manter simples.
+  }, [formState.acaoEspecifica, formState.assistidoEhIncapaz, isFixacaoDeAlimentos]);
 
   const clearFieldError = (field) => {
     setFormErrors((prev) => {
@@ -561,9 +560,9 @@ export const FormularioSubmissao = () => {
       assistidoEhIncapaz: "assistido_eh_incapaz",
       assistidoNacionalidade: "assistido_nacionalidade",
       assistidoEstadoCivil: "assistido_estado_civil",
-      assistidoOcupacao: "assistido_ocupacao",
       dataNascimentoAssistido: "assistido_data_nascimento",
-      enderecoProfissionalAssistido: "assistido_endereco_profissional",
+      assistidoRgNumero: "assistido_RgNumero",
+      assistidoRgOrgao: "assistido_RgOrgao",
 
       // Representante
       representanteNome: "representante_nome",
@@ -575,6 +574,8 @@ export const FormularioSubmissao = () => {
       representanteEnderecoProfissional: "representante_endereco_profissional",
       representanteEmail: "representante_email",
       representanteTelefone: "representante_telefone",
+      representanteRgNumero: "representante_rg_numero",
+      representanteRgOrgao: "representante_rg_orgao",
 
       // Requerido
       nomeRequerido: "nome_requerido",
@@ -595,12 +596,10 @@ export const FormularioSubmissao = () => {
       situacaoFinanceiraGenitora: "situacao_financeira_genitora",
 
       // Alimentos / Fixação
-      percentualSmRequerido: "percentual_sm_requerido",
-      percentualDespesasExtra: "percentual_despesas_extra",
+      valorMensalPensao: "valor_mensal_pensao",
       diaPagamentoRequerido: "dia_pagamento_requerido",
-      valorProvisorioReferencia: "valor_provisorio_referencia",
-      percentualDefinitivoSalarioMin: "percentual_definitivo_salario_min",
-      percentualDefinitivoExtras: "percentual_definitivo_extras",
+      
+      
       
       // Emprego Requerido
       requeridoTemEmpregoFormal: "requerido_tem_emprego_formal",
@@ -626,8 +625,6 @@ export const FormularioSubmissao = () => {
 
       // Geral Doc
       cidadeAssinatura: "cidade_assinatura",
-      valorCausa: "valor_causa",
-      valorCausaExtenso: "valor_causa_extenso",
       relato: "relato"
     };
 
@@ -651,8 +648,6 @@ export const FormularioSubmissao = () => {
         normalizedValue = stripNonDigits(rawValue);
       } else if (currencyFields.has(key)) {
         normalizedValue = normalizeDecimalForSubmit(rawValue);
-      } else if (percentFields.has(key)) {
-        normalizedValue = normalizeDecimalForSubmit(rawValue);
       }
       if (normalizedValue) {
         formData.append(fieldMapping[key], normalizedValue);
@@ -669,8 +664,7 @@ export const FormularioSubmissao = () => {
     const dadosAdicionaisRequerenteString = `
       RG: ${formState.assistidoRgNumero ? `${formState.assistidoRgNumero}${formState.assistidoRgOrgao ? ` ${formState.assistidoRgOrgao}` : ""}` : 'Não inf.'}, 
       Nacionalidade: ${formState.assistidoNacionalidade || 'Não inf.'}, 
-      Estado Civil: ${formState.assistidoEstadoCivil || 'Não inf.'}, 
-      Profissão: ${formState.assistidoOcupacao || 'Não inf.'},
+      Estado Civil: ${formState.assistidoEstadoCivil || 'Não inf.'},
       Data Nascimento: ${formState.dataNascimentoAssistido || 'Não inf.'}
     `;
     formData.append("dados_adicionais_requerente", dadosAdicionaisRequerenteString);
@@ -737,7 +731,6 @@ export const FormularioSubmissao = () => {
       ? documentosPorAcao[formState.tipoAcao][formState.acaoEspecifica]
       : [];
 
-  const acaoNorm = (formState.acaoEspecifica || "").toLowerCase();
   const isFixacaoOuOferta = acaoNorm.includes("fixa") || acaoNorm.includes("oferta");
   const isExecucao = acaoNorm.includes("execu");
   const isDivorcio = acaoNorm.includes("divór") || acaoNorm.includes("divor");
@@ -782,7 +775,7 @@ export const FormularioSubmissao = () => {
           </div>
         </div>
         <div className="bg-amber-500/10 p-3 rounded border border-amber-500/30 text-amber-200 text-sm text-left flex gap-2">
-          <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+          <AlertTriangle className="w-5 h-5 shrink-0" />
           <p>Guarde esses dados! Você precisará deles para consultar o andamento do seu caso.</p>
         </div>
         <button 
@@ -841,727 +834,724 @@ export const FormularioSubmissao = () => {
           </div>
         </section>
 
-        {/* --- ETAPA 2: IDENTIFICAÇÃO DO AUTOR (ASSISTIDO) --- */}
-        <section className="card space-y-6 border-l-4 border-l-green-500">
-          <div className="flex items-center gap-2 border-b border-soft pb-2">
-            <User className="text-green-400" />
-            <h2 className="heading-2">2. Quem está pedindo a ação?</h2>
-          </div>
+        {/* Renderização condicional das próximas seções */}
+        {formState.acaoEspecifica && (
+          <>
+            {/* --- ETAPA 2: IDENTIFICAÇÃO DO AUTOR (ASSISTIDO) --- */}
+            <section className="card space-y-6 border-l-4 border-l-green-500">
+              <div className="flex items-center gap-2 border-b border-soft pb-2">
+                <User className="text-green-400" />
+                <h2 className="heading-2">2. Quem está pedindo a ação?</h2>
+              </div>
 
-          {/* Pergunta Chave de Representação */}
-          <div className="bg-app p-4 rounded-lg border border-soft">
-            <label className="block text-sm font-semibold mb-2">Para quem é este processo?</label>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <label className="flex items-center gap-2 cursor-pointer bg-surface p-3 rounded border border-soft hover:border-primary transition">
-                <input 
-                  type="radio" 
-                  name="assistidoEhIncapaz" 
-                  value="nao" 
-                  checked={formState.assistidoEhIncapaz === "nao"} 
-                  onChange={handleFieldChange}
-                  className="w-4 h-4 text-primary"
-                />
-                <span>Para mim mesmo(a)</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer bg-surface p-3 rounded border border-soft hover:border-primary transition">
-                <input 
-                  type="radio" 
-                  name="assistidoEhIncapaz" 
-                  value="sim" 
-                  checked={formState.assistidoEhIncapaz === "sim"} 
-                  onChange={handleFieldChange}
-                  className="w-4 h-4 text-primary"
-                />
-                <span>Para meu filho(a) ou tutelado (Representação)</span>
-              </label>
-            </div>
-          </div>
+              {/* Pergunta Chave de Representação (agora condicional) */}
+              {!isFixacaoDeAlimentos && (
+                <div className="bg-app p-4 rounded-lg border border-soft">
+                  <label className="block text-sm font-semibold mb-2">Para quem é este processo?</label>
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer bg-surface p-3 rounded border border-soft hover:border-primary transition">
+                      <input 
+                        type="radio" 
+                        name="assistidoEhIncapaz" 
+                        value="nao" 
+                        checked={formState.assistidoEhIncapaz === "nao"} 
+                        onChange={handleFieldChange}
+                        className="w-4 h-4 text-primary"
+                      />
+                      <span>Para mim mesmo(a)</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer bg-surface p-3 rounded border border-soft hover:border-primary transition">
+                      <input 
+                        type="radio" 
+                        name="assistidoEhIncapaz" 
+                        value="sim" 
+                        checked={formState.assistidoEhIncapaz === "sim"} 
+                        onChange={handleFieldChange}
+                        className="w-4 h-4 text-primary"
+                      />
+                      <span>Para meu filho(a) ou tutelado (Representação)</span>
+                    </label>
+                  </div>
+                </div>
+              )}
 
-          {/* Dados do Autor/Beneficiário */}
-          <div className="space-y-4">
-            <h3 className="heading-3 text-primary">{labelAutor}</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <input type="text" placeholder="Nome Completo" name="nome" value={formState.nome} onChange={handleFieldChange} required className="input" />
-              <input
-                type="text"
-                inputMode="numeric"
-                placeholder="CPF"
-                name="cpf"
-                value={formState.cpf}
-                onChange={handleCpfChange('cpf')}
-                required
-                className="input"
-              />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <input type="date" placeholder="Data de Nascimento" name="dataNascimentoAssistido" value={formState.dataNascimentoAssistido} onChange={handleFieldChange} className="input" />
-              <select name="assistidoNacionalidade" value={formState.assistidoNacionalidade} onChange={handleFieldChange} className="input">
-                 {nacionalidadeOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-              <select name="assistidoEstadoCivil" value={formState.assistidoEstadoCivil} onChange={handleFieldChange} className="input">
-                 {estadoCivilOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-               <input type="text" placeholder="Profissão" name="assistidoOcupacao" value={formState.assistidoOcupacao} onChange={handleFieldChange} className="input md:col-span-1" />
-               <input
-                 type="text"
-                 inputMode="numeric"
-                 placeholder="RG"
-                 name="assistidoRgNumero"
-                 value={formState.assistidoRgNumero}
-                 onChange={handleRgChange('assistidoRgNumero')}
-                 className="input"
-               />
-               <select
-                 name="assistidoRgOrgao"
-                 value={formState.assistidoRgOrgao}
-                 onChange={handleFieldChange}
-                 className="input"
-               >
-                 {orgaoEmissorOptions.map((option) => (
-                   <option key={option.value} value={option.value}>
-                     {option.label}
-                   </option>
-                 ))}
-               </select>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-               <input type="text" placeholder="Endereço Residencial Completo" name="enderecoAssistido" value={formState.enderecoAssistido} onChange={handleFieldChange} required className="input" />
-               <input type="text" placeholder="Endereço Profissional (se houver)" name="enderecoProfissionalAssistido" value={formState.enderecoProfissionalAssistido} onChange={handleFieldChange} className="input" />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-               <input type="email" placeholder="Email (opcional)" name="emailAssistido" value={formState.emailAssistido} onChange={handleFieldChange} className="input" />
-               <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={18} />
+              {/* Dados do Autor/Beneficiário */}
+              <div className="space-y-4">
+                <h3 className="heading-3 text-primary">{labelAutor}</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <input type="text" placeholder="Nome Completo" name="nome" value={formState.nome} onChange={handleFieldChange} required className="input" />
                   <input
                     type="text"
-                    inputMode="tel"
-                    placeholder="Telefone/WhatsApp para contato"
-                    name="telefone"
-                    value={formState.telefone}
-                    onChange={handlePhoneChange('telefone')}
+                    inputMode="numeric"
+                    placeholder="CPF"
+                    name="cpf"
+                    value={formState.cpf}
+                    onChange={handleCpfChange('cpf')}
                     required
-                    className="input pl-10"
+                    className="input"
                   />
                 </div>
-            </div>
-          </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <input type="date" placeholder="Data de Nascimento" name="dataNascimentoAssistido" value={formState.dataNascimentoAssistido} onChange={handleFieldChange} className="input" />
+                  <select name="assistidoNacionalidade" value={formState.assistidoNacionalidade} onChange={handleFieldChange} className="input">
+                     {nacionalidadeOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                  <select name="assistidoEstadoCivil" value={formState.assistidoEstadoCivil} onChange={handleFieldChange} className="input">
+                     {estadoCivilOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                   
+                   <input
+                     type="text"
+                     inputMode="numeric"
+                     placeholder="RG"
+                     name="assistidoRgNumero"
+                     value={formState.assistidoRgNumero}
+                     onChange={handleRgChange('assistidoRgNumero')}
+                     className="input"
+                   />
+                   <select
+                     name="assistidoRgOrgao"
+                     value={formState.assistidoRgOrgao}
+                     onChange={handleFieldChange}
+                     className="input"
+                   >
+                     {orgaoEmissorOptions.map((option) => (
+                       <option key={option.value} value={option.value}>
+                         {option.label}
+                       </option>
+                     ))}
+                   </select>
+                   <input type="text" placeholder="Endereço Residencial Completo" name="enderecoAssistido" value={formState.enderecoAssistido} onChange={handleFieldChange} required className="input" />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                   <input type="email" placeholder="Email (opcional)" name="emailAssistido" value={formState.emailAssistido} onChange={handleFieldChange} className="input" />
+                   <div className="relative">
+                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={18} />
+                      <input
+                        type="text"
+                        inputMode="tel"
+                        placeholder="Telefone/WhatsApp para contato"
+                        name="telefone"
+                        value={formState.telefone}
+                        onChange={handlePhoneChange('telefone')}
+                        required
+                        className="input pl-10"
+                      />
+                    </div>
+                </div>
+              </div>
 
-          {/* Dados do Representante (Condicional) */}
-          {isRepresentacao && (
-            <div className="bg-surface-alt p-4 rounded-lg border-l-4 border-amber-500 space-y-4 mt-4 bg-amber-500/5">
-              <h3 className="heading-3 text-amber-600">Dados do Representante Legal (Você)</h3>
-              <p className="text-sm text-muted mb-2">Preencha com seus dados (mãe, pai, tutor) que está agindo em nome da criança acima.</p>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <input type="text" placeholder="Seu Nome Completo" name="representanteNome" value={formState.representanteNome} onChange={handleFieldChange} className="input" />
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  placeholder="Seu CPF"
-                  name="representanteCpf"
-                  value={formState.representanteCpf}
-                  onChange={handleCpfChange('representanteCpf')}
-                  className="input"
-                />
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                 <select name="representanteNacionalidade" value={formState.representanteNacionalidade} onChange={handleFieldChange} className="input">
-                   {nacionalidadeOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                 </select>
-                 <select name="representanteEstadoCivil" value={formState.representanteEstadoCivil} onChange={handleFieldChange} className="input">
-                   {estadoCivilOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                 </select>
-                 <input type="text" placeholder="Sua Profissão" name="representanteOcupacao" value={formState.representanteOcupacao} onChange={handleFieldChange} className="input" />
-              </div>
+              {/* Dados do Representante (Condicional) */}
+              {isRepresentacao && (
+                <div className="bg-surface-alt p-4 rounded-lg border-l-4 border-amber-500 space-y-4 mt-4 bg-amber-500/5">
+                  <h3 className="heading-3 text-amber-600">Dados do Representante Legal (Você)</h3>
+                  <p className="text-sm text-muted mb-2">Preencha com seus dados (mãe, pai, tutor) que está agindo em nome da criança acima.</p>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <input type="text" placeholder="Seu Nome Completo" name="representanteNome" value={formState.representanteNome} onChange={handleFieldChange} className="input" />
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="Seu CPF"
+                      name="representanteCpf"
+                      value={formState.representanteCpf}
+                      onChange={handleCpfChange('representanteCpf')}
+                      className="input"
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                     <select name="representanteNacionalidade" value={formState.representanteNacionalidade} onChange={handleFieldChange} className="input">
+                       {nacionalidadeOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                     </select>
+                     <select name="representanteEstadoCivil" value={formState.representanteEstadoCivil} onChange={handleFieldChange} className="input">
+                       {estadoCivilOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                     </select>
+                     <input type="text" placeholder="Sua Profissão" name="representanteOcupacao" value={formState.representanteOcupacao} onChange={handleFieldChange} className="input" />
+                  </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                 <input type="text" placeholder="Seu Endereço Residencial" name="representanteEnderecoResidencial" value={formState.representanteEnderecoResidencial} onChange={handleFieldChange} className="input" />
-                 <input type="text" placeholder="Seu Endereço Profissional (se houver)" name="representanteEnderecoProfissional" value={formState.representanteEnderecoProfissional} onChange={handleFieldChange} className="input" />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                 <input type="email" placeholder="Seu Email" name="representanteEmail" value={formState.representanteEmail} onChange={handleFieldChange} className="input" />
-                 <input
-                   type="text"
-                   inputMode="tel"
-                   placeholder="Seu Telefone"
-                   name="representanteTelefone"
-                   value={formState.representanteTelefone}
-                   onChange={handlePhoneChange('representanteTelefone')}
-                   className="input"
-                 />
-              </div>
-            </div>
-          )}
-        </section>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     <input type="text" placeholder="Seu Endereço Residencial" name="representanteEnderecoResidencial" value={formState.representanteEnderecoResidencial} onChange={handleFieldChange} className="input" />
+                     <input type="text" placeholder="Seu Endereço Profissional (se houver)" name="representanteEnderecoProfissional" value={formState.representanteEnderecoProfissional} onChange={handleFieldChange} className="input" />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     <input type="email" placeholder="Seu Email" name="representanteEmail" value={formState.representanteEmail} onChange={handleFieldChange} className="input" />
+                     <input
+                       type="text"
+                       inputMode="tel"
+                       placeholder="Seu Telefone"
+                       name="representanteTelefone"
+                       value={formState.representanteTelefone}
+                       onChange={handlePhoneChange('representanteTelefone')}
+                       className="input"
+                     />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                   
+                   <input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="Seu RG"
+                    name="representanteRgNumero"
+                    value={formState.representanteRgNumero}
+                    onChange={handleRgChange('representanteRgNumero')}
+                    className="input"
+                   />
+                   <select
+                    name="representanteRgOrgao"
+                    value={formState.representanteRgOrgao}
+                    onChange={handleFieldChange}
+                    className="input"
+                   >
+                     {orgaoEmissorOptions.map((option) => (
+                       <option key={option.value} value={option.value}>
+                         {option.label}
+                       </option>
+                     ))}
+                   </select>
+                </div>
+                </div>
+              )}
+            </section>
 
-        {/* --- ETAPA 3: DADOS DA OUTRA PARTE (REQUERIDO) --- */}
-        {!isAlvara && (
-          <section className="card space-y-4 border-l-4 border-l-red-500">
-            <div className="flex items-center gap-2 border-b border-soft pb-2">
-              <Users className="text-red-400" />
-              <h2 className="heading-2">3. Contra quem é a ação? (Requerido)</h2>
-            </div>
-            <p className="text-sm text-muted">Preencha com o máximo de informações que você souber.</p>
+            {/* --- ETAPA 3: DADOS DA OUTRA PARTE (REQUERIDO) --- */}
+            {!isAlvara && (
+              <section className="card space-y-4 border-l-4 border-l-red-500">
+                <div className="flex items-center gap-2 border-b border-soft pb-2">
+                  <Users className="text-red-400" />
+                  <h2 className="heading-2">3. Contra quem é a ação? (Requerido)</h2>
+                </div>
+                <p className="text-sm text-muted">Preencha com o máximo de informações que você souber.</p>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <input
-                  type="text"
-                  placeholder="Nome Completo da outra parte"
-                  name="nomeRequerido"
-                  value={formState.nomeRequerido}
-                  onChange={handleFieldChange}
-                  className="input"
-                  aria-invalid={Boolean(formErrors.nomeRequerido)}
-                />
-                {formErrors.nomeRequerido && (
-                  <p className="text-xs text-red-500 mt-1">{formErrors.nomeRequerido}</p>
-                )}
-              </div>
-              <div>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  placeholder="CPF (se souber)"
-                  name="cpfRequerido"
-                  value={formState.cpfRequerido}
-                  onChange={handleCpfChange('cpfRequerido')}
-                  className="input"
-                />
-              </div>
-            </div>
-            
-            <div>
-              <input
-                type="text"
-                placeholder="Endereço Residencial (se souber)"
-                name="enderecoRequerido"
-                value={formState.enderecoRequerido}
-                onChange={handleFieldChange}
-                className="input"
-                aria-invalid={Boolean(formErrors.requeridoContato)}
-              />
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <input
+                      type="text"
+                      placeholder="Nome Completo da outra parte"
+                      name="nomeRequerido"
+                      value={formState.nomeRequerido}
+                      onChange={handleFieldChange}
+                      className="input"
+                      aria-invalid={Boolean(formErrors.nomeRequerido)}
+                    />
+                    {formErrors.nomeRequerido && (
+                      <p className="text-xs text-red-500 mt-1">{formErrors.nomeRequerido}</p>
+                    )}
+                  </div>
+                  <div>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="CPF (se souber)"
+                      name="cpfRequerido"
+                      value={formState.cpfRequerido}
+                      onChange={handleCpfChange('cpfRequerido')}
+                      className="input"
+                    />
+                  </div>
+                </div>
+                
                 <div>
                   <input
                     type="text"
-                    inputMode="tel"
-                    placeholder="Telefone (se souber)"
-                    name="requeridoTelefone"
-                    value={formState.requeridoTelefone}
-                    onChange={handlePhoneChange('requeridoTelefone')}
+                    placeholder="Endereço Residencial (se souber)"
+                    name="enderecoRequerido"
+                    value={formState.enderecoRequerido}
+                    onChange={handleFieldChange}
                     className="input"
                     aria-invalid={Boolean(formErrors.requeridoContato)}
                   />
                 </div>
-                <div>
-                  <input type="email" placeholder="Email (se souber)" name="requeridoEmail" value={formState.requeridoEmail} onChange={handleFieldChange} className="input" />
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <input
+                        type="text"
+                        inputMode="tel"
+                        placeholder="Telefone (se souber)"
+                        name="requeridoTelefone"
+                        value={formState.requeridoTelefone}
+                        onChange={handlePhoneChange('requeridoTelefone')}
+                        className="input"
+                        aria-invalid={Boolean(formErrors.requeridoContato)}
+                      />
+                    </div>
+                    <div>
+                      <input type="email" placeholder="Email (se souber)" name="requeridoEmail" value={formState.requeridoEmail} onChange={handleFieldChange} className="input" />
+                    </div>
                 </div>
-            </div>
-            {formErrors.requeridoContato && (
-              <p className="text-xs text-red-500">{formErrors.requeridoContato}</p>
+                {formErrors.requeridoContato && (
+                  <p className="text-xs text-red-500">{formErrors.requeridoContato}</p>
+                )}
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <input type="text" placeholder="Profissão (se souber)" name="requeridoOcupacao" value={formState.requeridoOcupacao} onChange={handleFieldChange} className="input" />
+                     <select name="requeridoNacionalidade" value={formState.requeridoNacionalidade} onChange={handleFieldChange} className="input">
+                       {nacionalidadeOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                     </select>
+                     <select name="requeridoEstadoCivil" value={formState.requeridoEstadoCivil} onChange={handleFieldChange} className="input">
+                       {estadoCivilOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                     </select>
+                </div>
+                
+                <input type="text" placeholder="Endereço de Trabalho (se souber)" name="requeridoEnderecoProfissional" value={formState.requeridoEnderecoProfissional} onChange={handleFieldChange} className="input" />
+                
+                <div className="border border-dashed border-soft rounded-xl p-4 space-y-3 bg-app/40">
+                   <p className="label mb-0">Quais dessas informações adicionais você possui?</p>
+                   <div className="space-y-2">
+                     {outrosDadosRequeridoConfig.map((item) => {
+                       const selecionado = formState.requeridoOutrosSelecionados.includes(item.key);
+                       return (
+                         <div key={item.key} className="bg-surface rounded-lg border border-soft/60 p-3 space-y-2">
+                           <label className="flex items-center gap-2 cursor-pointer text-sm font-medium">
+                             <input
+                               type="checkbox"
+                               className="w-4 h-4 accent-primary"
+                               checked={selecionado}
+                               onChange={() => toggleRequeridoDetalhe(item.key)}
+                             />
+                             <span>{item.label}</span>
+                           </label>
+                           {selecionado && (
+                             <>
+                               {item.renderType === "rg" && (
+                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                   <input
+                                     type="text"
+                                     inputMode="numeric"
+                                     placeholder="RG"
+                                     name="requeridoRgNumero"
+                                     value={formState.requeridoRgNumero}
+                                     onChange={handleRgChange('requeridoRgNumero')}
+                                     className="input"
+                                   />
+                                   <select
+                                     name="requeridoRgOrgao"
+                                     value={formState.requeridoRgOrgao}
+                                     onChange={handleFieldChange}
+                                     className="input"
+                                   >
+                                     {orgaoEmissorOptions.map((option) => (
+                                       <option key={option.value} value={option.value}>
+                                         {option.label}
+                                       </option>
+                                     ))}
+                                   </select>
+                                 </div>
+                               )}
+                               {item.renderType === "date" && (
+                                 <input
+                                   type="date"
+                                   name={item.field}
+                                   value={formState[item.field]}
+                                   onChange={handleFieldChange}
+                                   className="input"
+                                 />
+                               )}
+                               {item.renderType === "text" && (
+                                 <input
+                                   type="text"
+                                   name={item.field}
+                                   value={formState[item.field]}
+                                   onChange={handleFieldChange}
+                                   className="input"
+                                   placeholder={item.placeholder}
+                                 />
+                               )}
+                               {item.renderType === "textarea" && (
+                                 <textarea
+                                   name={item.field}
+                                   value={formState[item.field]}
+                                   onChange={handleFieldChange}
+                                   className="input"
+                                   rows="2"
+                                   placeholder={item.placeholder}
+                                 />
+                               )}
+                             </>
+                           )}
+                         </div>
+                       );
+                     })}
+                   </div>
+                </div>
+              </section>
             )}
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <input type="text" placeholder="Profissão (se souber)" name="requeridoOcupacao" value={formState.requeridoOcupacao} onChange={handleFieldChange} className="input" />
-                 <select name="requeridoNacionalidade" value={formState.requeridoNacionalidade} onChange={handleFieldChange} className="input">
-                   {nacionalidadeOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                 </select>
-                 <select name="requeridoEstadoCivil" value={formState.requeridoEstadoCivil} onChange={handleFieldChange} className="input">
-                   {estadoCivilOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                 </select>
-            </div>
-            
-            <input type="text" placeholder="Endereço de Trabalho (se souber)" name="requeridoEnderecoProfissional" value={formState.requeridoEnderecoProfissional} onChange={handleFieldChange} className="input" />
-            
-            <div className="border border-dashed border-soft rounded-xl p-4 space-y-3 bg-app/40">
-               <p className="label mb-0">Quais dessas informações adicionais você possui?</p>
-               <div className="space-y-2">
-                 {outrosDadosRequeridoConfig.map((item) => {
-                   const selecionado = formState.requeridoOutrosSelecionados.includes(item.key);
-                   return (
-                     <div key={item.key} className="bg-surface rounded-lg border border-soft/60 p-3 space-y-2">
-                       <label className="flex items-center gap-2 cursor-pointer text-sm font-medium">
-                         <input
-                           type="checkbox"
-                           className="w-4 h-4 accent-primary"
-                           checked={selecionado}
-                           onChange={() => toggleRequeridoDetalhe(item.key)}
-                         />
-                         <span>{item.label}</span>
-                       </label>
-                       {selecionado && (
-                         <>
-                           {item.renderType === "rg" && (
-                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                               <input
-                                 type="text"
-                                 inputMode="numeric"
-                                 placeholder="RG"
-                                 name="requeridoRgNumero"
-                                 value={formState.requeridoRgNumero}
-                                 onChange={handleRgChange('requeridoRgNumero')}
-                                 className="input"
-                               />
-                               <select
-                                 name="requeridoRgOrgao"
-                                 value={formState.requeridoRgOrgao}
-                                 onChange={handleFieldChange}
-                                 className="input"
-                               >
-                                 {orgaoEmissorOptions.map((option) => (
-                                   <option key={option.value} value={option.value}>
-                                     {option.label}
-                                   </option>
-                                 ))}
-                               </select>
-                             </div>
-                           )}
-                           {item.renderType === "date" && (
-                             <input
-                               type="date"
-                               name={item.field}
-                               value={formState[item.field]}
-                               onChange={handleFieldChange}
-                               className="input"
-                             />
-                           )}
-                           {item.renderType === "text" && (
-                             <input
-                               type="text"
-                               name={item.field}
-                               value={formState[item.field]}
-                               onChange={handleFieldChange}
-                               className="input"
-                               placeholder={item.placeholder}
-                             />
-                           )}
-                           {item.renderType === "textarea" && (
-                             <textarea
-                               name={item.field}
-                               value={formState[item.field]}
-                               onChange={handleFieldChange}
-                               className="input"
-                               rows="2"
-                               placeholder={item.placeholder}
-                             />
-                           )}
-                         </>
-                       )}
-                     </div>
-                   );
-                 })}
-               </div>
-            </div>
-          </section>
-        )}
 
-        {/* --- ETAPA 4: DETALHES ESPECÍFICOS (CONDICIONAL) --- */}
-        {formState.acaoEspecifica && (
-          <section className="card space-y-6 border-l-4 border-l-amber-500">
-            <div className="flex items-center gap-2 border-b border-soft pb-2">
-              <Briefcase className="text-amber-400" />
-              <h2 className="heading-2">4. Detalhes do Caso</h2>
-            </div>
+            {/* --- ETAPA 4: DETALHES ESPECÍFICOS (CONDICIONAL) --- */}
+            <section className="card space-y-6 border-l-4 border-l-amber-500">
+              <div className="flex items-center gap-2 border-b border-soft pb-2">
+                <Briefcase className="text-amber-400" />
+                <h2 className="heading-2">4. Detalhes do Caso</h2>
+              </div>
 
-            {/* CAMPOS DE FIXAÇÃO / OFERTA / EXECUÇÃO (VALORES) */}
-            {showFixacaoBaseFields && (
-              <div className="space-y-4">
-                <h4 className="font-semibold text-primary">Valores e Pagamento (Pedido Principal)</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* CAMPOS DE FIXAÇÃO / OFERTA / EXECUÇÃO (VALORES) */}
+              {showFixacaoBaseFields && (
+                <div className="space-y-4">
+                  <h4 className="font-semibold text-primary">Valores e Pagamento (Pedido Principal)</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="label">Percentual de Pensão Requerido</label>
+                      <label className="label">Valor Mensal da Pensão e Despesas Extras</label>
                       <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted font-semibold">R$</span>
                         <input
                           type="text"
-                          inputMode="decimal"
-                          name="percentualSmRequerido"
-                          value={formState.percentualSmRequerido}
-                          onChange={handleDecimalFieldChange('percentualSmRequerido', { maxIntegerDigits: 3 })}
-                          placeholder="Ex: 23%"
-                          className="input pr-12"
+                          inputMode="numeric"
+                          name="valorMensalPensao"
+                          value={formState.valorMensalPensao}
+                          onChange={handleCurrencyChange('valorMensalPensao')}
+                          placeholder="0,00"
+                          className="input pl-12"
+                          required
                         />
-                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-muted font-semibold">%</span>
                       </div>
                     </div>
                     <div>
-                      <label className="label">Percentual Adicional para Despesas Extras</label>
-                      <div className="relative">
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          name="percentualDespesasExtra"
-                          value={formState.percentualDespesasExtra}
-                          onChange={handleDecimalFieldChange('percentualDespesasExtra', { maxIntegerDigits: 3 })}
-                          placeholder="Ex: 17%"
-                          className="input pr-12"
-                        />
-                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-muted font-semibold">%</span>
-                      </div>
+                      <label className="label">Dia de pagamento desejado</label>
+                      <input
+                        type="number"
+                        name="diaPagamentoRequerido"
+                        value={formState.diaPagamentoRequerido}
+                        onChange={handleDayInputChange('diaPagamentoRequerido')}
+                        placeholder="Dia (1 a 31)"
+                        className="input"
+                      />
                     </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="label">Dia de pagamento desejado</label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="31"
-                      name="diaPagamentoRequerido"
-                      value={formState.diaPagamentoRequerido}
-                      onChange={handleDayInputChange('diaPagamentoRequerido')}
-                      placeholder="Dia (1 a 31)"
-                      className="input"
-                    />
                   </div>
+                  <div className="space-y-4 rounded-lg border border-soft p-4 bg-surface">
+                      <h4 className="font-semibold text-text">Dados para Depósito da Pensão</h4>
+                      <div>
+                        <label className="label">Tipo de Conta</label>
+                        <select name="tipoContaDeposito" value={formState.tipoContaDeposito} onChange={handleFieldChange} className="input">
+                          <option value="">Tipo de Conta</option>
+                          <option value="corrente_poupanca">Conta Corrente / Poupança</option>
+                          <option value="pix">PIX</option>
+                          <option value="outro">Outro / Não sei</option>
+                        </select>
+                      </div>
+
+                      { (formState.tipoContaDeposito === 'corrente_poupanca') && (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <input type="text" name="bancoDeposito" value={formState.bancoDeposito} onChange={handleFieldChange} placeholder="Nome do Banco" className="input" />
+                          <input type="text" name="agenciaDeposito" value={formState.agenciaDeposito} onChange={handleFieldChange} placeholder="Agência" className="input" />
+                          <input type="text" name="contaDeposito" value={formState.contaDeposito} onChange={handleFieldChange} placeholder="Conta com dígito" className="input" />
+                        </div>
+                      )}
+
+                      { formState.tipoContaDeposito === 'pix' && (
+                        <div>
+                          <label className="label">Chave PIX</label>
+                          <input type="text" name="chavePixDeposito" value={formState.chavePixDeposito} onChange={handleFieldChange} placeholder="CPF, e-mail, telefone, etc." className="input" />
+                        </div>
+                      )}
+
+                      { formState.tipoContaDeposito === 'outro' && (
+                        <div>
+                          <label className="label">Descreva os dados que você possui</label>
+                          <textarea name="outrosDadosDeposito" value={formState.outrosDadosDeposito} onChange={handleFieldChange} rows="2" className="input" placeholder="Informe todos os dados para depósito que você tiver"></textarea>
+                        </div>
+                      )}
+                  </div>
+                </div>
+              )}
+              
+              {/* EMPREGO DO REQUERIDO */}
+              {showFixacaoBaseFields && (
+                <div className="space-y-4 pt-4 border-t border-soft">
+                  <h4 className="font-semibold text-primary">Sobre o Emprego da Outra Parte</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="label">A outra parte tem carteira assinada?</label>
+                      <select name="requeridoTemEmpregoFormal" value={formState.requeridoTemEmpregoFormal} onChange={handleFieldChange} className="input">
+                        <option value="">Tem carteira assinada?</option>
+                        <option value="sim">Sim</option>
+                        <option value="nao">Não</option>
+                        <option value="nao_sei">Não sei</option>
+                      </select>
+                    </div>
+                    {mostrarEmpregador && (
+                      <>
+                        <input type="text" placeholder="Nome da Empresa" name="empregadorRequeridoNome" value={formState.empregadorRequeridoNome} onChange={handleFieldChange} className="input" />
+                        <input type="text" placeholder="Endereço da Empresa" name="empregadorRequeridoEndereco" value={formState.empregadorRequeridoEndereco} onChange={handleFieldChange} className="input md:col-span-2" />
+                        <input type="email" placeholder="Email da Empresa (para ofício)" name="empregadorEmail" value={formState.empregadorEmail} onChange={handleFieldChange} className="input md:col-span-2" />
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* CAMPOS DE EXECUÇÃO */}
+              {isExecucao && (
+                 <div className="space-y-4 pt-4 border-t border-soft">
+                   <h4 className="font-semibold text-primary">Dados do Processo de Alimentos Original</h4>
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <input type="text" placeholder="Número do Processo Original" name="numeroProcessoOriginario" value={formState.numeroProcessoOriginario} onChange={handleFieldChange} className="input" />
+                      <input type="text" placeholder="Nº do Título (se houver)" name="processoTituloNumero" value={formState.processoTituloNumero} onChange={handleFieldChange} className="input" />
+                   </div>
+                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <input type="text" placeholder="Vara onde tramitou" name="varaOriginaria" value={formState.varaOriginaria} onChange={handleFieldChange} className="input" />
+                      <input type="text" placeholder="Valor/Percentual Fixado" name="percentualOuValorFixado" value={formState.percentualOuValorFixado} onChange={handleFieldChange} className="input" />
+                      <input type="number" min="1" max="31" placeholder="Dia (1-31)" name="diaPagamentoFixado" value={formState.diaPagamentoFixado} onChange={handleDayInputChange('diaPagamentoFixado')} className="input" />
+                   </div>
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <input type="text" placeholder="Período da Dívida (ex: Jan/2023 a Dez/2023)" name="periodoDebitoExecucao" value={formState.periodoDebitoExecucao} onChange={handleFieldChange} className="input" />
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted font-semibold">R$</span>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          placeholder="0,00"
+                          name="valorTotalDebitoExecucao"
+                          value={formState.valorTotalDebitoExecucao}
+                          onChange={handleCurrencyChange('valorTotalDebitoExecucao')}
+                          className="input pl-12"
+                        />
+                      </div>
+                   </div>
+                   {/* Fields for "definitivo" values can also be useful in execution cases */}
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                       <div>
+                        <label className="label">Pensão Definitiva (% Sal. Mínimo)</label>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            name="percentualDefinitivoSalarioMin"
+                            value={formState.percentualDefinitivoSalarioMin}
+                            onChange={handleDecimalFieldChange('percentualDefinitivoSalarioMin', { maxIntegerDigits: 3 })}
+                            className="input pr-12"
+                            placeholder="0,00"
+                          />
+                          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-muted font-semibold">%</span>
+                        </div>
+                       </div>
+                       <div>
+                        <label className="label">Pensão Definitiva (% Desp. Extras)</label>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            name="percentualDefinitivoExtras"
+                            value={formState.percentualDefinitivoExtras}
+                            onChange={handleDecimalFieldChange('percentualDefinitivoExtras', { maxIntegerDigits: 3 })}
+                            className="input pr-12"
+                            placeholder="0,00"
+                          />
+                          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-muted font-semibold">%</span>
+                        </div>
+                       </div>
+                   </div>
+                 </div>
+              )}
+
+              {/* CAMPOS DE DIVÓRCIO */}
+              {isDivorcio && (
+                 <div className="space-y-4 pt-4 border-t border-soft">
+                    <h4 className="font-semibold text-primary">Dados do Divórcio</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="label">Regime de Bens do Casamento</label>
+                        <input type="text" name="regimeBens" value={formState.regimeBens} onChange={handleFieldChange} placeholder="Ex: Comunhão Parcial de Bens" className="input" />
+                      </div>
+                      <div>
+                        <label className="label">Deseja voltar a usar o nome de solteira?</label>
+                        <select name="retornoNomeSolteira" value={formState.retornoNomeSolteira} onChange={handleFieldChange} className="input">
+                          <option value="">Voltar ao nome de solteira?</option>
+                          <option value="sim">Sim</option>
+                          <option value="nao">Não</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="label">Haverá pedido de pensão para o(a) ex-cônjuge?</label>
+                      <input type="text" name="alimentosParaExConjuge" value={formState.alimentosParaExConjuge} onChange={handleFieldChange} placeholder="Ex: Sim, no valor de R$ 500" className="input" />
+                    </div>
+                 </div>
+              )}
+
+              {/* CAMPOS GERAIS DE FAMÍLIA (Filhos, Bens, Datas) */}
+              <div className="space-y-4 pt-4 border-t border-soft">
+                <h4 className="font-semibold text-primary">Vínculos, Guarda e Bens</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                   <div>
+                     <label className="label">Data Início da Relação</label>
+                     <input type="date" name="dataInicioRelacao" value={formState.dataInicioRelacao} onChange={handleFieldChange} className="input" />
+                   </div>
+                   <div>
+                     <label className="label">Data da Separação (se houver)</label>
+                     <input type="date" name="dataSeparacao" value={formState.dataSeparacao} onChange={handleFieldChange} className="input" />
+                   </div>
+                </div>
+                
+                 <div>
+                  <label className="label">Como a guarda dos filhos é exercida hoje?</label>
+                  <textarea name="descricaoGuarda" value={formState.descricaoGuarda} onChange={handleFieldChange} rows="2" placeholder="Ex: A guarda de fato é minha, e o pai visita aos fins de semana." className="input"></textarea>
+                </div>
+                {!isFixacaoDeAlimentos && (
                   <div>
-                    <label className="label">Valor para Alimentos Provisórios (se diferente)</label>
+                    <label className="label">Bens a Partilhar (Carros, Casas, Móveis)</label>
+                    <textarea name="bensPartilha" value={formState.bensPartilha} onChange={handleFieldChange} rows="2" placeholder="Descreva os bens e se há acordo sobre a divisão" className="input"></textarea>
+                  </div>
+                )}
+                 <div>
+                  <label className="label">Situação Financeira de quem cuida dos filhos</label>
+                  <textarea name="situacaoFinanceiraGenitora" value={formState.situacaoFinanceiraGenitora} onChange={handleFieldChange} rows="2" placeholder="Descreva brevemente sua situação financeira (renda, ajuda de familiares, etc.)" className="input"></textarea>
+                </div>
+              </div>
+            </section>
+
+            {/* --- DADOS PROCESSUAIS GERAIS --- */}
+            <section className="card space-y-4 border-l-4 border-l-purple-500">
+              <div className="flex items-center gap-2 mb-2">
+                <DollarSign className="text-purple-400" />
+                <h2 className="heading-2">Dados Processuais</h2>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {!isFixacaoDeAlimentos && (
+                  <div>
+                    <label className="label">Valor da Causa (se souber)</label>
                     <div className="relative">
                       <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted font-semibold">R$</span>
                       <input
                         type="text"
                         inputMode="numeric"
-                        name="valorProvisorioReferencia"
-                        value={formState.valorProvisorioReferencia}
-                        onChange={handleCurrencyChange('valorProvisorioReferencia')}
+                        name="valorCausa"
+                        value={formState.valorCausa}
+                        onChange={handleCurrencyChange('valorCausa')}
                         placeholder="0,00"
                         className="input pl-12"
                       />
                     </div>
                   </div>
-                </div>
-                <div className="space-y-4 rounded-lg border border-soft p-4 bg-surface">
-                    <h4 className="font-semibold text-text">Dados para Depósito da Pensão</h4>
-                    <div>
-                      <label className="label">Tipo de Conta</label>
-                      <select name="tipoContaDeposito" value={formState.tipoContaDeposito} onChange={handleFieldChange} className="input">
-                        <option value="">Tipo de Conta</option>
-                        <option value="corrente_poupanca">Conta Corrente / Poupança</option>
-                        <option value="pix">PIX</option>
-                        <option value="outro">Outro / Não sei</option>
-                      </select>
-                    </div>
-
-                    { (formState.tipoContaDeposito === 'corrente_poupanca') && (
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <input type="text" name="bancoDeposito" value={formState.bancoDeposito} onChange={handleFieldChange} placeholder="Nome do Banco" className="input" />
-                        <input type="text" name="agenciaDeposito" value={formState.agenciaDeposito} onChange={handleFieldChange} placeholder="Agência" className="input" />
-                        <input type="text" name="contaDeposito" value={formState.contaDeposito} onChange={handleFieldChange} placeholder="Conta com dígito" className="input" />
-                      </div>
-                    )}
-
-                    { formState.tipoContaDeposito === 'pix' && (
-                      <div>
-                        <label className="label">Chave PIX</label>
-                        <input type="text" name="chavePixDeposito" value={formState.chavePixDeposito} onChange={handleFieldChange} placeholder="CPF, e-mail, telefone, etc." className="input" />
-                      </div>
-                    )}
-
-                    { formState.tipoContaDeposito === 'outro' && (
-                      <div>
-                        <label className="label">Descreva os dados que você possui</label>
-                        <textarea name="outrosDadosDeposito" value={formState.outrosDadosDeposito} onChange={handleFieldChange} rows="2" className="input" placeholder="Informe todos os dados para depósito que você tiver"></textarea>
-                      </div>
-                    )}
-                </div>
-              </div>
-            )}
-            
-            {/* EMPREGO DO REQUERIDO */}
-            {showFixacaoBaseFields && (
-              <div className="space-y-4 pt-4 border-t border-soft">
-                <h4 className="font-semibold text-primary">Sobre o Emprego da Outra Parte</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="label">A outra parte tem carteira assinada?</label>
-                    <select name="requeridoTemEmpregoFormal" value={formState.requeridoTemEmpregoFormal} onChange={handleFieldChange} className="input">
-                      <option value="">Tem carteira assinada?</option>
-                      <option value="sim">Sim</option>
-                      <option value="nao">Não</option>
-                      <option value="nao_sei">Não sei</option>
-                    </select>
-                  </div>
-                  {mostrarEmpregador && (
-                    <>
-                      <input type="text" placeholder="Nome da Empresa" name="empregadorRequeridoNome" value={formState.empregadorRequeridoNome} onChange={handleFieldChange} className="input" />
-                      <input type="text" placeholder="Endereço da Empresa" name="empregadorRequeridoEndereco" value={formState.empregadorRequeridoEndereco} onChange={handleFieldChange} className="input md:col-span-2" />
-                      <input type="email" placeholder="Email da Empresa (para ofício)" name="empregadorEmail" value={formState.empregadorEmail} onChange={handleFieldChange} className="input md:col-span-2" />
-                    </>
+                )}
+                <div className="relative">
+                  <label className="label">Cidade para assinatura</label>
+                  <input
+                    type="text"
+                    name="cidadeAssinatura"
+                    value={formState.cidadeAssinatura}
+                    onChange={handleCidadeChange}
+                    onBlur={() => setTimeout(() => setMostrarSugestoes(false), 150)}
+                    placeholder="Ex: Teixeira de Freitas"
+                    className="input"
+                    autoComplete="off"
+                  />
+                  {mostrarSugestoes && sugestoesCidades.length > 0 && (
+                    <ul className="absolute z-10 w-full bg-surface border border-soft rounded-md mt-1 max-h-60 overflow-y-auto shadow-lg">
+                      {sugestoesCidades.map(cidade => (
+                        <li
+                          key={cidade}
+                          onMouseDown={() => handleSelecionaCidade(cidade)}
+                          className="p-2 hover:bg-app cursor-pointer"
+                        >
+                          {cidade}
+                        </li>
+                      ))}
+                    </ul>
                   )}
                 </div>
               </div>
-            )}
+            </section>
 
-            {/* CAMPOS DE EXECUÇÃO */}
-            {isExecucao && (
-               <div className="space-y-4 pt-4 border-t border-soft">
-                 <h4 className="font-semibold text-primary">Dados do Processo de Alimentos Original</h4>
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <input type="text" placeholder="Número do Processo Original" name="numeroProcessoOriginario" value={formState.numeroProcessoOriginario} onChange={handleFieldChange} className="input" />
-                    <input type="text" placeholder="Nº do Título (se houver)" name="processoTituloNumero" value={formState.processoTituloNumero} onChange={handleFieldChange} className="input" />
-                 </div>
-                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <input type="text" placeholder="Vara onde tramitou" name="varaOriginaria" value={formState.varaOriginaria} onChange={handleFieldChange} className="input" />
-                    <input type="text" placeholder="Valor/Percentual Fixado" name="percentualOuValorFixado" value={formState.percentualOuValorFixado} onChange={handleFieldChange} className="input" />
-                    <input type="number" min="1" max="31" placeholder="Dia (1-31)" name="diaPagamentoFixado" value={formState.diaPagamentoFixado} onChange={handleDayInputChange('diaPagamentoFixado')} className="input" />
-                 </div>
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <input type="text" placeholder="Período da Dívida (ex: Jan/2023 a Dez/2023)" name="periodoDebitoExecucao" value={formState.periodoDebitoExecucao} onChange={handleFieldChange} className="input" />
-                    <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted font-semibold">R$</span>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        placeholder="0,00"
-                        name="valorTotalDebitoExecucao"
-                        value={formState.valorTotalDebitoExecucao}
-                        onChange={handleCurrencyChange('valorTotalDebitoExecucao')}
-                        className="input pl-12"
-                      />
-                    </div>
-                 </div>
-                 {/* Fields for "definitivo" values can also be useful in execution cases */}
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                     <div>
-                      <label className="label">Pensão Definitiva (% Sal. Mínimo)</label>
-                      <div className="relative">
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          name="percentualDefinitivoSalarioMin"
-                          value={formState.percentualDefinitivoSalarioMin}
-                          onChange={handleDecimalFieldChange('percentualDefinitivoSalarioMin', { maxIntegerDigits: 3 })}
-                          className="input pr-12"
-                          placeholder="0,00"
-                        />
-                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-muted font-semibold">%</span>
-                      </div>
-                     </div>
-                     <div>
-                      <label className="label">Pensão Definitiva (% Desp. Extras)</label>
-                      <div className="relative">
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          name="percentualDefinitivoExtras"
-                          value={formState.percentualDefinitivoExtras}
-                          onChange={handleDecimalFieldChange('percentualDefinitivoExtras', { maxIntegerDigits: 3 })}
-                          className="input pr-12"
-                          placeholder="0,00"
-                        />
-                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-muted font-semibold">%</span>
-                      </div>
-                     </div>
-                 </div>
-               </div>
-            )}
-
-            {/* CAMPOS DE DIVÓRCIO */}
-            {isDivorcio && (
-               <div className="space-y-4 pt-4 border-t border-soft">
-                  <h4 className="font-semibold text-primary">Dados do Divórcio</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="label">Regime de Bens do Casamento</label>
-                      <input type="text" name="regimeBens" value={formState.regimeBens} onChange={handleFieldChange} placeholder="Ex: Comunhão Parcial de Bens" className="input" />
-                    </div>
-                    <div>
-                      <label className="label">Deseja voltar a usar o nome de solteira?</label>
-                      <select name="retornoNomeSolteira" value={formState.retornoNomeSolteira} onChange={handleFieldChange} className="input">
-                        <option value="">Voltar ao nome de solteira?</option>
-                        <option value="sim">Sim</option>
-                        <option value="nao">Não</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="label">Haverá pedido de pensão para o(a) ex-cônjuge?</label>
-                    <input type="text" name="alimentosParaExConjuge" value={formState.alimentosParaExConjuge} onChange={handleFieldChange} placeholder="Ex: Sim, no valor de R$ 500" className="input" />
-                  </div>
-               </div>
-            )}
-
-            {/* CAMPOS GERAIS DE FAMÍLIA (Filhos, Bens, Datas) */}
-            <div className="space-y-4 pt-4 border-t border-soft">
-              <h4 className="font-semibold text-primary">Vínculos, Guarda e Bens</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                 <div>
-                   <label className="label">Data Início da Relação</label>
-                   <input type="date" name="dataInicioRelacao" value={formState.dataInicioRelacao} onChange={handleFieldChange} className="input" />
-                 </div>
-                 <div>
-                   <label className="label">Data da Separação (se houver)</label>
-                   <input type="date" name="dataSeparacao" value={formState.dataSeparacao} onChange={handleFieldChange} className="input" />
-                 </div>
+            {/* --- ETAPA 5: RELATO E DOCUMENTOS --- */}
+            <section className="card space-y-6 border-l-4 border-l-indigo-500">
+              <div className="flex items-center gap-2 border-b border-soft pb-2">
+                <FileText className="text-indigo-400" />
+                <h2 className="heading-2">5. Conte sua História e Anexe Provas</h2>
               </div>
-              
-               <div>
-                <label className="label">Como a guarda dos filhos é exercida hoje?</label>
-                <textarea name="descricaoGuarda" value={formState.descricaoGuarda} onChange={handleFieldChange} rows="2" placeholder="Ex: A guarda de fato é minha, e o pai visita aos fins de semana." className="input"></textarea>
-              </div>
+
               <div>
-                <label className="label">Bens a Partilhar (Carros, Casas, Móveis)</label>
-                <textarea name="bensPartilha" value={formState.bensPartilha} onChange={handleFieldChange} rows="2" placeholder="Descreva os bens e se há acordo sobre a divisão" className="input"></textarea>
+                <label className="label font-bold">Relato dos Fatos (O que aconteceu?)</label>
+                <textarea
+                  placeholder="Conte detalhadamente o que aconteceu, por que você precisa da justiça, como está a situação atual..."
+                  value={formState.relato}
+                  onChange={handleFieldChange}
+                  name="relato"
+                  rows="6"
+                  className="input w-full"
+                ></textarea>
               </div>
-               <div>
-                <label className="label">Situação Financeira de quem cuida dos filhos</label>
-                <textarea name="situacaoFinanceiraGenitora" value={formState.situacaoFinanceiraGenitora} onChange={handleFieldChange} rows="2" placeholder="Descreva brevemente sua situação financeira (renda, ajuda de familiares, etc.)" className="input"></textarea>
-              </div>
-            </div>
-          </section>
-        )}
 
-        {/* --- DADOS PROCESSUAIS GERAIS --- */}
-        <section className="card space-y-4 border-l-4 border-l-purple-500">
-          <div className="flex items-center gap-2 mb-2">
-            <DollarSign className="text-purple-400" />
-            <h2 className="heading-2">Dados Processuais</h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="label">Valor da Causa (se souber)</label>
-              <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted font-semibold">R$</span>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  name="valorCausa"
-                  value={formState.valorCausa}
-                  onChange={handleCurrencyChange('valorCausa')}
-                  placeholder="0,00"
-                  className="input pl-12"
-                />
-              </div>
-            </div>
-            <div className="relative">
-              <label className="label">Cidade para assinatura do documento</label>
-              <input
-                type="text"
-                name="cidadeAssinatura"
-                value={formState.cidadeAssinatura}
-                onChange={handleCidadeChange}
-                onBlur={() => setTimeout(() => setMostrarSugestoes(false), 150)}
-                placeholder="Ex: Teixeira de Freitas"
-                className="input"
-                autoComplete="off"
-              />
-              {mostrarSugestoes && sugestoesCidades.length > 0 && (
-                <ul className="absolute z-10 w-full bg-surface border border-soft rounded-md mt-1 max-h-60 overflow-y-auto shadow-lg">
-                  {sugestoesCidades.map(cidade => (
-                    <li
-                      key={cidade}
-                      onMouseDown={() => handleSelecionaCidade(cidade)}
-                      className="p-2 hover:bg-app cursor-pointer"
-                    >
-                      {cidade}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </div>
-        </section>
-
-        {/* --- ETAPA 5: RELATO E DOCUMENTOS --- */}
-        <section className="card space-y-6 border-l-4 border-l-indigo-500">
-          <div className="flex items-center gap-2 border-b border-soft pb-2">
-            <FileText className="text-indigo-400" />
-            <h2 className="heading-2">5. Conte sua História e Anexe Provas</h2>
-          </div>
-
-          <div>
-            <label className="label font-bold">Relato dos Fatos (O que aconteceu?)</label>
-            <textarea
-              placeholder="Conte detalhadamente o que aconteceu, por que você precisa da justiça, como está a situação atual..."
-              value={formState.relato}
-              onChange={handleFieldChange}
-              name="relato"
-              rows="6"
-              className="input w-full"
-            ></textarea>
-          </div>
-
-          {/* Gravação de Áudio */}
-          <div className="bg-surface p-4 rounded-lg border border-dashed border-soft flex flex-col items-center justify-center gap-3">
-              <p className="text-sm text-muted">Prefere falar? Grave um áudio contando sua história.</p>
-              {!isRecording && !formState.audioBlob && (
-                <button type="button" onClick={startRecording} className="btn btn-secondary rounded-full px-6">
-                  <Mic size={20} /> Iniciar Gravação
-                </button>
-              )}
-              {isRecording && (
-                <button type="button" onClick={stopRecording} className="btn btn-error animate-pulse rounded-full px-6 text-red-600 bg-red-100 border-red-200">
-                  <Square size={20} /> Parar Gravação
-                </button>
-              )}
-              {formState.audioBlob && (
-                <div className="flex items-center gap-4 w-full max-w-md bg-slate-100 dark:bg-slate-700 p-2 rounded-full">
-                  <audio src={URL.createObjectURL(formState.audioBlob)} controls className="w-full h-8" />
-                  <button type="button" onClick={removeAudioRecording} className="text-red-500 p-1 hover:bg-red-100 rounded-full">
-                    <X size={18} />
-                  </button>
-                </div>
-              )}
-          </div>
-
-          {/* Checklist e Upload */}
-          {listaDeDocumentos.length > 0 && (
-            <div className="bg-surface p-4 rounded-lg border border-soft">
-              <h3 className="heading-3 mb-3">Checklist de Documentos Necessários</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
-                {listaDeDocumentos.map((doc) => (
-                  <label key={doc} className="flex items-start gap-2 p-2 rounded-md hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer text-sm">
-                    <input type="checkbox" name={doc} onChange={handleCheckboxChange} className="mt-1 w-4 h-4 accent-primary" />
-                    <span className="text-muted">{doc}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="bg-surface p-4 rounded-lg border border-dashed border-soft">
-              <input type="file" accept=".pdf,.jpg,.jpeg,.png" ref={documentInputRef} onChange={handleDocumentChange} className="hidden" multiple />
-              <button type="button" onClick={() => documentInputRef.current.click()} className="btn btn-ghost w-full border border-soft border-dashed h-24 flex flex-col gap-2 text-muted hover:text-primary hover:border-primary">
-                <Paperclip size={24} className="mx-auto" /> 
-                <span>Clique para anexar fotos ou PDFs dos documentos</span>
-              </button>
-              
-              {formState.documentFiles.length > 0 && (
-                <div className="mt-4 space-y-2">
-                  {formState.documentFiles.map((file, idx) => (
-                    <div key={`${file.name}-${idx}`} className="flex items-center justify-between bg-slate-100 dark:bg-slate-700 p-2 rounded text-sm">
-                      <span className="truncate max-w-xs">{file.name}</span>
-                      <button type="button" onClick={() => removeDocument(file.name)} className="text-red-500 hover:text-red-700">
-                        <X size={16} />
+              {/* Gravação de Áudio */}
+              <div className="bg-surface p-4 rounded-lg border border-dashed border-soft flex flex-col items-center justify-center gap-3">
+                  <p className="text-sm text-muted">Prefere falar? Grave um áudio contando sua história.</p>
+                  {!isRecording && !formState.audioBlob && (
+                    <button type="button" onClick={startRecording} className="btn btn-secondary rounded-full px-6">
+                      <Mic size={20} /> Iniciar Gravação
+                    </button>
+                  )}
+                  {isRecording && (
+                    <button type="button" onClick={stopRecording} className="btn btn-error animate-pulse rounded-full px-6 text-red-600 bg-red-100 border-red-200">
+                      <Square size={20} /> Parar Gravação
+                    </button>
+                  )}
+                  {formState.audioBlob && (
+                    <div className="flex items-center gap-4 w-full max-w-md bg-slate-100 dark:bg-slate-700 p-2 rounded-full">
+                      <audio src={URL.createObjectURL(formState.audioBlob)} controls className="w-full h-8" />
+                      <button type="button" onClick={removeAudioRecording} className="text-red-500 p-1 hover:bg-red-100 rounded-full">
+                        <X size={18} />
                       </button>
                     </div>
-                  ))}
+                  )}
+              </div>
+
+              {/* Checklist e Upload */}
+              {listaDeDocumentos.length > 0 && (
+                <div className="bg-surface p-4 rounded-lg border border-soft">
+                  <h3 className="heading-3 mb-3">Checklist de Documentos Necessários</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
+                    {listaDeDocumentos.map((doc) => (
+                      <label key={doc} className="flex items-start gap-2 p-2 rounded-md hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer text-sm">
+                        <input type="checkbox" name={doc} onChange={handleCheckboxChange} className="mt-1 w-4 h-4 accent-primary" />
+                        <span className="text-muted">{doc}</span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
               )}
-          </div>
-        </section>
 
-        {/* --- BOTÃO FINAL --- */}
-        <div className="pt-6">
-          <button type="submit" disabled={loading} className="btn btn-primary w-full py-4 text-lg shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1">
-            {loading ? (
-              <span className="flex items-center gap-2">Processando...</span>
-            ) : (
-              <>
-                <Upload size={20} /> Enviar Caso para a Defensoria
-              </>
-            )}
-          </button>
-          {loading && (
-            <p className="text-center text-sm text-muted mt-2 animate-pulse">{statusMessage}</p>
-          )}
-        </div>
+              <div className="bg-surface p-4 rounded-lg border border-dashed border-soft">
+                  <input type="file" accept=".pdf,.jpg,.jpeg,.png" ref={documentInputRef} onChange={handleDocumentChange} className="hidden" multiple />
+                  <button type="button" onClick={() => documentInputRef.current.click()} className="btn btn-ghost w-full border border-soft border-dashed h-24 flex flex-col gap-2 text-muted hover:text-primary hover:border-primary">
+                    <Paperclip size={24} className="mx-auto" /> 
+                    <span>Clique para anexar fotos ou PDFs dos documentos</span>
+                  </button>
+                  
+                  {formState.documentFiles.length > 0 && (
+                    <div className="mt-4 space-y-2">
+                      {formState.documentFiles.map((file, idx) => (
+                        <div key={`${file.name}-${idx}`} className="flex items-center justify-between bg-slate-100 dark:bg-slate-700 p-2 rounded text-sm">
+                          <span className="truncate max-w-xs">{file.name}</span>
+                          <button type="button" onClick={() => removeDocument(file.name)} className="text-red-500 hover:text-red-700">
+                            <X size={16} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+              </div>
+            </section>
 
+            {/* --- BOTÃO FINAL --- */}
+            <div className="pt-6">
+              <button type="submit" disabled={loading} className="btn btn-primary w-full py-4 text-lg shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1">
+                {loading ? (
+                  <span className="flex items-center gap-2">Processando...</span>
+                ) : (
+                  <>
+                    <Upload size={20} /> Enviar Caso para a Defensoria
+                  </>
+                )}
+              </button>
+              {loading && (
+                <p className="text-center text-sm text-muted mt-2 animate-pulse">{statusMessage}</p>
+              )}
+            </div>
+          </>
+        )}
       </form>
       {checklistWarningOpen && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 px-4">

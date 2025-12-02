@@ -83,10 +83,8 @@ export const normalizePromptData = (raw = {}) => {
     exequente: raw.exequente || requerente,
     executado: raw.executado || requerido,
     dadosBancarios,
-    valorPercentualSalMin:
-      raw.valorPercentualSalMin ?? raw.percentual_sm_requerido,
-    valorPercentualExtrasSaudeEducVestu:
-      raw.valorPercentualExtrasSaudeEducVestu ?? raw.percentual_despesas_extra,
+    valorMensalPensao:
+      raw.valorMensalPensao ?? raw.valor_mensal_pensao,
     diaPagamentoMensal: raw.diaPagamentoMensal ?? raw.dia_pagamento_requerido,
     periodoDevedor: raw.periodoDevedor || raw.periodo_debito_execucao,
     valorTotalDebito:
@@ -241,14 +239,9 @@ export const generateDosFatos = async (caseData = {}) => {
       caseData.dados_adicionais_requerido,
       "Sem detalhes adicionais sobre o requerido."
     );
-    const percentualPretendido = cleanText(
-      caseData.percentual_sm_requerido ||
-        normalized.valorPercentualSalMin,
-      "Percentual não informado"
-    );
-    const percentualExtras = cleanText(
-      caseData.percentual_despesas_extra,
-      "Percentual de despesas adicionais não informado"
+    const valorPensao = cleanText(
+      caseData.valor_mensal_pensao || normalized.valorMensalPensao,
+      "Valor não informado"
     );
     const prompt = `**Persona:**
 Você é um assistente jurídico especialista em Direito de Família da Defensoria Pública da Bahia. Sua tarefa é redigir a seção "DOS FATOS" de uma petição de alimentos.
@@ -279,11 +272,10 @@ Regras obrigatórias:
 - Requerido: ${cleanText(
       normalized.requerido?.nome,
       "Nome do requerido não informado"
-    )}, CPF ${cleanText(normalized.requerido?.cpf, "não informado")}.
+    )} (CPF ${cleanText(normalized.requerido?.cpf, "não informado")}).
 - Situação econômica do assistido: ${situacaoAssistido}
 - Situação econômica do requerido: ${situacaoRequerido}
-- Percentual pretendido sobre o salário mínimo: ${percentualPretendido}%
-- Percentual para despesas extras (saúde, educação, vestuário): ${percentualExtras}%
+- Valor mensal pretendido para pensão e despesas extras: R$ ${valorPensao}
 - Informações sobre filhos/dependentes: ${filhosInfo}
 - Relato fornecido pelo assistido:
 \"\"\"${relatoBase}\"\"\"

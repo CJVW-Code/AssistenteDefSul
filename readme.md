@@ -795,7 +795,7 @@ export const FormularioSubmissao = () => {
           </div>
         </div>
         <div className="bg-amber-500/10 p-3 rounded border border-amber-500/30 text-amber-200 text-sm text-left flex gap-2">
-          <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+          <AlertTriangle className="w-5 h-5 shrink-0" />
           <p>Guarde esses dados! Você precisará deles para consultar o andamento do seu caso.</p>
         </div>
         <button 
