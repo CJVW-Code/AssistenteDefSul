@@ -846,10 +846,10 @@ export const FormularioSubmissao = () => {
 
               {/* Pergunta Chave de Representação (agora condicional) */}
               {!isFixacaoDeAlimentos && (
-                <div className="bg-app p-4 rounded-lg border border-soft">
+                <div className="bg-surface p-4 rounded-lg border border-soft">
                   <label className="block text-sm font-semibold mb-2">Para quem é este processo?</label>
                   <div className="flex flex-col sm:flex-row gap-4">
-                    <label className="flex items-center gap-2 cursor-pointer bg-surface p-3 rounded border border-soft hover:border-primary transition">
+                    <label className="flex items-center gap-2 cursor-pointer p-3 bg-surface rounded-lg border border-soft hover:border-primary transition">
                       <input 
                         type="radio" 
                         name="assistidoEhIncapaz" 
@@ -860,7 +860,7 @@ export const FormularioSubmissao = () => {
                       />
                       <span>Para mim mesmo(a)</span>
                     </label>
-                    <label className="flex items-center gap-2 cursor-pointer bg-surface p-3 rounded border border-soft hover:border-primary transition">
+                    <label className="flex items-center gap-2 cursor-pointer bg-surface p-3 rounded-lg border border-soft hover:border-primary transition">
                       <input 
                         type="radio" 
                         name="assistidoEhIncapaz" 
@@ -1025,7 +1025,7 @@ export const FormularioSubmissao = () => {
                   <h2 className="heading-2">3. Contra quem é a ação? (Requerido)</h2>
                 </div>
                 <p className="text-sm text-muted">Preencha com o máximo de informações que você souber.</p>
-
+                <p className="text-thirt text-sm">Informando o Número para contato aumenta em 40% as chances do processo progredir mais rapido.</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <input
@@ -1410,23 +1410,6 @@ export const FormularioSubmissao = () => {
                 <h2 className="heading-2">Dados Processuais</h2>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {!isFixacaoDeAlimentos && (
-                  <div>
-                    <label className="label">Valor da Causa (se souber)</label>
-                    <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted font-semibold">R$</span>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        name="valorCausa"
-                        value={formState.valorCausa}
-                        onChange={handleCurrencyChange('valorCausa')}
-                        placeholder="0,00"
-                        className="input pl-12"
-                      />
-                    </div>
-                  </div>
-                )}
                 <div className="relative">
                   <label className="label">Cidade para assinatura</label>
                   <input

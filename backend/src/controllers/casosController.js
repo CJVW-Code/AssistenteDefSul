@@ -25,7 +25,16 @@ const storageBuckets = {
   peticoes: process.env.SUPABASE_PETICOES_BUCKET || "peticoes",
   audios: process.env.SUPABASE_AUDIOS_BUCKET || "audios",
 };
-
+const calcularValorCausa = (valorMensal) => {
+  if (!valorMensal) return "0,00";
+  // Remove formatação brasileira para cálculo (ex: "1.200,50" -> 1200.50)
+  const valorNumerico = parseFloat(valorMensal.replace(/\./g, "").replace(",", "."));
+  if (isNaN(valorNumerico)) return "0,00";
+  
+  const total = valorNumerico * 12;
+  
+  return total.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};s
 const extractObjectPath = (storedValue) => {
   if (!storedValue) return null;
   if (!storedValue.startsWith("http")) {
@@ -130,9 +139,9 @@ const buildDocxTemplatePayload = (
     baseData.vara;
   const cidadeAssinatura =
     baseData.cidade_assinatura || normalizedData.cidadeDataAssinatura;
-  const percentualBase =
-    baseData.percentual_ou_valor_fixado ??
-    normalizedData.valorPercentualSalMin;
+  const valorCausaCalculado = baseData.valor_causa || calcularValorCausa(baseData.valor_pensao);  
+  const percentualProvisorio = baseData.percentual_ou_valor_fixado || baseData.percentual_definitivo_salario_min;
+  const percentualExtras = baseData.percentual_definitivo_extras || "0";
   const diaPagamentoBase =
     baseData.dia_pagamento_fixado || baseData.dia_pagamento_requerido;
   const assistidoNome = baseData.nome_assistido || requerente.nome;
@@ -237,7 +246,7 @@ const buildDocxTemplatePayload = (
       "[DESCREVER OS FATOS]",
   };
 };
-// --- FUNÇÃO DE CRIAÇÃO (VERSÃO FINAL E COMPLETA) ---
+// --- FUNÇÃO DE CRIAÇÃO  ---
 export const criarNovoCaso = async (req, res) => {
   try {
     const dados_formulario = req.body;

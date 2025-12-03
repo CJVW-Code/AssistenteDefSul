@@ -22,6 +22,7 @@
 
   --color-text: #000000;
   --color-text-muted: #4f5152;
+  --color-text-thirt: #eba40a;
 
   /* Feedback */
   --color-success: #1fa97c;
@@ -70,10 +71,67 @@
     --color-text-muted: #c9d1d9;
   }
 }
+/* -------------------------------------------------------------
+   thema
+---------------------------------------------------------------- */
 
+@theme {
+  /* -----------------------------------------------------------
+     CORES (Cria classes: text-*, bg-*, border-*, ring-*)
+     ----------------------------------------------------------- */
+  
+  /* Primária */
+  --color-primary: var(--color-primary);
+  --color-primary-600: var(--color-primary-600);
+
+  /* Secundária */
+  --color-secondary: var(--color-secondary);
+  --color-secondary-600: var(--color-secondary-600);
+
+  /* Estruturais */
+  /* Cria bg-app, text-app, border-app */
+  --color-app: var(--color-bg); 
+  
+  /* Cria bg-surface, text-surface (para cards) */
+  --color-surface: var(--color-surface); 
+  
+  /* Cria border-border (para bordas genéricas) */
+  --color-border: var(--color-border); 
+
+  /* Tipografia */
+  /* Cria text-main (cor padrão do texto) */
+  --color-main: var(--color-text);
+  
+  /* Cria text-muted (texto cinza/secundário) */
+  --color-muted: var(--color-text-muted);
+  
+  /* Cria text-thirt (seu 'text-thirt' definido no root) */
+  --color-thirt: var(--color-text-thirt);
+
+  /* Feedback */
+  --color-success: var(--color-success);
+  --color-error: var(--color-error);
+  --color-focus: var(--color-focus);
+
+  /* -----------------------------------------------------------
+     OUTROS UTILITÁRIOS (Baseados nas suas variáveis)
+     ----------------------------------------------------------- */
+  
+  /* Arredondamento */
+  /* Cria rounded-card (12px/0.75rem) */
+  --radius-card: var(--radius); 
+  
+  /* Cria rounded-badge (8px/0.5rem) */
+  --radius-badge: var(--radius-sm); 
+
+  /* Sombras */
+  /* Cria shadow-soft */
+  --shadow-soft: var(--shadow-soft);
+}
 /* -------------------------------------------------------------
    4) Base
 ---------------------------------------------------------------- */
+
 @layer base {
   html,
   body {
@@ -281,3 +339,5 @@
 .container-app {
   @apply max-w-6xl mx-auto px-4 sm:px-6 lg:px-8;
 }
+
+

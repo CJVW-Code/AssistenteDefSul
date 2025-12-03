@@ -207,28 +207,23 @@ export const generateDosFatos = async (caseData = {}) => {
   try {
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
     const normalized = normalizePromptData(caseData);
-    const relatoBase =
-      cleanText(
-        caseData.relato_texto ||
-          caseData.relato ||
-          normalized.relato,
-        "Relato detalhado não informado."
-      ) || "Relato detalhado não informado.";
+    const relatoBase = cleanText(normalized.relato, "Relato detalhado não informado.");
 
     const formatDocumentList = (docs = []) => {
-      // Esta função foi movida para cá na refatoração anterior.
       if (!Array.isArray(docs) || !docs.length) {
         return "Nenhum documento ou prova informado.";
       }
       const filtered = docs
         .map((doc) => cleanText(doc))
         .filter((doc) => Boolean(doc));
-      if (!filtered.length) return "Nenhum documento ou prova informado.";
+      if (!filtered.length) {
+        return "Nenhum documento ou prova informado.";
+      }
       return filtered.map((doc, index) => `${index + 1}. ${doc}`).join("\n");
     };
-    const documentosList = formatDocumentList(caseData.documentos_informados);    
+    const documentosList = formatDocumentList(caseData.documentos_informados);
     const filhosInfo = cleanText(
-      caseData.filhos_info,
+      caseData.filhos_info || caseData.filhosInfo,
       "Informações sobre filhos não foram apresentadas."
     );
     const situacaoAssistido = cleanText(
@@ -239,10 +234,7 @@ export const generateDosFatos = async (caseData = {}) => {
       caseData.dados_adicionais_requerido,
       "Sem detalhes adicionais sobre o requerido."
     );
-    const valorPensao = cleanText(
-      caseData.valor_mensal_pensao || normalized.valorMensalPensao,
-      "Valor não informado"
-    );
+    const valorPensao = cleanText(normalized.valorMensalPensao, "Valor não informado");
     const prompt = `**Persona:**
 Você é um assistente jurídico especialista em Direito de Família da Defensoria Pública da Bahia. Sua tarefa é redigir a seção "DOS FATOS" de uma petição de alimentos.
 
