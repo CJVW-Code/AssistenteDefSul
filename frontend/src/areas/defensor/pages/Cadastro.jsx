@@ -66,10 +66,8 @@ export const Cadastro = () => {
         </button>
       </div>
       <div className="absolute top-4 right-4">
-              <button>
-                <ThemeToggle />
-              </button>
-            </div>
+        <ThemeToggle />
+      </div>
       <div className="w-full max-w-5xl grid gap-8 md:grid-cols-2 items-center">
         <div className="hidden md:flex card bg-gradient-to-br from-primary to-green-700 h-full">
           <div className="space-y-4">

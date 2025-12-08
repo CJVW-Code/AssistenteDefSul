@@ -14,27 +14,36 @@ import {
   normalizePromptData,
 } from "../services/geminiService.js";
 import { getVaraByTipoAcao } from "../config/varasMapping.js";
+
 // Tempo de expiração (em segundos) para URLs assinadas do Supabase
 // Pode ser configurado pela env var SIGNED_URL_EXPIRES; padrão 24h (86400s)
 const signedExpires = Number.parseInt(
   process.env.SIGNED_URL_EXPIRES || "86400",
   10
 );
+
 const storageBuckets = {
   documentos: process.env.SUPABASE_DOCUMENTOS_BUCKET || "documentos",
   peticoes: process.env.SUPABASE_PETICOES_BUCKET || "peticoes",
   audios: process.env.SUPABASE_AUDIOS_BUCKET || "audios",
 };
+
 const calcularValorCausa = (valorMensal) => {
   if (!valorMensal) return "0,00";
   // Remove formatação brasileira para cálculo (ex: "1.200,50" -> 1200.50)
-  const valorNumerico = parseFloat(valorMensal.replace(/\./g, "").replace(",", "."));
+  const valorNumerico = parseFloat(
+    valorMensal.replace(/\./g, "").replace(",", ".")
+  );
   if (isNaN(valorNumerico)) return "0,00";
-  
+
   const total = valorNumerico * 12;
-  
-  return total.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-};s
+
+  return total.toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+};
+
 const extractObjectPath = (storedValue) => {
   if (!storedValue) return null;
   if (!storedValue.startsWith("http")) {
@@ -139,8 +148,16 @@ const buildDocxTemplatePayload = (
     baseData.vara;
   const cidadeAssinatura =
     baseData.cidade_assinatura || normalizedData.cidadeDataAssinatura;
-  const valorCausaCalculado = baseData.valor_causa || calcularValorCausa(baseData.valor_pensao);  
-  const percentualProvisorio = baseData.percentual_ou_valor_fixado || baseData.percentual_definitivo_salario_min;
+  
+  // CORREÇÃO: Usar valor padrão para evitar erro no cálculo
+  const valorCausaCalculado =
+    baseData.valor_causa || calcularValorCausa(baseData.valor_pensao || "0,00");
+
+  // CORREÇÃO: Definindo a variável correta aqui
+  const percentualProvisorio =
+    baseData.percentual_ou_valor_fixado ||
+    baseData.percentual_definitivo_salario_min;
+  
   const percentualExtras = baseData.percentual_definitivo_extras || "0";
   const diaPagamentoBase =
     baseData.dia_pagamento_fixado || baseData.dia_pagamento_requerido;
@@ -149,6 +166,11 @@ const buildDocxTemplatePayload = (
   const dadosBancarios = baseData.dados_bancarios_deposito;
   const executadoEndereco =
     baseData.endereco_requerido || requerido.endereco || "";
+
+  // Datas em formato brasileiro (dd/mm/aaaa), quando possivel
+  const dataNascimentoAssistidoBr = formatDateBr(
+    baseData.assistido_data_nascimento || requerente.dataNascimento
+  );
 
   return {
     ...baseData,
@@ -161,12 +183,8 @@ const buildDocxTemplatePayload = (
     requerente_incapaz_sim_nao: ensureText(
       baseData.assistido_eh_incapaz || "nao"
     ),
-    requerente_dataNascimento: ensureText(
-      baseData.assistido_data_nascimento || requerente.dataNascimento
-    ),
-    requerente_data_nascimento: ensureText(
-      baseData.assistido_data_nascimento || requerente.dataNascimento
-    ),
+    requerente_dataNascimento: ensureText(dataNascimentoAssistidoBr),
+    requerente_data_nascimento: ensureText(dataNascimentoAssistidoBr),
     requerente_cpf: ensureText(assistidoCpf),
     requerente_nacionalidade: ensureText(baseData.assistido_nacionalidade),
     requerente_estado_civil: ensureText(baseData.assistido_estado_civil),
@@ -179,12 +197,14 @@ const buildDocxTemplatePayload = (
     representante_nacionalidade: ensureText(
       baseData.representante_nacionalidade
     ),
-    representante_estado_civil: ensureText(
-      baseData.representante_estado_civil
-    ),
+    representante_estado_civil: ensureText(baseData.representante_estado_civil),
     representante_ocupacao: ensureText(baseData.representante_ocupacao),
     representante_cpf: ensureText(baseData.representante_cpf),
-    representante_rg: ensureText(baseData.representante_rg_numero ? `${baseData.representante_rg_numero} ${baseData.representante_rg_orgao}` : ''),
+    representante_rg: ensureText(
+      baseData.representante_rg_numero
+        ? `${baseData.representante_rg_numero} ${baseData.representante_rg_orgao}`
+        : ""
+    ),
     representante_endereco_residencial: ensureText(
       baseData.representante_endereco_residencial
     ),
@@ -197,9 +217,7 @@ const buildDocxTemplatePayload = (
     exequente_incapaz_sim_nao: ensureText(
       baseData.assistido_eh_incapaz || "nao"
     ),
-    exequente_data_nascimento: ensureText(
-      baseData.assistido_data_nascimento || requerente.dataNascimento
-    ),
+    exequente_data_nascimento: ensureText(dataNascimentoAssistidoBr),
     exequente_cpf: ensureText(assistidoCpf),
     exequente_representante: ensureText(requerente.representante),
     executado_nome: ensureText(baseData.nome_requerido || requerido.nome),
@@ -216,8 +234,11 @@ const buildDocxTemplatePayload = (
     ),
     executado_email: ensureText(baseData.requerido_email),
     executado_telefone: ensureText(baseData.requerido_telefone),
-    valorPercentualSalMin: ensureText(percentualBase),
-    percentual_salario_minimo: ensureText(percentualBase),
+    
+    // CORREÇÃO: Usando a variável correta (percentualProvisorio)
+    valorPercentualSalMin: ensureText(percentualProvisorio),
+    percentual_salario_minimo: ensureText(percentualProvisorio),
+    
     valor_pensao: ensureText(baseData.valor_pensao),
     percentual_definitivo_salario_min: ensureText(
       baseData.percentual_definitivo_salario_min
@@ -246,10 +267,12 @@ const buildDocxTemplatePayload = (
       "[DESCREVER OS FATOS]",
   };
 };
+
 // --- FUNÇÃO DE CRIAÇÃO  ---
 export const criarNovoCaso = async (req, res) => {
   try {
     const dados_formulario = req.body;
+    // Desestruturação dos dados recebidos
     const {
       nome,
       cpf,
@@ -319,6 +342,7 @@ export const criarNovoCaso = async (req, res) => {
       retorno_nome_solteira,
       alimentos_para_ex_conjuge,
     } = dados_formulario;
+
     const formattedAssistidoNascimento = formatDateBr(
       assistido_data_nascimento
     );
@@ -328,16 +352,24 @@ export const criarNovoCaso = async (req, res) => {
       dia_pagamento_requerido
     );
     const formattedDiaPagamentoFixado = formatDateBr(dia_pagamento_fixado);
-    const formattedValorPensao = formatCurrencyBr(valor_pensao);
+    const formattedValorPensao = formatCurrencyBr(
+      dados_formulario.valor_mensal_pensao
+    );
     const formattedValorTotalDebitoExecucao = formatCurrencyBr(
       valor_total_debito_execucao
     );
-    const documentosInformadosArray = JSON.parse(documentos_informados || "[]");
+
+    const documentosInformadosArray = JSON.parse(
+      documentos_informados || "[]"
+    );
     const { protocolo, chaveAcesso } = generateCredentials(tipoAcao);
     const chaveAcessoHash = hashKeyWithSalt(chaveAcesso);
-    
-    // Determina a vara automaticamente
-    const varaAutomatica = getVaraByTipoAcao(tipoAcao);
+
+    const varaMapeada = getVaraByTipoAcao(tipoAcao);
+    const varaAutomatica =
+      varaMapeada && !varaMapeada.includes("NÃO ESPECIFICADA")
+        ? varaMapeada
+        : null;
 
     console.log("\n--- DEBUG: CRIAÇÃO DO CASO ---");
     console.log("Chave de Acesso (Texto Puro):", chaveAcesso);
@@ -354,13 +386,7 @@ export const criarNovoCaso = async (req, res) => {
     // --- ETAPA 1: PROCESSAMENTO ---
     if (req.files) {
       if (req.files.audio) {
-        // Bloco de transcrição de áudio
-        /*
-        console.log("Iniciando transcrição de áudio...");
-        const textoDoAudio = await transcribeAudio(req.files.audio[0].path);
-        textoCompleto += `\n\n--- TRANSCRIÇÃO DO ÁUDIO ---\n${textoDoAudio}`;
-        console.log("Transcrição concluída.");
-        */
+        // Lógica de áudio (se houver)
       }
       if (req.files.documentos) {
         for (const docFile of req.files.documentos) {
@@ -375,9 +401,12 @@ export const criarNovoCaso = async (req, res) => {
     console.log("Gerando resumo com IA...");
     resumo_ia = await analyzeCase(textoCompleto);
     console.log("Resumo gerado.");
+
     console.log("Gerando seção 'Dos Fatos' com IA...");
     const acaoEspecifica =
       (tipoAcao || "").split(" - ")[1]?.trim() || (tipoAcao || "").trim();
+
+    // Objeto consolidado com os dados para a petição
     const caseDataForPetition = {
       protocolo,
       nome_assistido: nome,
@@ -448,20 +477,23 @@ export const criarNovoCaso = async (req, res) => {
       retorno_nome_solteira,
       alimentos_para_ex_conjuge,
     };
+
     const dosFatosTexto = await generateDosFatos(caseDataForPetition);
     const peticao_inicial_rascunho = `DOS FATOS\n\n${dosFatosTexto || ""}`;
     console.log("Seção 'Dos Fatos' gerada.");
-    // --- FIM DA CHAMADA ---
 
+    // --- CORREÇÃO: CRIAÇÃO DO docxData ANTES DE USAR ---
+    const docxData = buildDocxTemplatePayload(
+      {},
+      dosFatosTexto,
+      caseDataForPetition
+    );
 
-    // ... (O código de geração do .docx continua aqui, se você ainda o quiser) ...
-    console.log("Gerando documento .docx..."); // Linha existente
-
-    // ... (O código de upload dos arquivos originais continua aqui) ...
-    // --- GERAÇÃO E UPLOAD DO DOCX GERADO ---
+    console.log("Gerando documento .docx...");
     let peticao_completa_texto = null;
+
     try {
-      const docxBuffer = await generateDocx(docxData);
+      const docxBuffer = await generateDocx(docxData); // Agora docxData existe!
       const docxPath = `${protocolo}/peticao_inicial_${protocolo}.docx`;
 
       const { value: extractedText } = await mammoth.extractRawText({
@@ -485,7 +517,6 @@ export const criarNovoCaso = async (req, res) => {
       console.error("Erro ao gerar/upload do DOCX:", e);
     }
 
-    // --- ETAPA 2: UPLOAD DOS ARQUIVOS ORIGINAIS ---
     console.log("Iniciando upload dos arquivos originais...");
     if (req.files) {
       if (req.files.audio) {
@@ -535,8 +566,8 @@ export const criarNovoCaso = async (req, res) => {
       url_documento_gerado,
       documentos_informados: documentosInformadosArray,
       peticao_inicial_rascunho,
-      dados_formulario,
-      peticao_completa_texto,
+      dados_formulario, // Campo JSONB
+      peticao_completa_texto, // Campo TEXT
     });
 
     if (dbError) {
@@ -605,6 +636,7 @@ export const obterDetalhesCaso = async (req, res) => {
     res.status(500).json({ error: "Falha ao buscar detalhes do caso." });
   }
 };
+
 export const atualizarStatusCaso = async (req, res) => {
   try {
     const { id } = req.params; // Pega o ID do caso da URL
@@ -638,9 +670,3 @@ export const atualizarStatusCaso = async (req, res) => {
     res.status(500).json({ error: "Falha ao atualizar status." });
   }
 };
-
-
-
-
-
-
