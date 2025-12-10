@@ -28,6 +28,10 @@ const storageBuckets = {
   audios: process.env.SUPABASE_AUDIOS_BUCKET || "audios",
 };
 
+const salarioMinimoAtual = Number.parseFloat(
+  process.env.SALARIO_MINIMO_ATUAL || "1412"
+);
+
 const calcularValorCausa = (valorMensal) => {
   if (!valorMensal) return "0,00";
   // Remove formatação brasileira para cálculo (ex: "1.200,50" -> 1200.50)
@@ -42,6 +46,16 @@ const calcularValorCausa = (valorMensal) => {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+};
+
+const calcularPercentualSalarioMinimo = (valorMensalPensao) => {
+  if (!valorMensalPensao) return "";
+  const valorNumerico = Number(valorMensalPensao);
+  if (!salarioMinimoAtual || Number.isNaN(valorNumerico) || valorNumerico <= 0) {
+    return "";
+  }
+  const percentual = (valorNumerico / salarioMinimoAtual) * 100;
+  return percentual.toFixed(2).replace(".", ",");
 };
 
 const extractObjectPath = (storedValue) => {
@@ -155,6 +169,7 @@ const buildDocxTemplatePayload = (
 
   // CORREÇÃO: Definindo a variável correta aqui
   const percentualProvisorio =
+    baseData.percentual_salario_minimo ||
     baseData.percentual_ou_valor_fixado ||
     baseData.percentual_definitivo_salario_min;
   
@@ -236,8 +251,9 @@ const buildDocxTemplatePayload = (
     executado_telefone: ensureText(baseData.requerido_telefone),
     
     // CORREÇÃO: Usando a variável correta (percentualProvisorio)
-    valorPercentualSalMin: ensureText(percentualProvisorio),
-    percentual_salario_minimo: ensureText(percentualProvisorio),
+      valorPercentualSalMin: ensureText(percentualProvisorio),
+      percentual_salario_minimo: ensureText(percentualProvisorio),
+      percentual_salario: ensureText(percentualProvisorio),
     
     valor_pensao: ensureText(baseData.valor_pensao),
     percentual_definitivo_salario_min: ensureText(
@@ -340,24 +356,28 @@ export const criarNovoCaso = async (req, res) => {
       // DIVÓRCIO
       regime_bens,
       retorno_nome_solteira,
-      alimentos_para_ex_conjuge,
-    } = dados_formulario;
+        alimentos_para_ex_conjuge,
+      } = dados_formulario;
+      const { valor_mensal_pensao } = dados_formulario;
 
     const formattedAssistidoNascimento = formatDateBr(
       assistido_data_nascimento
     );
     const formattedDataInicioRelacao = formatDateBr(data_inicio_relacao);
     const formattedDataSeparacao = formatDateBr(data_separacao);
-    const formattedDiaPagamentoRequerido = formatDateBr(
-      dia_pagamento_requerido
-    );
-    const formattedDiaPagamentoFixado = formatDateBr(dia_pagamento_fixado);
-    const formattedValorPensao = formatCurrencyBr(
-      dados_formulario.valor_mensal_pensao
-    );
-    const formattedValorTotalDebitoExecucao = formatCurrencyBr(
-      valor_total_debito_execucao
-    );
+      const formattedDiaPagamentoRequerido = formatDateBr(
+        dia_pagamento_requerido
+      );
+      const formattedDiaPagamentoFixado = formatDateBr(dia_pagamento_fixado);
+      const formattedValorPensao = formatCurrencyBr(
+        valor_mensal_pensao
+      );
+      const formattedValorTotalDebitoExecucao = formatCurrencyBr(
+        valor_total_debito_execucao
+      );
+      const percentualSalarioMinimoCalculado = calcularPercentualSalarioMinimo(
+        valor_mensal_pensao
+      );
 
     const documentosInformadosArray = JSON.parse(
       documentos_informados || "[]"
@@ -454,13 +474,15 @@ export const criarNovoCaso = async (req, res) => {
       descricao_guarda,
       situacao_financeira_genitora,
       processo_titulo_numero,
-      cidade_assinatura,
-      cidadeDataAssinatura: cidade_assinatura,
-      valor_total_extenso,
-      valor_debito_extenso,
-      percentual_definitivo_salario_min,
-      percentual_definitivo_extras,
-      valor_pensao: formattedValorPensao,
+        cidade_assinatura,
+        cidadeDataAssinatura: cidade_assinatura,
+        valor_total_extenso,
+        valor_debito_extenso,
+        percentual_definitivo_salario_min,
+        percentual_definitivo_extras,
+        valor_pensao: formattedValorPensao,
+        valor_mensal_pensao,
+        percentual_salario_minimo: percentualSalarioMinimoCalculado,
       dia_pagamento_requerido: formattedDiaPagamentoRequerido,
       dados_bancarios_deposito,
       requerido_tem_emprego_formal,
