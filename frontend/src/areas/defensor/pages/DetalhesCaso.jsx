@@ -18,6 +18,32 @@ const statusBadges = {
   finalizado: "bg-emerald-100 text-emerald-800 border-emerald-200",
 };
 
+const formatValue = (value) => {
+  if (value === null || value === undefined || value === "") {
+    return "Não informado";
+  }
+
+  if (typeof value === "boolean") {
+    return value ? "Sim" : "Não";
+  }
+
+  if (Array.isArray(value)) {
+    if (value.length === 0) return "Não informado";
+    return value.join(", ");
+  }
+
+  if (typeof value === "object") {
+    const entries = Object.entries(value);
+    if (entries.length === 0) return "Não informado";
+    // Ex.: "chave: valor • chave2: valor2"
+    return entries
+      .map(([k, v]) => `${k.replace(/_/g, " ")}: ${formatValue(v)}`)
+      .join(" • ");
+  }
+
+  return String(value);
+};
+
 const CollapsibleText = ({ text, maxLength = 350, isPre = false, defaultCollapsed = true }) => {
   const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
 
@@ -29,7 +55,7 @@ const CollapsibleText = ({ text, maxLength = 350, isPre = false, defaultCollapse
 
   const Wrapper = ({ children }) => 
     isPre ? (
-      <pre className="text-sm whitespace-pre-wrap font-sans p-4 bg-slate-50 dark:bg-slate-900 rounded-lg">{children}</pre>
+      <pre className="text-sm whitespace-pre-wrap font-sans p-4 bg-surface border border-soft rounded-lg">{children}</pre>
     ) : (
       <p className="text-muted whitespace-pre-wrap">{children}</p>
     );
@@ -123,11 +149,13 @@ export const DetalhesCaso = () => {
     statusBadges[statusKey] || "";
     
   const renderDataField = (label, value) => (
-    <div>
-      <p className="text-xs text-muted uppercase tracking-wide">{label}</p>
-      <p className="font-semibold break-words">{value || "—"}</p>
-    </div>
-  );
+  <div>
+    <p className="text-xs text-muted uppercase tracking-wide">{label}</p>
+    <p className="font-semibold break-words">
+      {formatValue(value)}
+    </p>
+  </div>
+);
 
   const handleGenerateFatos = async () => {
   try {
@@ -195,7 +223,7 @@ export const DetalhesCaso = () => {
                            {Object.entries(caso.dados_formulario || {}).map(([key, value]) =>
                               renderDataField(
                                 key.replace(/_/g, " "),
-                                formatValue(value) // CORREÇÃO LÓGICA: Usa a função que trata booleanos
+                                (value) // CORREÇÃO LÓGICA: Usa a função que trata booleanos
                               )
                             )}
                         </div>
@@ -215,7 +243,7 @@ export const DetalhesCaso = () => {
           <section className="card space-y-4 ">
             <h2 className="heading-2 text-primary">Seção DOS FATOS</h2>
               <div><CollapsibleText 
-              className="text-primary"
+              className=""
                 text={caso.peticao_inicial_rascunho || "Rascunho não disponível ou ainda não gerado."} 
                 isPre={true} 
                 maxLength={500}

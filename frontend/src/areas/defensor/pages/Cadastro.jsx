@@ -69,7 +69,7 @@ export const Cadastro = () => {
         <ThemeToggle />
       </div>
       <div className="w-full max-w-5xl grid gap-8 md:grid-cols-2 items-center">
-        <div className="hidden md:flex card bg-gradient-to-br from-primary to-green-700 h-full">
+        <div className="hidden md:flex card bg-gradient-to-br to-amber-600 h-full">
           <div className="space-y-4">
             <Shield className="w-10 h-10" />
             <h1 className="heading-1">Cadastro de defensor</h1>

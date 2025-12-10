@@ -73,8 +73,6 @@ const initialState = {
   requeridoOutrosDetalhes: "",
 
   // Dados Específicos (Família/Alimentos)
-  dataInicioRelacao: "",
-  dataSeparacao: "",
   bensPartilha: "", // Será ocultado para fixação de alimentos
   descricaoGuarda: "",
   situacaoFinanceiraGenitora: "",
@@ -476,7 +474,7 @@ export const FormularioSubmissao = () => {
     }
   };
 
-  // --- LÓGICA DE SUBMISSÃO ---
+  // --- LÓGICA DE SUBMISSÃO ---fffff
   const processSubmission = async ({
     bypassChecklist = false,
     isAlvaraContext = false,
@@ -589,7 +587,6 @@ export const FormularioSubmissao = () => {
       requeridoEnderecoProfissional: "requerido_endereco_profissional",
 
       // Família Geral
-      dataInicioRelacao: "data_inicio_relacao",
       dataSeparacao: "data_separacao",
       bensPartilha: "bens_partilha",
       descricaoGuarda: "descricao_guarda",
@@ -946,8 +943,8 @@ export const FormularioSubmissao = () => {
 
               {/* Dados do Representante (Condicional) */}
               {isRepresentacao && (
-                <div className="bg-surface-alt p-4 rounded-lg border-l-4 border-amber-500 space-y-4 mt-4 bg-amber-500/5">
-                  <h3 className="heading-3 text-amber-600">Dados do Representante Legal (Você)</h3>
+                <div className="bg-surface-alt p-4 rounded-lg border-l-4 border-green-500 space-y-4 mt-4 bg-amber-500/5">
+                  <h3 className="heading-3 text-green-600">Dados do Representante Legal (Você)</h3>
                   <p className="text-sm text-muted mb-2">Preencha com seus dados (mãe, pai, tutor) que está agindo em nome da criança acima.</p>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1182,9 +1179,9 @@ export const FormularioSubmissao = () => {
             )}
 
             {/* --- ETAPA 4: DETALHES ESPECÍFICOS (CONDICIONAL) --- */}
-            <section className="card space-y-6 border-l-4 border-l-amber-500">
+            <section className="card space-y-6 border-l-4 border-l-green-500">
               <div className="flex items-center gap-2 border-b border-soft pb-2">
-                <Briefcase className="text-amber-400" />
+                <Briefcase className="text-green-400" />
                 <h2 className="heading-2">4. Detalhes do Caso</h2>
               </div>
 
@@ -1209,17 +1206,7 @@ export const FormularioSubmissao = () => {
                         />
                       </div>
                     </div>
-                    <div>
-                      <label className="label">Dia de pagamento desejado</label>
-                      <input
-                        type="number"
-                        name="diaPagamentoRequerido"
-                        value={formState.diaPagamentoRequerido}
-                        onChange={handleDayInputChange('diaPagamentoRequerido')}
-                        placeholder="Dia (1 a 31)"
-                        className="input"
-                      />
-                    </div>
+                   
                   </div>
                   <div className="space-y-4 rounded-lg border border-soft p-4 bg-surface">
                       <h4 className="font-semibold text-text">Dados para Depósito da Pensão</h4>
@@ -1293,7 +1280,7 @@ export const FormularioSubmissao = () => {
                    </div>
                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <input type="text" placeholder="Vara onde tramitou" name="varaOriginaria" value={formState.varaOriginaria} onChange={handleFieldChange} className="input" />
-                      <input type="text" placeholder="Valor/Percentual Fixado" name="percentualOuValorFixado" value={formState.percentualOuValorFixado} onChange={handleFieldChange} className="input" />
+                      
                       <input type="number" min="1" max="31" placeholder="Dia (1-31)" name="diaPagamentoFixado" value={formState.diaPagamentoFixado} onChange={handleDayInputChange('diaPagamentoFixado')} className="input" />
                    </div>
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1313,36 +1300,8 @@ export const FormularioSubmissao = () => {
                    </div>
                    {/* Fields for "definitivo" values can also be useful in execution cases */}
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                       <div>
-                        <label className="label">Pensão Definitiva (% Sal. Mínimo)</label>
-                        <div className="relative">
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            name="percentualDefinitivoSalarioMin"
-                            value={formState.percentualDefinitivoSalarioMin}
-                            onChange={handleDecimalFieldChange('percentualDefinitivoSalarioMin', { maxIntegerDigits: 3 })}
-                            className="input pr-12"
-                            placeholder="0,00"
-                          />
-                          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-muted font-semibold">%</span>
-                        </div>
-                       </div>
-                       <div>
-                        <label className="label">Pensão Definitiva (% Desp. Extras)</label>
-                        <div className="relative">
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            name="percentualDefinitivoExtras"
-                            value={formState.percentualDefinitivoExtras}
-                            onChange={handleDecimalFieldChange('percentualDefinitivoExtras', { maxIntegerDigits: 3 })}
-                            className="input pr-12"
-                            placeholder="0,00"
-                          />
-                          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-muted font-semibold">%</span>
-                        </div>
-                       </div>
+                       
+                       
                    </div>
                  </div>
               )}
@@ -1374,17 +1333,8 @@ export const FormularioSubmissao = () => {
 
               {/* CAMPOS GERAIS DE FAMÍLIA (Filhos, Bens, Datas) */}
               <div className="space-y-4 pt-4 border-t border-soft">
-                <h4 className="font-semibold text-primary">Vínculos, Guarda e Bens</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                   <div>
-                     <label className="label">Data Início da Relação</label>
-                     <input type="date" name="dataInicioRelacao" value={formState.dataInicioRelacao} onChange={handleFieldChange} className="input" />
-                   </div>
-                   <div>
-                     <label className="label">Data da Separação (se houver)</label>
-                     <input type="date" name="dataSeparacao" value={formState.dataSeparacao} onChange={handleFieldChange} className="input" />
-                   </div>
-                </div>
+                <h4 className="font-semibold text-primary">Vínculos, Guarda...</h4>
+              
                 
                  <div>
                   <label className="label">Como a guarda dos filhos é exercida hoje?</label>
@@ -1487,7 +1437,7 @@ export const FormularioSubmissao = () => {
                   <h3 className="heading-3 mb-3">Checklist de Documentos Necessários</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
                     {listaDeDocumentos.map((doc) => (
-                      <label key={doc} className="flex items-start gap-2 p-2 rounded-md hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer text-sm">
+                      <label key={doc} className="flex items-start gap-2 p-2 rounded-md cursor-pointer text-sm transition-colors hover:bg-primary/5 select-none">
                         <input type="checkbox" name={doc} onChange={handleCheckboxChange} className="mt-1 w-4 h-4 accent-primary" />
                         <span className="text-muted">{doc}</span>
                       </label>

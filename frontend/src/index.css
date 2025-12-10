@@ -1,5 +1,5 @@
 @import "tailwindcss";
-/* index.css — Tailwind 4.x */
+/* index.css — ssTailwind 4.x */
 /* -------------------------------------------------------------
    1) Carrega Tailwind
    ---------------------------------------------------------------- */
@@ -12,8 +12,8 @@
   /* Core */
   --color-primary: #006837; /* Verde DPE-BA */
   --color-primary-600: #00562b; /* Hover/pressed */
-  --color-secondary: #eba40a; /* Dourado-laranja */
-  --color-secondary-600: #c98600;
+  --color-secondary: #006837; /* Dourado-laranja */
+  --color-secondary-600: #00562b;
 
   /* Surfaces & text */
   --color-bg: #dddddd;
@@ -22,7 +22,7 @@
 
   --color-text: #000000;
   --color-text-muted: #4f5152;
-  --color-text-thirt: #eba40a;
+  --color-text-thirt: #006837;
 
   /* Feedback */
   --color-success: #1fa97c;
@@ -43,8 +43,8 @@
 :root[data-theme="dark"] {
   --color-primary: #1fa97c; /* verde sucesso como acento em dark */
   --color-primary-600: #178963;
-  --color-secondary: #eba40a;
-  --color-secondary-600: #c98600;
+  --color-secondary: #1fa97c;
+  --color-secondary-600: #178963;
 
   --color-bg: #0b1520; /* azul-petróleo escuro */
   --color-surface: #142433; /* cards/painéis */
@@ -140,7 +140,7 @@
   }
 
   ::selection {
-    background: color-mix(in oklab, var(--color-primary) 22%, white);
+    background: color-mix(in oklab, var(--color-primary) 40%, var(--color-bg));
     color: var(--color-text);
   }
 
