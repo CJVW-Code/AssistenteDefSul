@@ -148,6 +148,103 @@ const formatCurrencyBr = (value) => {
     .replace(/\u00A0/g, " ");
 };
 
+const buildFallbackDosFatos = (caseData = {}) => {
+  const safe = (value) =>
+    typeof value === "string" ? value.trim() : value ?? "";
+
+  const paragraphs = [];
+  const assistidoNome =
+    safe(caseData.nome_assistido) ||
+    safe(caseData.requerente_nome) ||
+    safe(caseData.nome) ||
+    "";
+  const representanteNome = safe(caseData.representante_nome);
+  const requeridoNome =
+    safe(caseData.nome_requerido) ||
+    safe(caseData.requerido_nome) ||
+    safe(caseData.requerido) ||
+    "";
+
+  if (assistidoNome || representanteNome) {
+    const sujeito =
+      caseData.assistido_eh_incapaz === "sim" && representanteNome
+        ? `${representanteNome}, na qualidade de representante legal de ${
+            assistidoNome || "seu dependente"
+          }`
+        : assistidoNome || representanteNome;
+    const complemento = requeridoNome
+      ? `relata que ${requeridoNome} não contribui de forma regular para o custeio das despesas básicas`
+      : "relata a ausência de contribuição regular da outra parte para o custeio das despesas básicas";
+    paragraphs.push(
+      `${sujeito} ${complemento}, razão pela qual busca a tutela jurisdicional para garantir a subsistência da criança.`
+    );
+  }
+
+  if (safe(caseData.descricao_guarda)) {
+    paragraphs.push(
+      `A guarda fática atualmente é descrita da seguinte forma: ${safe(
+        caseData.descricao_guarda
+      )}.`
+    );
+  }
+
+  const situacaoAssistido = [caseData.situacao_financeira_genitora, caseData.dados_adicionais_requerente]
+    .map(safe)
+    .filter(Boolean)
+    .join(" ");
+  if (situacaoAssistido) {
+    paragraphs.push(
+      `Sobre a realidade econômica de quem assume as despesas, informa-se que ${situacaoAssistido}.`
+    );
+  }
+
+  if (safe(caseData.dados_adicionais_requerido)) {
+    paragraphs.push(
+      `Quanto ao requerido, destacam-se os seguintes elementos: ${safe(
+        caseData.dados_adicionais_requerido
+      )}.`
+    );
+  }
+
+  const valorPretendido =
+    safe(caseData.valor_pensao) ||
+    safe(formatCurrencyBr(caseData.valor_mensal_pensao));
+  const diaPagamento =
+    safe(caseData.dia_pagamento_requerido) ||
+    safe(caseData.dia_pagamento_fixado);
+  if (valorPretendido || diaPagamento) {
+    paragraphs.push(
+      `Diante desse contexto, requer-se a fixação de alimentos no valor de ${valorPretendido ||
+        "[valor a ser definido]"}` +
+        (diaPagamento ? `, com vencimento no dia ${diaPagamento} de cada mês.` : ".")
+    );
+  }
+
+  if (safe(caseData.relato_texto)) {
+    paragraphs.push(`Relato do assistido: ${safe(caseData.relato_texto)}.`);
+  }
+
+  const documentosInformados = Array.isArray(caseData.documentos_informados)
+    ? caseData.documentos_informados
+        .map((doc) => safe(doc))
+        .filter(Boolean)
+    : [];
+  if (documentosInformados.length) {
+    const resumoDocs = documentosInformados.slice(0, 3).join("; ");
+    paragraphs.push(
+      `Os fatos narrados encontram respaldo nos documentos informados no formulário, tais como ${resumoDocs}${
+        documentosInformados.length > 3 ? ", entre outros" : ""
+      }.`
+    );
+  } else {
+    paragraphs.push(
+      "A narrativa será complementada com a documentação que acompanha o formulário e eventuais provas a serem juntadas posteriormente."
+    );
+  }
+
+  return paragraphs.filter(Boolean).join("\n\n");
+};
+
 const buildDocxTemplatePayload = (
   normalizedData,
   dosFatosTexto,
@@ -187,7 +284,7 @@ const buildDocxTemplatePayload = (
     baseData.assistido_data_nascimento || requerente.dataNascimento
   );
 
-  return {
+  const payload = {
     ...baseData,
     vara: ensureText(varaPreferida),
     comarca: ensureText(normalizedData.comarca),
@@ -219,6 +316,9 @@ const buildDocxTemplatePayload = (
       baseData.representante_rg_numero
         ? `${baseData.representante_rg_numero} ${baseData.representante_rg_orgao}`
         : ""
+    ),
+    representante_data_nascimento: ensureText(
+      formatDateBr(baseData.representante_data_nascimento)
     ),
     representante_endereco_residencial: ensureText(
       baseData.representante_endereco_residencial
@@ -278,16 +378,34 @@ const buildDocxTemplatePayload = (
     cidadeDataAssinatura: ensureText(cidadeAssinatura),
     cidade_data_assinatura: ensureText(cidadeAssinatura),
     defensoraNome: ensureText(normalizedData.defensoraNome),
+    valor_causa: ensureText(valorCausaCalculado),
+    valor_causa_extenso: ensureText(
+      baseData.valor_causa_extenso ||
+        baseData.valor_total_extenso ||
+        baseData.valor_debito_extenso
+    ),
+    percentual_despesas_extras: ensureText(
+      baseData.percentual_despesas_extras ||
+        baseData.percentual_definitivo_extras ||
+        percentualExtras
+    ),
     dos_fatos:
       ensureText(dosFatosTexto, "[DESCREVER OS FATOS]") ||
       "[DESCREVER OS FATOS]",
   };
+
+  payload.REQUERENTE_NOME = payload.requerente_nome;
+  payload.REPRESENTANTE_NOME = payload.representante_nome;
+  payload.REQUERIDO_NOME = payload.requerido_nome;
+
+  return payload;
 };
 
 // --- FUNÇÃO DE CRIAÇÃO  ---
 export const criarNovoCaso = async (req, res) => {
   try {
     const dados_formulario = req.body;
+    const avisos = [];
     // Desestruturação dos dados recebidos
     const {
       nome,
@@ -326,6 +444,8 @@ export const criarNovoCaso = async (req, res) => {
       representante_telefone,
       representante_rg_numero,
       representante_rg_orgao,
+      representante_data_nascimento: formattedRepresentanteNascimento,
+      representante_data_nascimento,
       requerido_nacionalidade,
       requerido_estado_civil,
       requerido_ocupacao,
@@ -362,6 +482,9 @@ export const criarNovoCaso = async (req, res) => {
 
     const formattedAssistidoNascimento = formatDateBr(
       assistido_data_nascimento
+    );
+    const formattedRepresentanteNascimento = formatDateBr(
+      representante_data_nascimento
     );
     const formattedDataInicioRelacao = formatDateBr(data_inicio_relacao);
     const formattedDataSeparacao = formatDateBr(data_separacao);
@@ -419,8 +542,19 @@ export const criarNovoCaso = async (req, res) => {
     }
 
     console.log("Gerando resumo com IA...");
-    resumo_ia = await analyzeCase(textoCompleto);
-    console.log("Resumo gerado.");
+    try {
+      resumo_ia = await analyzeCase(textoCompleto);
+      console.log("Resumo gerado.");
+    } catch (analyzeError) {
+      console.error(
+        "Falha ao gerar resumo com IA. Prosseguindo sem o resumo automático:",
+        analyzeError
+      );
+      resumo_ia = null;
+      avisos.push(
+        "Não foi possível gerar o resumo automático com a IA (limite ou indisponibilidade do serviço)."
+      );
+    }
 
     console.log("Gerando seção 'Dos Fatos' com IA...");
     const acaoEspecifica =
@@ -500,9 +634,18 @@ export const criarNovoCaso = async (req, res) => {
       alimentos_para_ex_conjuge,
     };
 
-    const dosFatosTexto = await generateDosFatos(caseDataForPetition);
+    let dosFatosTexto = "";
+    try {
+      dosFatosTexto = await generateDosFatos(caseDataForPetition);
+      console.log("Seção 'Dos Fatos' gerada.");
+    } catch (dosFatosError) {
+      console.error(
+        "Falha ao gerar a seção 'Dos Fatos' com IA. Utilizando fallback local:",
+        dosFatosError
+      );
+      dosFatosTexto = buildFallbackDosFatos(caseDataForPetition);
+    }
     const peticao_inicial_rascunho = `DOS FATOS\n\n${dosFatosTexto || ""}`;
-    console.log("Seção 'Dos Fatos' gerada.");
 
     // --- CORREÇÃO: CRIAÇÃO DO docxData ANTES DE USAR ---
     const docxData = buildDocxTemplatePayload(
@@ -606,7 +749,11 @@ export const criarNovoCaso = async (req, res) => {
         }
       }
     }
-    res.status(201).json({ protocolo, chaveAcesso });
+    const responsePayload = { protocolo, chaveAcesso };
+    if (avisos.length) {
+      responsePayload.avisos = avisos;
+    }
+    res.status(201).json(responsePayload);
   } catch (error) {
     console.error("Erro final ao criar novo caso:", error);
     if (req.files) {
@@ -619,6 +766,259 @@ export const criarNovoCaso = async (req, res) => {
       }
     }
     res.status(500).json({ error: "Falha ao processar a solicitação." });
+  }
+};
+
+export const regenerarDosFatos = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { data: caso, error } = await supabase
+      .from("casos")
+      .select("*")
+      .eq("id", id)
+      .single();
+    if (error) throw error;
+    if (!caso) {
+      return res.status(404).json({ error: "Caso não encontrado." });
+    }
+
+    const dados_formulario = caso.dados_formulario || {};
+    const {
+      nome,
+      cpf,
+      telefone,
+      tipoAcao,
+      relato,
+      endereco_assistido,
+      email_assistido,
+      dados_adicionais_requerente,
+      nome_requerido,
+      cpf_requerido,
+      endereco_requerido,
+      dados_adicionais_requerido,
+      filhos_info,
+      data_inicio_relacao,
+      data_separacao,
+      bens_partilha,
+      descricao_guarda,
+      situacao_financeira_genitora,
+      assistido_eh_incapaz,
+      assistido_nacionalidade,
+      assistido_estado_civil,
+      assistido_ocupacao,
+      assistido_data_nascimento,
+      representante_nome,
+      representante_nacionalidade,
+      representante_estado_civil,
+      representante_ocupacao,
+      representante_cpf,
+      representante_endereco_residencial,
+      representante_endereco_profissional,
+      representante_email,
+      representante_telefone,
+      representante_rg_numero,
+      representante_rg_orgao,
+      requerido_nacionalidade,
+      requerido_estado_civil,
+      requerido_ocupacao,
+      requerido_endereco_profissional,
+      requerido_email,
+      requerido_telefone,
+      processo_titulo_numero,
+      cidade_assinatura,
+      valor_total_extenso,
+      valor_debito_extenso,
+      percentual_definitivo_salario_min,
+      percentual_definitivo_extras,
+      valor_pensao,
+      dia_pagamento_requerido,
+      dados_bancarios_deposito,
+      requerido_tem_emprego_formal,
+      empregador_requerido_nome,
+      empregador_requerido_endereco,
+      empregador_email,
+      numero_processo_originario,
+      vara_originaria,
+      percentual_ou_valor_fixado,
+      dia_pagamento_fixado,
+      periodo_debito_execucao,
+      valor_total_debito_execucao,
+      regime_bens,
+      retorno_nome_solteira,
+      alimentos_para_ex_conjuge,
+    } = dados_formulario;
+    const valor_mensal_pensao = dados_formulario.valor_mensal_pensao;
+
+    const formattedAssistidoNascimento = formatDateBr(
+      assistido_data_nascimento
+    );
+    const formattedDataInicioRelacao = formatDateBr(data_inicio_relacao);
+    const formattedDataSeparacao = formatDateBr(data_separacao);
+    const formattedDiaPagamentoRequerido = formatDateBr(
+      dia_pagamento_requerido
+    );
+    const formattedDiaPagamentoFixado = formatDateBr(dia_pagamento_fixado);
+    const formattedValorPensao = formatCurrencyBr(valor_mensal_pensao);
+    const formattedValorTotalDebitoExecucao = formatCurrencyBr(
+      valor_total_debito_execucao
+    );
+    const percentualSalarioMinimoCalculado = calcularPercentualSalarioMinimo(
+      valor_mensal_pensao
+    );
+
+    const documentosInformadosArray = Array.isArray(
+      caso.documentos_informados
+    )
+      ? caso.documentos_informados
+      : [];
+    const varaMapeada = getVaraByTipoAcao(tipoAcao || caso.tipo_acao);
+    const varaAutomatica =
+      varaMapeada && !varaMapeada.includes("NÃO ESPECIFICADA")
+        ? varaMapeada
+        : null;
+
+    const caseDataForPetition = {
+      protocolo: caso.protocolo,
+      nome_assistido: nome || caso.nome_assistido,
+      cpf_assistido: cpf || caso.cpf_assistido,
+      telefone_assistido: telefone || caso.telefone_assistido,
+      tipo_acao: tipoAcao || caso.tipo_acao,
+      acao_especifica:
+        (tipoAcao || caso.tipo_acao || "")
+          .split(" - ")[1]
+          ?.trim() || (tipoAcao || caso.tipo_acao || "").trim(),
+      relato_texto: relato || caso.relato_texto,
+      documentos_informados: documentosInformadosArray,
+      resumo_ia: caso.resumo_ia,
+      vara: varaAutomatica || vara_originaria,
+      endereco_assistido,
+      email_assistido,
+      dados_adicionais_requerente,
+      assistido_eh_incapaz,
+      assistido_nacionalidade,
+      assistido_estado_civil,
+      assistido_ocupacao,
+      assistido_data_nascimento: formattedAssistidoNascimento,
+      representante_nome,
+      representante_nacionalidade,
+      representante_estado_civil,
+      representante_ocupacao,
+      representante_cpf,
+      representante_endereco_residencial,
+      representante_endereco_profissional,
+      representante_email,
+      representante_telefone,
+      representante_rg_numero,
+      representante_rg_orgao,
+      nome_requerido,
+      cpf_requerido,
+      endereco_requerido,
+      dados_adicionais_requerido,
+      requerido_nacionalidade,
+      requerido_estado_civil,
+      requerido_ocupacao,
+      requerido_endereco_profissional,
+      requerido_email,
+      requerido_telefone,
+      filhos_info,
+      data_inicio_relacao: formattedDataInicioRelacao,
+      data_separacao: formattedDataSeparacao,
+      bens_partilha,
+      descricao_guarda,
+      situacao_financeira_genitora,
+      processo_titulo_numero,
+      cidade_assinatura,
+      cidadeDataAssinatura: cidade_assinatura,
+      valor_total_extenso,
+      valor_debito_extenso,
+      percentual_definitivo_salario_min,
+      percentual_definitivo_extras,
+      valor_pensao: formattedValorPensao || valor_pensao,
+      valor_mensal_pensao,
+      percentual_salario_minimo: percentualSalarioMinimoCalculado,
+      dia_pagamento_requerido: formattedDiaPagamentoRequerido,
+      dados_bancarios_deposito,
+      requerido_tem_emprego_formal,
+      empregador_requerido_nome,
+      empregador_requerido_endereco,
+      empregador_email,
+      numero_processo_originario,
+      vara_originaria,
+      percentual_ou_valor_fixado,
+      dia_pagamento_fixado: formattedDiaPagamentoFixado,
+      periodo_debito_execucao,
+      valor_total_debito_execucao: formattedValorTotalDebitoExecucao,
+      regime_bens,
+      retorno_nome_solteira,
+      alimentos_para_ex_conjuge,
+    };
+
+    let dosFatosTexto = "";
+    try {
+      dosFatosTexto = await generateDosFatos(caseDataForPetition);
+    } catch (errorGeracao) {
+      console.error(
+        "Falha ao gerar a seção 'Dos Fatos' com IA. Utilizando fallback local:",
+        errorGeracao
+      );
+      dosFatosTexto = buildFallbackDosFatos(caseDataForPetition);
+    }
+    const peticao_inicial_rascunho = `DOS FATOS\n\n${dosFatosTexto || ""}`;
+
+    const docxData = buildDocxTemplatePayload(
+      {},
+      dosFatosTexto,
+      caseDataForPetition
+    );
+
+    let peticao_completa_texto = caso.peticao_completa_texto;
+    let url_documento_gerado = caso.url_documento_gerado;
+
+    try {
+      const docxBuffer = await generateDocx(docxData);
+      const docxPath = `${caso.protocolo}/peticao_inicial_${caso.protocolo}.docx`;
+
+      const { value: extractedText } = await mammoth.extractRawText({
+        buffer: docxBuffer,
+      });
+      peticao_completa_texto = extractedText;
+
+      const { error: uploadDocxErr } = await supabase.storage
+        .from("peticoes")
+        .upload(docxPath, docxBuffer, {
+          contentType:
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          upsert: true,
+        });
+      if (uploadDocxErr) {
+        console.error("Falha ao fazer upload do DOCX gerado:", uploadDocxErr);
+      } else {
+        url_documento_gerado = docxPath;
+      }
+    } catch (docxError) {
+      console.error("Erro ao gerar/upload do DOCX na regeneração:", docxError);
+    }
+
+    const { data: casoAtualizado, error: updateError } = await supabase
+      .from("casos")
+      .update({
+        peticao_inicial_rascunho,
+        peticao_completa_texto,
+        url_documento_gerado,
+      })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (updateError) throw updateError;
+
+    res.status(200).json(casoAtualizado);
+  } catch (error) {
+    console.error(
+      "Erro ao regenerar a seção 'Dos Fatos' para o caso:",
+      error
+    );
+    res.status(500).json({ error: "Falha ao gerar a seção dos fatos." });
   }
 };
 

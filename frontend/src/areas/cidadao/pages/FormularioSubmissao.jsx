@@ -53,6 +53,7 @@ const initialState = {
   representanteTelefone: "",
   representanteRgNumero: "",
   representanteRgOrgao: "",
+  representanteDataNascimento: "",
 
   // Parte Contrária (Requerido)
   nomeRequerido: "",
@@ -574,6 +575,7 @@ export const FormularioSubmissao = () => {
       representanteTelefone: "representante_telefone",
       representanteRgNumero: "representante_rg_numero",
       representanteRgOrgao: "representante_rg_orgao",
+      representanteDataNascimento: "representante_data_nascimento",
 
       // Requerido
       nomeRequerido: "nome_requerido",
@@ -968,6 +970,19 @@ export const FormularioSubmissao = () => {
                        {estadoCivilOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                      </select>
                      <input type="text" placeholder="Sua Profissão" name="representanteOcupacao" value={formState.representanteOcupacao} onChange={handleFieldChange} className="input" />
+                 </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="md:col-span-1">
+                      <label className="label">Data de nascimento do representante</label>
+                      <input
+                        type="date"
+                        name="representanteDataNascimento"
+                        value={formState.representanteDataNascimento}
+                        onChange={handleFieldChange}
+                        className="input"
+                      />
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
