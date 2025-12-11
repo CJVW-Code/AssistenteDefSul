@@ -247,6 +247,33 @@ const ensureText = (value, fallback = "[PREENCHER]") => {
   return text.length ? text : fallback;
 };
 
+const sanitizeInlineText = (value) => {
+  if (value === null || value === undefined) return value;
+  const text = String(value);
+  return text.replace(/\s*\n+\s*/g, " ").replace(/\s{2,}/g, " ").trim();
+};
+
+const ensureInlineValue = (value) => {
+  const ensured = ensureText(value);
+  if (!ensured || ensured === "[PREENCHER]") return ensured;
+  return ensured.startsWith("[") ? ensured : ` ${ensured}`;
+};
+
+const sanitizeCaseDataInlineFields = (data = {}) => {
+  const sanitized = { ...data };
+  const inlineFields = [
+    "dados_adicionais_requerente",
+    "representante_nacionalidade",
+    "representante_estado_civil",
+  ];
+  inlineFields.forEach((field) => {
+    if (sanitized[field] !== undefined && sanitized[field] !== null) {
+      sanitized[field] = sanitizeInlineText(sanitized[field]);
+    }
+  });
+  return sanitized;
+};
+
 const formatDateBr = (value) => {
   if (!value) return value;
   const parts = value.split("-");
@@ -430,10 +457,12 @@ const buildDocxTemplatePayload = (
     requerente_endereco_residencial: ensureText(baseData.endereco_assistido),
     requerente_representante: ensureText(requerente.representante),
     representante_nome: ensureText(baseData.representante_nome),
-    representante_nacionalidade: ensureText(
+    representante_nacionalidade: ensureInlineValue(
       baseData.representante_nacionalidade
     ),
-    representante_estado_civil: ensureText(baseData.representante_estado_civil),
+    representante_estado_civil: ensureInlineValue(
+      baseData.representante_estado_civil
+    ),
     representante_ocupacao: ensureText(baseData.representante_ocupacao),
     representante_cpf: ensureText(baseData.representante_cpf),
     representante_rg: ensureText(
@@ -501,6 +530,9 @@ const buildDocxTemplatePayload = (
     defensoraNome: ensureText(normalizedData.defensoraNome),
     valor_causa: ensureText(valorCausaCalculado),
     valor_causa_extenso: ensureText(valorCausaExtenso),
+    dados_adicionais_requerente: ensureText(
+      sanitizeInlineText(baseData.dados_adicionais_requerente)
+    ),
     percentual_despesas_extras: ensureText(
       baseData.percentual_despesas_extras ||
         baseData.percentual_definitivo_extras ||
@@ -673,7 +705,7 @@ export const criarNovoCaso = async (req, res) => {
       (tipoAcao || "").split(" - ")[1]?.trim() || (tipoAcao || "").trim();
 
     // Objeto consolidado com os dados para a petição
-    const caseDataForPetition = {
+    const caseDataForPetitionRaw = {
       protocolo,
       nome_assistido: nome,
       cpf_assistido: cpf,
@@ -745,6 +777,9 @@ export const criarNovoCaso = async (req, res) => {
       retorno_nome_solteira,
       alimentos_para_ex_conjuge,
     };
+    const caseDataForPetition = sanitizeCaseDataInlineFields(
+      caseDataForPetitionRaw
+    );
 
     let dosFatosTexto = "";
     try {
@@ -989,7 +1024,7 @@ export const regenerarDosFatos = async (req, res) => {
         ? varaMapeada
         : null;
 
-    const caseDataForPetition = {
+    const caseDataForPetitionRaw = {
       protocolo: caso.protocolo,
       nome_assistido: nome || caso.nome_assistido,
       cpf_assistido: cpf || caso.cpf_assistido,
@@ -1064,6 +1099,9 @@ export const regenerarDosFatos = async (req, res) => {
       retorno_nome_solteira,
       alimentos_para_ex_conjuge,
     };
+    const caseDataForPetition = sanitizeCaseDataInlineFields(
+      caseDataForPetitionRaw
+    );
 
     let dosFatosTexto = "";
     try {

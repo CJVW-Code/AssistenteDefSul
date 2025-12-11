@@ -670,11 +670,11 @@ export const FormularioSubmissao = () => {
       `Estado Civil: ${formState.assistidoEstadoCivil || "Não informado"},`,
       `Data Nascimento: ${
         formatDateToBr(formState.dataNascimentoAssistido) || "Não informado"
-      }`,
-    ].join("\n");
+      },`,
+    ].join(" ");
     formData.append(
       "dados_adicionais_requerente",
-      dadosAdicionaisRequerente.trim()
+      `${dadosAdicionaisRequerente.trim()} `
     );
 
     const detalhesRequerido = [];
