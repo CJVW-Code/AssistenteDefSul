@@ -32,20 +32,142 @@ const salarioMinimoAtual = Number.parseFloat(
   process.env.SALARIO_MINIMO_ATUAL || "1412"
 );
 
+const parseCurrencyToNumber = (value) => {
+  if (value === null || value === undefined) return 0;
+  if (typeof value === "number") return value;
+  const normalized = String(value)
+    .trim()
+    .replace(/[^\d.,-]/g, "");
+  if (!normalized) return 0;
+  const hasComma = normalized.includes(",");
+  const parsedString = hasComma
+    ? normalized.replace(/\./g, "").replace(",", ".")
+    : normalized;
+  const result = Number(parsedString);
+  return Number.isNaN(result) ? 0 : result;
+};
+
 const calcularValorCausa = (valorMensal) => {
-  if (!valorMensal) return "0,00";
-  // Remove formatação brasileira para cálculo (ex: "1.200,50" -> 1200.50)
-  const valorNumerico = parseFloat(
-    valorMensal.replace(/\./g, "").replace(",", ".")
-  );
-  if (isNaN(valorNumerico)) return "0,00";
+  const valorNumerico = parseCurrencyToNumber(valorMensal);
+  if (!valorNumerico) return 0;
+  return valorNumerico * 12;
+};
 
-  const total = valorNumerico * 12;
+const numeroParaExtenso = (valor) => {
+  const unidades = [
+    "zero",
+    "um",
+    "dois",
+    "três",
+    "quatro",
+    "cinco",
+    "seis",
+    "sete",
+    "oito",
+    "nove",
+  ];
+  const especiais = [
+    "dez",
+    "onze",
+    "doze",
+    "treze",
+    "quatorze",
+    "quinze",
+    "dezesseis",
+    "dezessete",
+    "dezoito",
+    "dezenove",
+  ];
+  const dezenas = [
+    "",
+    "dez",
+    "vinte",
+    "trinta",
+    "quarenta",
+    "cinquenta",
+    "sessenta",
+    "setenta",
+    "oitenta",
+    "noventa",
+  ];
+  const centenas = [
+    "",
+    "cento",
+    "duzentos",
+    "trezentos",
+    "quatrocentos",
+    "quinhentos",
+    "seiscentos",
+    "setecentos",
+    "oitocentos",
+    "novecentos",
+  ];
+  const qualificadores = [
+    { singular: "", plural: "" },
+    { singular: "mil", plural: "mil" },
+    { singular: "milhão", plural: "milhões" },
+    { singular: "bilhão", plural: "bilhões" },
+  ];
 
-  return total.toLocaleString("pt-BR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+  const inteiro = Math.floor(Math.abs(valor));
+  const centavos = Math.round((Math.abs(valor) - inteiro) * 100);
+
+  if (inteiro === 0 && centavos === 0) {
+    return "zero real";
+  }
+
+  const numeroParaTextoAte999 = (numero) => {
+    if (numero === 0) return "";
+    if (numero === 100) return "cem";
+    const c = Math.floor(numero / 100);
+    const d = Math.floor((numero % 100) / 10);
+    const u = numero % 10;
+    const partes = [];
+    if (c) {
+      partes.push(centenas[c]);
+    }
+    if (d === 1) {
+      partes.push(especiais[u]);
+    } else {
+      if (d) partes.push(dezenas[d]);
+      if (u) partes.push(unidades[u]);
+    }
+    return partes.join(" e ");
+  };
+
+  const grupos = [];
+  let numeroRestante = inteiro;
+  while (numeroRestante > 0) {
+    grupos.push(numeroRestante % 1000);
+    numeroRestante = Math.floor(numeroRestante / 1000);
+  }
+
+  const partesInteiras = grupos
+    .map((grupo, index) => {
+      if (!grupo) return null;
+      const texto = numeroParaTextoAte999(grupo);
+      if (!texto) return null;
+      const qualificador = qualificadores[index];
+      const ehSingular = grupo === 1 && index > 0;
+      const sufixo =
+        index === 0
+          ? ""
+          : ` ${ehSingular ? qualificador.singular : qualificador.plural}`;
+      return `${texto}${sufixo}`;
+    })
+    .filter(Boolean)
+    .reverse();
+
+  const inteiroExtenso = partesInteiras.join(" e ") || "zero";
+  const rotuloInteiro = inteiro === 1 ? "real" : "reais";
+
+  let resultado = `${inteiroExtenso} ${rotuloInteiro}`;
+  if (centavos > 0) {
+    const centavosExtenso = numeroParaTextoAte999(centavos) || "zero";
+    const rotuloCentavos = centavos === 1 ? "centavo" : "centavos";
+    resultado += ` e ${centavosExtenso} ${rotuloCentavos}`;
+  }
+  return resultado;
 };
 
 const calcularPercentualSalarioMinimo = (valorMensalPensao) => {
@@ -260,9 +382,11 @@ const buildDocxTemplatePayload = (
   const cidadeAssinatura =
     baseData.cidade_assinatura || normalizedData.cidadeDataAssinatura;
   
-  // CORREÇÃO: Usar valor padrão para evitar erro no cálculo
-  const valorCausaCalculado =
-    baseData.valor_causa || calcularValorCausa(baseData.valor_pensao || "0,00");
+  const valorCausaNumero = calcularValorCausa(
+    baseData.valor_mensal_pensao || baseData.valor_pensao || 0
+  );
+  const valorCausaCalculado = formatCurrencyBr(valorCausaNumero);
+  const valorCausaExtenso = numeroParaExtenso(valorCausaNumero);
 
   // CORREÇÃO: Definindo a variável correta aqui
   const percentualProvisorio =
@@ -316,9 +440,6 @@ const buildDocxTemplatePayload = (
       baseData.representante_rg_numero
         ? `${baseData.representante_rg_numero} ${baseData.representante_rg_orgao}`
         : ""
-    ),
-    representante_data_nascimento: ensureText(
-      formatDateBr(baseData.representante_data_nascimento)
     ),
     representante_endereco_residencial: ensureText(
       baseData.representante_endereco_residencial
@@ -379,11 +500,7 @@ const buildDocxTemplatePayload = (
     cidade_data_assinatura: ensureText(cidadeAssinatura),
     defensoraNome: ensureText(normalizedData.defensoraNome),
     valor_causa: ensureText(valorCausaCalculado),
-    valor_causa_extenso: ensureText(
-      baseData.valor_causa_extenso ||
-        baseData.valor_total_extenso ||
-        baseData.valor_debito_extenso
-    ),
+    valor_causa_extenso: ensureText(valorCausaExtenso),
     percentual_despesas_extras: ensureText(
       baseData.percentual_despesas_extras ||
         baseData.percentual_definitivo_extras ||
@@ -444,8 +561,6 @@ export const criarNovoCaso = async (req, res) => {
       representante_telefone,
       representante_rg_numero,
       representante_rg_orgao,
-      representante_data_nascimento: formattedRepresentanteNascimento,
-      representante_data_nascimento,
       requerido_nacionalidade,
       requerido_estado_civil,
       requerido_ocupacao,
@@ -482,9 +597,6 @@ export const criarNovoCaso = async (req, res) => {
 
     const formattedAssistidoNascimento = formatDateBr(
       assistido_data_nascimento
-    );
-    const formattedRepresentanteNascimento = formatDateBr(
-      representante_data_nascimento
     );
     const formattedDataInicioRelacao = formatDateBr(data_inicio_relacao);
     const formattedDataSeparacao = formatDateBr(data_separacao);

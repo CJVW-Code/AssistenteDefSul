@@ -53,7 +53,6 @@ const initialState = {
   representanteTelefone: "",
   representanteRgNumero: "",
   representanteRgOrgao: "",
-  representanteDataNascimento: "",
 
   // Parte Contrária (Requerido)
   nomeRequerido: "",
@@ -575,7 +574,6 @@ export const FormularioSubmissao = () => {
       representanteTelefone: "representante_telefone",
       representanteRgNumero: "representante_rg_numero",
       representanteRgOrgao: "representante_rg_orgao",
-      representanteDataNascimento: "representante_data_nascimento",
 
       // Requerido
       nomeRequerido: "nome_requerido",
@@ -660,13 +658,24 @@ export const FormularioSubmissao = () => {
 
     // 3. Construção de Campos Compostos para a IA (Gemini)
     // A IA usa 'dados_adicionais_requerente' para criar o resumo, então montamos uma string rica
-    const dadosAdicionaisRequerenteString = `
-      RG: ${formState.assistidoRgNumero ? `${formState.assistidoRgNumero}${formState.assistidoRgOrgao ? ` ${formState.assistidoRgOrgao}` : ""}` : 'Não inf.'}, 
-      Nacionalidade: ${formState.assistidoNacionalidade || 'Não inf.'}, 
-      Estado Civil: ${formState.assistidoEstadoCivil || 'Não inf.'},
-      Data Nascimento: ${formState.dataNascimentoAssistido || 'Não inf.'}
-    `;
-    formData.append("dados_adicionais_requerente", dadosAdicionaisRequerenteString);
+    const dadosAdicionaisRequerente = [
+      `RG: ${
+        formState.assistidoRgNumero
+          ? `${formState.assistidoRgNumero}${
+              formState.assistidoRgOrgao ? ` ${formState.assistidoRgOrgao}` : ""
+            }`
+          : "Não informado"
+      },`,
+      `Nacionalidade: ${formState.assistidoNacionalidade || "Não informado"},`,
+      `Estado Civil: ${formState.assistidoEstadoCivil || "Não informado"},`,
+      `Data Nascimento: ${
+        formatDateToBr(formState.dataNascimentoAssistido) || "Não informado"
+      }`,
+    ].join("\n");
+    formData.append(
+      "dados_adicionais_requerente",
+      dadosAdicionaisRequerente.trim()
+    );
 
     const detalhesRequerido = [];
     if (formState.requeridoOutrosSelecionados?.includes("requeridoRg") && formState.requeridoRgNumero) {
@@ -971,19 +980,6 @@ export const FormularioSubmissao = () => {
                      </select>
                      <input type="text" placeholder="Sua Profissão" name="representanteOcupacao" value={formState.representanteOcupacao} onChange={handleFieldChange} className="input" />
                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="md:col-span-1">
-                      <label className="label">Data de nascimento do representante</label>
-                      <input
-                        type="date"
-                        name="representanteDataNascimento"
-                        value={formState.representanteDataNascimento}
-                        onChange={handleFieldChange}
-                        className="input"
-                      />
-                    </div>
-                  </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                      <input type="text" placeholder="Seu Endereço Residencial" name="representanteEnderecoResidencial" value={formState.representanteEnderecoResidencial} onChange={handleFieldChange} className="input" />
