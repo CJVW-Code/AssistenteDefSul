@@ -9,7 +9,6 @@ const TEMPLATE_MAP = {
   fixacao: "fixacao_alimentos1.docx",
   execucao_prisao: "execucao_prisao.docx",
   execucao_penhora: "execucao_penhora.docx",
-  default: "template.docx",
 };
 
 const resolveTemplatePath = (baseDir, key) => {

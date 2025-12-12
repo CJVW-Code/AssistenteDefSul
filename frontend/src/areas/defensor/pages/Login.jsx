@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { Shield, LogIn } from "lucide-react";
+import { Shield, LogIn, ArrowLeft } from "lucide-react";
+import { ThemeToggle } from "../../../components/ThemeToggle";
 
 export const Login = () => {
   const [email, setEmail] = useState("");
@@ -27,9 +28,18 @@ export const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-app flex items-center justify-center px-4 py-10">
+    <div className="min-h-screen bg-app flex flex-col items-center justify-center px-4 py-10 relative">
+      <div className="absolute top-4 left-4">
+        <button onClick={() => navigate("/")} className=" btn btn-ghost">
+          <ArrowLeft size={18} />
+          Voltar para o início
+        </button>
+      </div>
+      <div className="absolute top-4 right-4">
+        <ThemeToggle />
+      </div>
       <div className="w-full max-w-5xl grid gap-8 md:grid-cols-2 items-center">
-        <div className="hidden md:flex card bg-gradient-to-br from-primary to-primary-600 h-full">
+        <div className="hidden md:flex card bg-gradient-to-br to-green-700 h-full">
           <div className="space-y-4">
             <Shield className="w-10 h-10" />
             <h1 className="heading-1  ">Painel do Defensor</h1>

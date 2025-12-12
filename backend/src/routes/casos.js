@@ -5,6 +5,7 @@ import {
   listarCasos,
   obterDetalhesCaso,
   atualizarStatusCaso,
+  regenerarDosFatos,
 } from "../controllers/casosController.js";
 import { authMiddleware } from "../middleware/auth.js";
 
@@ -24,4 +25,5 @@ router.post(
 router.patch("/:id/status", authMiddleware, atualizarStatusCaso);
 router.get("/", authMiddleware, listarCasos);
 router.get("/:id", authMiddleware, obterDetalhesCaso);
+router.post("/:id/gerar-fatos", authMiddleware, regenerarDosFatos);
 export default router;
