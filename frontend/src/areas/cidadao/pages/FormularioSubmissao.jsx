@@ -641,15 +641,15 @@ export const FormularioSubmissao = () => {
         return;
       }
       let normalizedValue = rawValue;
-      if (digitsOnlyFields.has(key)) {
-        normalizedValue = stripNonDigits(rawValue);
-      } else if (currencyFields.has(key)) {
-        normalizedValue = normalizeDecimalForSubmit(rawValue);
-      }
-      if (normalizedValue) {
-        formData.append(fieldMapping[key], normalizedValue);
-      }
-    });
+        if (digitsOnlyFields.has(key)) {
+          normalizedValue = stripNonDigits(rawValue);
+        } else if (currencyFields.has(key)) {
+          normalizedValue = normalizeDecimalForSubmit(rawValue);
+        }
+        if (normalizedValue) {
+          formData.append(fieldMapping[key], normalizedValue);
+        }
+      });
 
     // 2. Correção Crítica: Formatar Tipo de Ação para o Backend
     // O backend espera "Area - Ação" para saber qual template DOCX usar
@@ -1217,7 +1217,6 @@ export const FormularioSubmissao = () => {
                         />
                       </div>
                     </div>
-                   
                   </div>
                   <div className="space-y-4 rounded-lg border border-soft p-4 bg-surface">
                       <h4 className="font-semibold text-text">Dados para Depósito da Pensão</h4>

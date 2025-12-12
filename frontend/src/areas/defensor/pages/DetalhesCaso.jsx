@@ -44,18 +44,28 @@ const formatValue = (value) => {
   return String(value);
 };
 
-const CollapsibleText = ({ text, maxLength = 350, isPre = false, defaultCollapsed = true }) => {
+const CollapsibleText = ({
+  text,
+  maxLength = 350,
+  isPre = false,
+  defaultCollapsed = true,
+}) => {
   const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
 
   if (!text || text.length === 0) {
     return <p className="text-sm text-muted">Nenhuma informação fornecida.</p>;
   }
 
-  const textToShow = isCollapsed && text.length > maxLength ? text.substring(0, maxLength) + "..." : text;
+  const textToShow =
+    isCollapsed && text.length > maxLength
+      ? text.substring(0, maxLength) + "..."
+      : text;
 
-  const Wrapper = ({ children }) => 
+  const Wrapper = ({ children }) =>
     isPre ? (
-      <pre className="text-sm whitespace-pre-wrap font-sans p-4 bg-surface border border-soft rounded-lg">{children}</pre>
+      <pre className="text-sm whitespace-pre-wrap font-sans p-4 bg-surface border border-soft rounded-lg">
+        {children}
+      </pre>
     ) : (
       <p className="text-muted whitespace-pre-wrap">{children}</p>
     );
@@ -75,7 +85,6 @@ const CollapsibleText = ({ text, maxLength = 350, isPre = false, defaultCollapse
   );
 };
 
-
 export const DetalhesCaso = () => {
   const { id } = useParams();
   const { token } = useAuth();
@@ -83,6 +92,8 @@ export const DetalhesCaso = () => {
   const [loading, setLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
   const [showReview, setShowReview] = useState(false);
+  const [toast, setToast] = useState(null);
+  const [showToastModal, setShowToastModal] = useState(false);
 
   useEffect(() => {
     const fetchDetalhes = async () => {
@@ -145,43 +156,59 @@ export const DetalhesCaso = () => {
   }
 
   const statusKey = (caso.status || "recebido").toLowerCase();
-  const badgeClass =
-    statusBadges[statusKey] || "";
-    
+  const badgeClass = statusBadges[statusKey] || "";
+
   const renderDataField = (label, value) => (
-  <div>
-    <p className="text-xs text-muted uppercase tracking-wide">{label}</p>
-    <p className="font-semibold break-words">
-      {formatValue(value)}
-    </p>
-  </div>
-);
+    <div>
+      <p className="text-xs text-muted uppercase tracking-wide">{label}</p>
+      <p className="font-semibold break-words">{formatValue(value)}</p>
+    </div>
+  );
 
   const handleGenerateFatos = async () => {
-  try {
-    const response = await fetch(`${API_BASE}/casos/${id}/gerar-fatos`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-    });
+    try {
+      const response = await fetch(`${API_BASE}/casos/${id}/gerar-fatos`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
-    if (!response.ok) {
-      throw new Error("Falha ao gerar a sessão dos fatos.");
+      if (!response.ok) {
+        throw new Error("Falha ao gerar a sessão dos fatos.");
+      }
+
+      const updatedCaso = await response.json();
+      setCaso(updatedCaso);
+      setToast({
+        type: "success",
+        message:
+          "Sessão dos fatos gerada com sucesso! Recarregue a página antes de baixar a nova petição.",
+      });
+      setShowToastModal(true);
+    } catch (error) {
+      console.error(error);
+      setToast({ type: "error", message: error.message });
+      setShowToastModal(true);
     }
-
-    const updatedCaso = await response.json();
-    setCaso(updatedCaso);
-    alert("Sessão dos fatos gerada com sucesso!");
-  } catch (error) {
-    console.error(error);
-    alert(error.message);
-  }
-};
+  };
 
   return (
     <div className="space-y-8 pb-24">
+      {showToastModal && toast && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+          <div className="bg-surface border border-soft rounded-2xl max-w-md w-full p-6 space-y-4 text-center shadow-2xl">
+            <p className="text-sm text-muted">{toast.message}</p>
+            <button
+              className="btn btn-primary w-full"
+              onClick={() => setShowToastModal(false)}
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <Link
@@ -206,64 +233,79 @@ export const DetalhesCaso = () => {
               {renderDataField("Nome completo", caso.nome_assistido)}
               {renderDataField("CPF", caso.cpf_assistido)}
               {renderDataField("Telefone", caso.telefone_assistido)}
-              {renderDataField("Tipo de ação", caso.tipo_acao?.replace("_", " "))}
+              {renderDataField(
+                "Tipo de ação",
+                caso.tipo_acao?.replace("_", " ")
+              )}
             </div>
-             <div className="pt-4">
-                <button 
-                    onClick={() => setShowReview(!showReview)}
-                    className="btn btn-secondary w-full justify-start"
-                >
-                    <Eye size={18} />
-                    Revisar dados preenchidos
-                </button>
-                {showReview && (
-                    <div className="mt-4 space-y-4 border-t border-soft pt-4">
-                        <h3 className="heading-3">Formulário do Assistido</h3>
-                        <div className="grid gap-4 md:grid-cols-2">
-                           {Object.entries(caso.dados_formulario || {}).map(([key, value]) =>
-                              renderDataField(
-                                key.replace(/_/g, " "),
-                                (value) // CORREÇÃO LÓGICA: Usa a função que trata booleanos
-                              )
-                            )}
-                        </div>
-                    </div>
-                )}
+            <div className="pt-4">
+              <button
+                onClick={() => setShowReview(!showReview)}
+                className="btn btn-secondary w-full justify-start"
+              >
+                <Eye size={18} />
+                Revisar dados preenchidos
+              </button>
+              {showReview && (
+                <div className="mt-4 space-y-4 border-t border-soft pt-4">
+                  <h3 className="heading-3">Formulário do Assistido</h3>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {Object.entries(caso.dados_formulario || {}).map(
+                      ([key, value]) =>
+                        renderDataField(
+                          key.replace(/_/g, " "),
+                          value // CORREÇÃO LÓGICA: Usa a função que trata booleanos
+                        )
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
           <div className="card space-y-4">
             <div className="flex items-center gap-3">
-              <FileText  />
+              <FileText />
               <h2 className="heading-2">Relato do caso</h2>
             </div>
-            <CollapsibleText className="text-primary" text={caso.relato_texto} />
+            <CollapsibleText
+              className="text-primary"
+              text={caso.relato_texto}
+            />
           </div>
-          
+
           <section className="card space-y-4 ">
             <h2 className="heading-2 text-primary">Seção DOS FATOS</h2>
-              <div><CollapsibleText 
-              className=""
-                text={caso.peticao_inicial_rascunho || "Rascunho não disponível ou ainda não gerado."} 
-                isPre={true} 
+            <div>
+              <CollapsibleText
+                className=""
+                text={
+                  caso.peticao_inicial_rascunho ||
+                  "Rascunho não disponível ou ainda não gerado."
+                }
+                isPre={true}
                 maxLength={500}
                 defaultCollapsed={true}
-            />
+              />
             </div>
-            <button 
+            <button
               onClick={handleGenerateFatos}
-              className="btn btn-primary w-full mt-4">
+              className="btn btn-primary w-full mt-4"
+            >
               Gerar sessão dos fatos
             </button>
           </section>
 
           <section className="card space-y-4">
             <h2 className="heading-2">Visualizar petição completa</h2>
-             <CollapsibleText 
-                text={caso.peticao_completa_texto || "Petição completa não disponível ou ainda não gerada."} 
-                isPre={true} 
-                maxLength={700}
-                defaultCollapsed={true}
+            <CollapsibleText
+              text={
+                caso.peticao_completa_texto ||
+                "Petição completa não disponível ou ainda não gerada."
+              }
+              isPre={true}
+              maxLength={700}
+              defaultCollapsed={true}
             />
           </section>
         </section>

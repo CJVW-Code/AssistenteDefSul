@@ -177,7 +177,14 @@ const calcularPercentualSalarioMinimo = (valorMensalPensao) => {
     return "";
   }
   const percentual = (valorNumerico / salarioMinimoAtual) * 100;
-  return percentual.toFixed(2).replace(".", ",");
+  const percentualLimpo = Number(percentual.toFixed(2));
+  if (Number.isNaN(percentualLimpo)) {
+    return "";
+  }
+  if (Number.isInteger(percentualLimpo)) {
+    return String(percentualLimpo);
+  }
+  return percentualLimpo.toFixed(2).replace(".", ",");
 };
 
 const extractObjectPath = (storedValue) => {
@@ -415,12 +422,11 @@ const buildDocxTemplatePayload = (
   const valorCausaCalculado = formatCurrencyBr(valorCausaNumero);
   const valorCausaExtenso = numeroParaExtenso(valorCausaNumero);
 
-  // CORREÇÃO: Definindo a variável correta aqui
-  const percentualProvisorio =
+  const percentualDefinitivoBase =
+    baseData.percentual_definitivo_salario_min ||
     baseData.percentual_salario_minimo ||
     baseData.percentual_ou_valor_fixado ||
-    baseData.percentual_definitivo_salario_min;
-  
+    "";
   const percentualExtras = baseData.percentual_definitivo_extras || "0";
   const diaPagamentoBase =
     baseData.dia_pagamento_fixado || baseData.dia_pagamento_requerido;
@@ -500,14 +506,9 @@ const buildDocxTemplatePayload = (
     executado_email: ensureText(baseData.requerido_email),
     executado_telefone: ensureText(baseData.requerido_telefone),
     
-    // CORREÇÃO: Usando a variável correta (percentualProvisorio)
-      valorPercentualSalMin: ensureText(percentualProvisorio),
-      percentual_salario_minimo: ensureText(percentualProvisorio),
-      percentual_salario: ensureText(percentualProvisorio),
-    
     valor_pensao: ensureText(baseData.valor_pensao),
     percentual_definitivo_salario_min: ensureText(
-      baseData.percentual_definitivo_salario_min
+      percentualDefinitivoBase
     ),
     percentual_definitivo_extras: ensureText(
       baseData.percentual_definitivo_extras
