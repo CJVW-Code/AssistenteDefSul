@@ -8,14 +8,28 @@ if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir);
 }
 
+const sanitizeFilename = (rawName = "arquivo") => {
+  const toUtf8 = Buffer.from(rawName, "latin1").toString("utf8");
+  const trimmed = toUtf8.trim() || "arquivo";
+  const sanitized = trimmed
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, "_")
+    .replace(/[^\w.-]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  return sanitized || "arquivo";
+};
+
 // Configura o armazenamento temporário no disco
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
-    // Garante um nome de arquivo único adicionando um timestamp
-    cb(null, `${Date.now()}-${file.originalname}`);
+    // Garante um nome de arquivo único, normalizado e sem caracteres inválidos
+    const normalizedName = sanitizeFilename(file.originalname);
+    cb(null, `${Date.now()}-${normalizedName}`);
   },
 });
 
