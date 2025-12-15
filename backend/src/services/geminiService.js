@@ -22,6 +22,8 @@ const DEFAULT_TRIAGEM = "[TRIAGEM SIGAD/SOLAR]";
 const DEFAULT_PROCESSO = "[NÚMERO DO PROCESSO/DEPENDÊNCIA]";
 const PLACEHOLDER_FIELD = "[DADO PENDENTE]";
 
+// --- FUNÇÕES UTILITÁRIAS DE NORMALIZAÇÃO ---
+
 export const normalizePromptData = (raw = {}) => {
   const requerente =
     raw.requerente || raw.exequente || raw.assistido || raw.cliente || {
@@ -137,8 +139,15 @@ const cleanText = (value, fallback = "") => {
 };
 
 function sanitizeLegalAbbreviations(text) {
-  return text.replace(/\b(art)\/\s*/gi, "$1. ");
+  // 1. Remove formatações Markdown de títulos que a IA possa ter colocado
+  let cleaned = text.replace(/#+\s*Dos Fatos/gi, "").replace(/\*\*Dos Fatos\*\*/gi, "");
+  // 2. Remove o título "Dos Fatos" se estiver solto no início
+  cleaned = cleaned.replace(/^Dos Fatos\n/i, "").trim();
+  // 3. Corrige abreviação de artigo (art/ 5 -> art. 5)
+  return cleaned.replace(/\b(art)\/\s*/gi, "$1. ");
 }
+
+// --- FUNÇÕES PRINCIPAIS DE GERAÇÃO ---
 
 /**
  * Analisa o caso para gerar um resumo executivo para o Painel do Defensor.
@@ -160,6 +169,7 @@ export const analyzeCase = async (fullText) => {
   ${fullText}`;
 
   try {
+    // Resumo para painel interno tem menor risco, mas passa pelo orquestrador para velocidade (Groq)
     return await generateLegalText(systemPrompt, userPrompt, 0.3);
   } catch (error) {
     console.error("Erro na análise do caso:", error);
@@ -168,8 +178,8 @@ export const analyzeCase = async (fullText) => {
 };
 
 /**
- * Gera a seção "DOS FATOS" da petição, usando estrutura rígida e formal.
- * Usa a arquitetura híbrida (Groq/Gemini).
+ * Gera a seção "DOS FATOS" da petição.
+ * Usa o serviço blindado (Sanitização + Groq/Gemini).
  */
 export const generateDosFatos = async (caseData = {}) => {
   try {
@@ -184,20 +194,18 @@ export const generateDosFatos = async (caseData = {}) => {
 
     const documentosList = formatDocumentList(caseData.documentos_informados);
     
-    // Mapeia descricao_guarda para filhosInfo se filhosInfo estiver vazio
     const filhosInfo = cleanText(
       caseData.filhos_info || caseData.filhosInfo || caseData.descricao_guarda,
       "Informações sobre filhos não foram apresentadas."
     );
 
-    // Enriquece a situação do assistido
+    // Preparação dos textos descritivos
     let situacaoAssistido = cleanText(caseData.dados_adicionais_requerente, "");
     if (caseData.situacao_financeira_genitora) {
       situacaoAssistido += `\nSituação Financeira: ${caseData.situacao_financeira_genitora}`;
     }
     if (!situacaoAssistido) situacaoAssistido = "Sem detalhes adicionais sobre o assistido.";
 
-    // Enriquece a situação do requerido
     let situacaoRequerido = cleanText(caseData.dados_adicionais_requerido, "");
     if (caseData.requerido_tem_emprego_formal) {
       situacaoRequerido += `\nPossui emprego formal? ${caseData.requerido_tem_emprego_formal}.`;
@@ -211,29 +219,47 @@ export const generateDosFatos = async (caseData = {}) => {
     if (!situacaoRequerido) situacaoRequerido = "Sem detalhes adicionais sobre o requerido.";
 
     const valorPensao = cleanText(normalized.valorMensalPensao, "Valor não informado");
-    
-    // Dados extras
     const bensPartilha = cleanText(caseData.bens_partilha);
     const outrosPedidos = [];
     if (bensPartilha) outrosPedidos.push(`Bens a partilhar: ${bensPartilha}`);
     if (caseData.alimentos_para_ex_conjuge) outrosPedidos.push(`Alimentos para ex-cônjuge: ${caseData.alimentos_para_ex_conjuge}`);
     const contextoExtra = outrosPedidos.length ? `\nOutros Pedidos/Detalhes: ${outrosPedidos.join("; ")}` : "";
 
-    // --- PROMPTS ESTRUTURADOS PARA O ORQUESTRADOR ---
+    // --- CONSTRUÇÃO DO MAPA DE PRIVACIDADE (PII MAP) ---
+    // Mapeia os dados reais para placeholders.
+    // O aiService vai trocar isso ANTES de enviar para a IA.
+    const piiMap = {};
+    const addToPii = (value, placeholder) => {
+      // Regra de segurança: só substitui se tiver mais de 3 chars e não for placeholder genérico
+      if (value && value.length > 3 && value !== "Não informado" && value !== "Valor não informado") {
+        piiMap[value] = placeholder;
+      }
+    };
+
+    addToPii(normalized.requerente?.nome, "[NOME_AUTOR]");
+    addToPii(normalized.requerente?.cpf, "[CPF_AUTOR]");
+    addToPii(normalized.requerido?.nome, "[NOME_REU]");
+    addToPii(normalized.requerido?.cpf, "[CPF_REU]");
+    // Se quiser, adicione mais campos aqui (ex: nome da criança se tiver separado)
+
+    // --- PROMPTS ---
 
     const systemPrompt = `Você é um Defensor Público experiente na Bahia.
 Seu estilo de escrita é extremamente formal, culto e padronizado (juridiquês clássico).
 Você DEVE utilizar os conectivos: "Insta salientar", "Ocorre que, no caso em tela", "Como é sabido", "aduzir".
 Não use listas ou tópicos na resposta final. Escreva apenas parágrafos coesos.`;
 
-    const userPrompt = `Redija APENAS o conteúdo textual da seção "DOS FATOS" de uma ${normalized.tipo_acao || "petição inicial"} seguindo rigorosamente este modelo lógico:
-    
-ATENÇÃO: NÃO inclua o título "DOS FATOS", "DOS FATOS E FUNDAMENTOS" ou qualquer outro cabeçalho no início da resposta. Comece diretamente pelo primeiro parágrafo do texto.
+    // No userPrompt, instruímos a IA a usar os placeholders que ela vai receber
+    // Ex: Ela vai receber "O autor [NOME_AUTOR]..." em vez de "O autor João..."
+    const userPrompt = `Redija APENAS o conteúdo textual da seção "DOS FATOS" de uma ${normalized.tipo_acao || "petição inicial"}.
 
-1. **Vínculo e Guarda:** "O autor é filho do requerido, conforme é possível aduzir..." (Mencione guarda de fato e documentos).
-2. **Necessidade:** "Ocorre que, no caso em tela, os recursos financeiros da genitora..." (Liste necessidades e situação financeira).
-3. **Dever Jurídico:** "Como é sabido, o dispêndio com a criação..." (Reforce obrigação mútua e capacidade do pai).
-4. **Conflito:** "Insta salientar que a genitora..." (Cite tentativas frustradas de acordo e necessidade do Judiciário).
+ATENÇÃO: NÃO inclua o título "DOS FATOS", "DOS FATOS E FUNDAMENTOS" ou qualquer cabeçalho. Comece diretamente pelo texto.
+
+Estrutura Lógica Obrigatória:
+1. **Vínculo:** "O autor ([NOME_AUTOR]) é filho do requerido ([NOME_REU]), conforme é possível aduzir..."
+2. **Necessidade:** "Ocorre que, no caso em tela..."
+3. **Dever:** "Como é sabido..."
+4. **Conflito:** "Insta salientar..."
 
 DADOS DO CASO:
 - Assistido: ${cleanText(normalized.requerente?.nome)} (CPF: ${cleanText(normalized.requerente?.cpf)})
@@ -248,8 +274,8 @@ ${contextoExtra}
 
 Adapte o texto se o relato informal contradizer o modelo padrão (ex: pai já paga algo), mas mantenha o tom formal.`;
 
-    // Chamada Híbrida (Tenta Groq, falha para Gemini)
-    const textoGerado = await generateLegalText(systemPrompt, userPrompt, 0.3);
+    // Chamada Segura: Envia o mapa PII para sanitização automática no aiService
+    const textoGerado = await generateLegalText(systemPrompt, userPrompt, 0.3, piiMap);
     
     return sanitizeLegalAbbreviations(textoGerado.trim());
 
