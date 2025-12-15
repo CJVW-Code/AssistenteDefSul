@@ -73,6 +73,14 @@ export const generateLegalText = async (systemPrompt, userPrompt, temperature = 
     safeUserPrompt = safeUserPrompt.replace(regex, placeholder);
   });
 
+  // --- 🛡️ LOG DE AUDITORIA DE SEGURANÇA 🛡️ ---
+  // Isso prova no terminal que os dados reais NÃO estão saindo
+  console.log("\n🔒 [AUDITORIA LGPD] Payload Seguro Enviado para IA:");
+  console.log("---------------------------------------------------");
+  console.log("DADOS SENSÍVEIS DETECTADOS E MASCARADOS:", piiKeys.length);
+  // console.log("SYS:", safeSystemPrompt.substring(0, 50) + "..."); // Opcional
+  console.log("USER PROMPT (TRECHO):", safeUserPrompt.substring(0, 300) + "..."); 
+  console.log("---------------------------------------------------\n");
   let generatedText = "";
 
   // --- ETAPA 2: CHAMADA À IA (Com texto anonimizado) ---

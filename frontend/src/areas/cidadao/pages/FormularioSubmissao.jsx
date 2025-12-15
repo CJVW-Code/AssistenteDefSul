@@ -702,7 +702,11 @@ export const FormularioSubmissao = () => {
     // Arquivos e Arrays
     formData.append("documentos_informados", JSON.stringify(formState.documentosMarcados));
     if (formState.audioBlob) formData.append("audio", formState.audioBlob, "gravacao.webm");
-    formState.documentFiles.forEach((file) => formData.append("documentos", file));
+    formState.documentFiles.forEach((file) => {
+      // Sanitiza o nome do arquivo (remove acentos) para evitar erros de encoding no servidor
+      const safeName = file.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      formData.append("documentos", file, safeName);
+    });
 
     try {
       const response = await fetch(`${API_BASE}/casos/novo`, { method: "POST", body: formData });
