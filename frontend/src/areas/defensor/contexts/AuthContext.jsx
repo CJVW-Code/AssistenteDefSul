@@ -37,13 +37,27 @@ export const AuthProvider = ({ children }) => {
     setToken(null);
     localStorage.removeItem("defensorToken");
   };
+// --- NOVO CÓDIGO AQUI ---
+  // Escuta o evento de sessão expirada vindo do authFetch
+useEffect(() => {
+    const handleSessionExpired = () => {
+      console.warn("Sessão expirada detectada. Realizando logout...");
+      logout();
+    };
+
+    window.addEventListener('auth:session-expired', handleSessionExpired);
+
+    return () => {
+      window.removeEventListener('auth:session-expired', handleSessionExpired);
+    };
+  }, []);
+  // ------------------------
 
   const value = { token, login, logout };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-// Hook customizado para facilitar o uso do contexto
 export const useAuth = () => {
   return useContext(AuthContext);
 };
