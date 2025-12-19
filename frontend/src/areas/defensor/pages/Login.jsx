@@ -48,9 +48,7 @@ export const Login = () => {
               Assistente Def Sul, solicitar documentos e gerar minutas com o
               mesmo visual do nosso novo portal.
             </p>
-            <p className="text-sm">
-              Suporte: suporte@defsul.app
-            </p>
+            <p className="text-sm">Suporte: suporte@defsul.app</p>
           </div>
         </div>
 
@@ -89,11 +87,7 @@ export const Login = () => {
                 className="input"
               />
             </div>
-            {error && (
-              <p className="alert alert-error">
-                {error}
-              </p>
-            )}
+            {error && <p className="alert alert-error">{error}</p>}
             <button
               type="submit"
               disabled={loading}
@@ -103,12 +97,6 @@ export const Login = () => {
               {loading ? "Entrando..." : "Entrar"}
             </button>
           </form>
-          <p className="text-sm text-muted text-center">
-            Não tem uma conta?{" "}
-            <Link to="/painel/cadastro" className="link font-semibold">
-              Solicite cadastro
-            </Link>
-          </p>
         </div>
       </div>
     </div>

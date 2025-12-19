@@ -1,21 +1,28 @@
 import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { ChevronLeft, Download, FileText, Mic, Eye } from "lucide-react";
+import {
+  ChevronLeft,
+  Download,
+  Mic,
+  Eye,
+  Upload,
+  CheckCircle,
+  FileText,
+  Scale,
+} from "lucide-react";
 import { API_BASE } from "../../../utils/apiBase";
 
 const statusOptions = [
   { value: "recebido", label: "Recebido" },
   { value: "em_analise", label: "Em análise" },
-  { value: "aguardando_docs", label: "Aguardando documentos" },
-  { value: "finalizado", label: "Finalizado" },
+  { value: "aguardando_docs", label: "Pendentes de documentos" },
 ];
 
 const statusBadges = {
   recebido: "bg-amber-100 text-amber-800 border-amber-200",
   em_analise: "bg-sky-100 text-sky-800 border-sky-200",
   aguardando_docs: "bg-purple-100 text-purple-800 border-purple-200",
-  finalizado: "bg-emerald-100 text-emerald-800 border-emerald-200",
 };
 
 const formatValue = (value) => {
@@ -94,6 +101,10 @@ export const DetalhesCaso = () => {
   const [showReview, setShowReview] = useState(false);
   const [toast, setToast] = useState(null);
   const [showToastModal, setShowToastModal] = useState(false);
+  const [numSolar, setNumSolar] = useState("");
+  const [numProcesso, setNumProcesso] = useState("");
+  const [arquivoCapa, setArquivoCapa] = useState(null);
+  const [enviandoFinalizacao, setEnviandoFinalizacao] = useState(false);
 
   useEffect(() => {
     const fetchDetalhes = async () => {
@@ -194,6 +205,40 @@ export const DetalhesCaso = () => {
     }
   };
 
+  const handleFinalizarCaso = async (e) => {
+    e.preventDefault();
+    if (!arquivoCapa || !numSolar || !numProcesso) {
+      alert("Por favor, preencha todos os campos e anexe a capa.");
+      return;
+    }
+
+    setEnviandoFinalizacao(true);
+    const formData = new FormData();
+    formData.append("numero_solar", numSolar);
+    formData.append("numero_processo", numProcesso);
+    formData.append("capa", arquivoCapa);
+
+    try {
+      const response = await fetch(`${API_BASE}/casos/${id}/finalizar`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("defensorToken")}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) throw new Error("Erro ao finalizar caso.");
+
+      alert("Caso finalizado e capa enviada com sucesso!");
+      // Recarrega os dados da página
+      window.location.reload();
+    } catch (error) {
+      console.error(error);
+      alert("Erro ao finalizar: " + error.message);
+    } finally {
+      setEnviandoFinalizacao(false);
+    }
+  };
   return (
     <div className="space-y-8 pb-24">
       {showToastModal && toast && (
@@ -363,20 +408,160 @@ export const DetalhesCaso = () => {
                 {statusKey.replace(/_/g, " ")}
               </span>
             </div>
+
             <select
-              className="input"
+              className="input disabled:opacity-70 disabled:cursor-not-allowed"
               onChange={(e) => handleStatusChange(e.target.value)}
               value={statusKey}
-              disabled={isUpdating}
+              // TRAVA: Desabilita se estiver atualizando OU se já estiver finalizado/encaminhado
+              disabled={isUpdating || statusKey === "encaminhado_solar"}
             >
+              {/* LÓGICA DE EXIBIÇÃO INTELIGENTE: */}
+
+              {/* 1. Se o caso JÁ estiver finalizado, mostra essa opção extra apenas para leitura */}
+              {statusKey === "encaminhado_solar" && (
+                <option value="encaminhado_solar">
+                  ✅ Concluído / Encaminhado
+                </option>
+              )}
+
+              {/* 2. Mostra as opções normais (Recebido, Em Análise...) */}
               {statusOptions.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>
               ))}
             </select>
+
+            {/* Aviso visual extra */}
+            {statusKey === "encaminhado_solar" && (
+              <p className="text-xs text-green-600 mt-1">
+                * Caso finalizado via integração Solar.
+              </p>
+            )}
+
             {isUpdating && (
               <p className="text-xs text-muted">Atualizando status...</p>
+            )}
+          </div>
+          {/* --- ZONA DE FINALIZAÇÃO DO ESTAGIÁRIO --- */}
+          <div className="mt-8 pt-8 border-t border-soft">
+            <h2 className="text-xl font-bold text-primary mb-4 flex items-center gap-2">
+              <CheckCircle className="text-green-500" />
+              Finalização e Encaminhamento (Solar)
+            </h2>
+
+            {caso.status === "encaminhado_solar" ? (
+              // SE JÁ ESTIVER FINALIZADO, MOSTRA OS DADOS
+              <div className="bg-green-500/10 border border-green-500/30 p-6 rounded-xl">
+                <div className="flex items-center gap-2 text-green-400 font-bold mb-4">
+                  <CheckCircle size={20} /> CASO CONCLUÍDO E ENCAMINHADO
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="text-xs text-muted uppercase font-bold">
+                      Número
+                    </label>
+                    <p className="text-lg font-mono text-muted">
+                      {caso.numero_solar}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted uppercase font-bold">
+                      Número do Processo (TJ)
+                    </label>
+                    <p className="text-lg font-mono text-muted">
+                      {caso.numero_processo}
+                    </p>
+                  </div>
+                </div>
+                {caso.url_capa_processual && (
+                  <div className="mt-4">
+                    <a
+                      href={caso.url_capa_processual}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-primary hover:underline flex items-center gap-2"
+                    >
+                      <FileText size={16} /> Ver Capa Processual Anexada
+                    </a>
+                  </div>
+                )}
+              </div>
+            ) : (
+              // SE NÃO ESTIVER FINALIZADO, MOSTRA O FORMULÁRIO
+              <form
+                onSubmit={handleFinalizarCaso}
+                className="bg-surface border border-soft p-6 rounded-xl space-y-4"
+              >
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* INPUT NÚMERO SOLAR */}
+                  <div>
+                    <label className="block text-sm font-medium text-muted mb-1">
+                      Número de Atendimento
+                    </label>
+                    <input
+                      type="text"
+                      value={numSolar}
+                      onChange={(e) => setNumSolar(e.target.value)}
+                      placeholder="Ex: 123456"
+                      className="w-full bg-app border border-soft rounded-lg p-3 text-muted focus:ring-2 focus:ring-primary outline-none"
+                      required
+                    />
+                  </div>
+
+                  {/* INPUT NÚMERO PROCESSO */}
+                  <div>
+                    <label className="block text-sm font-medium text-muted mb-1">
+                      Número do Processo (PJE/TJ)
+                    </label>
+                    <input
+                      type="text"
+                      value={numProcesso}
+                      onChange={(e) => setNumProcesso(e.target.value)}
+                      placeholder="Ex: 8000..."
+                      className="w-full bg-app border border-soft rounded-lg p-3 text-muted focus:ring-2 focus:ring-primary outline-none"
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* UPLOAD CAPA */}
+                <div>
+                  <label className="block text-sm font-medium text-muted mb-1">
+                    Anexar Capa Processual (PDF)
+                  </label>
+                  <div className="border-2 border-dashed border-soft rounded-lg p-6 flex flex-col items-center justify-center text-center hover:bg-white/5 transition-colors cursor-pointer relative">
+                    <input
+                      type="file"
+                      accept=".pdf"
+                      onChange={(e) => setArquivoCapa(e.target.files[0])}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      required
+                    />
+                    <Upload className="text-muted mb-2" size={24} />
+                    {arquivoCapa ? (
+                      <span className="text-primary font-medium">
+                        {arquivoCapa.name}
+                      </span>
+                    ) : (
+                      <span className="text-muted text-sm">
+                        Clique ou arraste o PDF da capa aqui
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={enviandoFinalizacao}
+                  className="btn btn-primary w-full py-3 mt-4 flex items-center justify-center gap-2"
+                >
+                  {enviandoFinalizacao
+                    ? "Processando..."
+                    : "Concluir Caso e Enviar ao Cidadão"}
+                </button>
+              </form>
             )}
           </div>
         </section>

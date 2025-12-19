@@ -6,6 +6,9 @@ import {
   obterDetalhesCaso,
   atualizarStatusCaso,
   regenerarDosFatos,
+  finalizarCasoSolar,
+  buscarPorCpf,
+  resetarChaveAcesso,
 } from "../controllers/casosController.js";
 import { authMiddleware } from "../middleware/auth.js";
 
@@ -26,4 +29,9 @@ router.patch("/:id/status", authMiddleware, atualizarStatusCaso);
 router.get("/", authMiddleware, listarCasos);
 router.get("/:id", authMiddleware, obterDetalhesCaso);
 router.post("/:id/gerar-fatos", authMiddleware, regenerarDosFatos);
+router.post("/:id/finalizar", upload.single("capa"), finalizarCasoSolar);
+// Rota de busca da recepção
+router.get("/buscar-cpf", buscarPorCpf);
+// Rota de reset de chave (Protegida)
+router.post("/:id/resetar-chave", resetarChaveAcesso);
 export default router;

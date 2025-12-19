@@ -1,11 +1,42 @@
 ﻿import React, { createContext, useState, useContext, useEffect } from "react";
-import { API_BASE } from '../../../utils/apiBase';
+import { API_BASE } from "../../../utils/apiBase";
 
-const AuthContext = createContext(null);
+const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  // Tenta pegar o token salvo no armazenamento local do navegador
+  const [user, setUser] = useState(null);
   const [token, setToken] = useState(localStorage.getItem("defensorToken"));
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const initAuth = async () => {
+      const storedUser = localStorage.getItem("defensorUser");
+      const storedToken = localStorage.getItem("defensorToken");
+
+      if (storedToken && storedUser) {
+        try {
+          // PROTEÇÃO: Verifica se não é "undefined" texto
+          if (storedUser !== "undefined" && storedUser !== "null") {
+            const parsedUser = JSON.parse(storedUser);
+            setUser(parsedUser);
+          } else {
+            // Se tiver lixo, limpa
+            localStorage.removeItem("defensorUser");
+            localStorage.removeItem("defensorToken");
+          }
+        } catch (e) {
+          console.error("Erro crítico ao ler usuário:", e);
+          // Se der erro no JSON, limpa tudo para não travar o app
+          localStorage.removeItem("defensorUser");
+          localStorage.removeItem("defensorToken");
+          setUser(null);
+        }
+      }
+      setLoading(false);
+    };
+
+    initAuth();
+  }, []);
 
   const login = async (email, senha) => {
     try {
@@ -14,50 +45,42 @@ export const AuthProvider = ({ children }) => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, senha }),
       });
-      const contentType = response.headers.get("content-type") || "";
-      const isJson = contentType.includes("application/json");
-      const data = isJson
-        ? await response.json()
-        : { error: await response.text() };
 
       if (!response.ok) {
-        throw new Error(data.error || "Falha na requisiÃ§Ã£o");
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Erro no login");
       }
 
-      setToken(data.token);
+      const data = await response.json();
+      const userObj = data.defensor;
+
       localStorage.setItem("defensorToken", data.token);
+      localStorage.setItem("defensorUser", JSON.stringify(userObj));
+
+      setToken(data.token);
+      setUser(userObj);
+
       return true;
     } catch (error) {
-      console.error("Erro no login:", error);
-      throw error; // Joga o erro para o componente de Login tratar
+      console.error(error);
+      throw error;
     }
   };
 
   const logout = () => {
-    setToken(null);
     localStorage.removeItem("defensorToken");
+    localStorage.removeItem("defensorUser");
+    setToken(null);
+    setUser(null);
+    // Redirecionamento seguro
+    window.location.href = "/login";
   };
-// --- NOVO CÓDIGO AQUI ---
-  // Escuta o evento de sessão expirada vindo do authFetch
-useEffect(() => {
-    const handleSessionExpired = () => {
-      console.warn("Sessão expirada detectada. Realizando logout...");
-      logout();
-    };
 
-    window.addEventListener('auth:session-expired', handleSessionExpired);
-
-    return () => {
-      window.removeEventListener('auth:session-expired', handleSessionExpired);
-    };
-  }, []);
-  // ------------------------
-
-  const value = { token, login, logout };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={{ user, token, login, logout, loading }}>
+      {!loading && children}
+    </AuthContext.Provider>
+  );
 };
 
-export const useAuth = () => {
-  return useContext(AuthContext);
-};
+export const useAuth = () => useContext(AuthContext);
