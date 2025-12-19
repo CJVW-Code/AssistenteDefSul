@@ -15,6 +15,7 @@ import {
 } from "../services/geminiService.js";
 import { getVaraByTipoAcao } from "../config/varasMapping.js";
 import { hashPassword } from "../services/securityService.js";
+import { verifyPassword } from "../services/securityService.js";
 
 // Tempo de expiração (em segundos) para URLs assinadas do Supabase
 // Pode ser configurado pela env var SIGNED_URL_EXPIRES; padrão 24h (86400s)
@@ -1343,6 +1344,59 @@ export const resetarChaveAcesso = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Erro ao resetar chave." });
+  }
+};
+export const consultarStatusCaso = async (req, res) => {
+  try {
+    // 1. Agora recebemos CPF e CHAVE (não mais protocolo)
+    const { cpf, chave } = req.query;
+
+    if (!cpf || !chave) {
+      return res
+        .status(400)
+        .json({ error: "CPF e Chave de Acesso são obrigatórios." });
+    }
+
+    // 2. Limpeza do CPF (remove pontos e traços para evitar erros de busca)
+    const cpfLimpo = cpf.replace(/\D/g, "");
+
+    // 3. Busca o caso pelo CPF
+    const { data: caso, error } = await supabase
+      .from("casos")
+      .select(
+        "id, status, chave_acesso_hash, nome_assistido, numero_processo, url_capa_processual"
+      )
+      .eq("cpf_assistido", cpfLimpo)
+      .single();
+
+    if (error || !caso) {
+      // Dica de segurança: Não dizer se o CPF não existe ou se a chave tá errada
+      return res
+        .status(404)
+        .json({ error: "Dados inválidos ou caso não encontrado." });
+    }
+
+    // 4. Verifica a Chave (Hash)
+    // Precisamos importar 'verifyPassword' do securityService no topo do arquivo se não tiver
+    // import { verifyPassword } from "../services/securityService.js";
+    const chaveValida = await verifyPassword(chave, caso.chave_acesso_hash);
+
+    if (!chaveValida) {
+      return res
+        .status(401)
+        .json({ error: "Dados inválidos ou caso não encontrado." });
+    }
+
+    // 5. Retorna os dados seguros
+    res.json({
+      status: caso.status,
+      nome_assistido: caso.nome_assistido,
+      numero_processo: caso.numero_processo,
+      url_capa_processual: caso.url_capa_processual,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Erro ao consultar status." });
   }
 };
 export const atualizarStatusCaso = async (req, res) => {
