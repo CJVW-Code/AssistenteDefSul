@@ -1,14 +1,17 @@
 // Arquivo: frontend-defensor/src/components/Cadastro.jsx
 import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { UserPlus, Shield, ArrowLeft  } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { UserPlus, Shield, Eye, EyeOff, Loader2 } from "lucide-react";
 import { API_BASE } from "../../../utils/apiBase";
-import { ThemeToggle } from "../../../components/ThemeToggle";
+import { useAuth } from "../contexts/AuthContext";
 
 export const Cadastro = () => {
+  const { token } = useAuth();
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
+  const [cargo, setCargo] = useState("estagiario");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -18,7 +21,7 @@ export const Cadastro = () => {
     let timer;
     if (success) {
       timer = setTimeout(() => {
-        navigate("/painel/login");
+        navigate("/painel/equipe"); // Redireciona para a lista de equipe após sucesso
       }, 1500);
     }
     return () => clearTimeout(timer); // Função de limpeza
@@ -29,17 +32,15 @@ export const Cadastro = () => {
     setError(null);
     setSuccess(null);
 
-    if (!email.endsWith("@defensoria.ba.def.br")) {
-      setError("Apenas emails @defensoria.ba.def.br são permitidos.");
-      return;
-    }
-
     setLoading(true);
     try {
       const response = await fetch(`${API_BASE}/defensores/register`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nome, email, senha }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ nome, email, senha, cargo }),
       });
       const data = await response.json();
 
@@ -47,9 +48,7 @@ export const Cadastro = () => {
         throw new Error(data.error);
       }
 
-      setSuccess(
-        "Cadastro realizado com sucesso! Você será redirecionado para o login."
-      );
+      setSuccess("Membro cadastrado com sucesso!");
     } catch (err) {
       setError(err.message);
     } finally {
@@ -58,27 +57,19 @@ export const Cadastro = () => {
   };
 
   return (
-    <div className="min-h-screen bg-app flex flex-col items-center justify-center px-4 py-10 relative">
-      <div className="absolute top-4 left-4">
-        <button onClick={() => navigate("/")} className=" btn btn-ghost">
-          <ArrowLeft size={18} />
-          Voltar para o início
-        </button>
-      </div>
-      <div className="absolute top-4 right-4">
-        <ThemeToggle />
-      </div>
-      <div className="w-full max-w-5xl grid gap-8 md:grid-cols-2 items-center">
-        <div className="hidden md:flex card bg-gradient-to-br to-amber-600 h-full">
+    <div className="max-w-4xl mx-auto space-y-8 pb-24">
+      <div className="grid gap-8 md:grid-cols-2 items-start">
+        <div className="card bg-gradient-to-br from-surface to-surface-alt border-l-4 border-l-primary h-full">
           <div className="space-y-4">
             <Shield className="w-10 h-10" />
-            <h1 className="heading-1">Cadastro de defensor</h1>
-            <p>
-              Solicite seu acesso ao painel do Assistente Def Sul e
-              sincronize os atendimentos com a Defensoria Pública.
+            <h1 className="heading-1">Novo Membro</h1>
+            <p className="text-muted">
+              Cadastre um novo defensor, estagiário ou recepcionista para
+              acessar o painel.
             </p>
-            <p className="text-sm font-semibold">
-              Necessário email @defensoria.ba.def.br
+            <div className="divider my-4"></div>
+            <p className="text-sm text-muted">
+              Preencha os dados abaixo para criar o acesso.
             </p>
           </div>
         </div>
@@ -90,7 +81,7 @@ export const Cadastro = () => {
               <p className="text-xs uppercase text-muted tracking-[0.3em]">
                 Novo acesso
               </p>
-              <h2 className="heading-2">Solicitar cadastro</h2>
+              <h2 className="heading-2">Dados do Usuário</h2>
             </div>
           </div>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -122,42 +113,65 @@ export const Cadastro = () => {
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium text-muted">Senha</label>
-              <input
-                type="password"
-                placeholder="Crie uma senha"
-                value={senha}
-                onChange={(e) => setSenha(e.target.value)}
-                required
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Crie uma senha"
+                  value={senha}
+                  onChange={(e) => setSenha(e.target.value)}
+                  required
+                  className="input pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-white"
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-muted">
+                Cargo / Permissão
+              </label>
+              <select
+                value={cargo}
+                onChange={(e) => setCargo(e.target.value)}
                 className="input"
-              />
+              >
+                <option value="estagiario">Estagiário</option>
+                <option value="defensor">Defensor</option>
+                <option value="recepcao">Recepção</option>
+                <option value="admin">Administrador</option>
+              </select>
             </div>
 
-            {error && (
-              <p className="alert alert-error">
-                {error}
-              </p>
-            )}
-            {success && (
-              <p className="alert alert-success">
-                {success}
-              </p>
-            )}
+            {error && <p className="alert alert-error">{error}</p>}
+            {success && <p className="alert alert-success">{success}</p>}
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="btn btn-primary w-full text-base"
-            >
-              <UserPlus size={18} />
-              {loading ? "Cadastrando..." : "Criar conta"}
-            </button>
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => navigate("/painel/equipe")}
+                className="btn btn-ghost flex-1 border border-soft"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="btn btn-primary flex-1 text-base flex items-center justify-center gap-2"
+              >
+                {loading ? (
+                  <Loader2 size={18} className="animate-spin" />
+                ) : (
+                  <UserPlus size={18} />
+                )}
+                {loading ? "Salvando..." : "Cadastrar"}
+              </button>
+            </div>
           </form>
-          <p className="text-sm text-muted text-center">
-            Já tem uma conta?{" "}
-            <Link to="/painel/login" className="link font-semibold">
-              Faça o login
-            </Link>
-          </p>
         </div>
       </div>
     </div>

@@ -1,12 +1,7 @@
-// Arquivo: backend/src/services/geminiService.js
-
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { generateLegalText } from "./aiService.js";
 import dotenv from "dotenv";
 
 dotenv.config();
-
-// Inicializa o cliente da IA com sua chave de API
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 const DEFAULT_COMARCA =
   process.env.DEFENSORIA_DEFAULT_COMARCA || "Teixeira de Freitas/BA";
@@ -27,6 +22,8 @@ const DEFAULT_TRIAGEM = "[TRIAGEM SIGAD/SOLAR]";
 const DEFAULT_PROCESSO = "[NÚMERO DO PROCESSO/DEPENDÊNCIA]";
 const PLACEHOLDER_FIELD = "[DADO PENDENTE]";
 
+// --- FUNÇÕES UTILITÁRIAS DE NORMALIZAÇÃO ---
+
 export const normalizePromptData = (raw = {}) => {
   const requerente =
     raw.requerente || raw.exequente || raw.assistido || raw.cliente || {
@@ -45,7 +42,7 @@ export const normalizePromptData = (raw = {}) => {
         raw.data_nascimento_assistido ||
         raw.data_nascimento_requerente,
       representante:
-        raw.representante_requerente || raw.representante || undefined,
+        raw.representante_requerente || raw.representante || raw.representante_nome || undefined,
     };
 
   const requerido =
@@ -60,6 +57,7 @@ export const normalizePromptData = (raw = {}) => {
         raw.requerido_cpf ||
         raw.executado_cpf ||
         raw.cpf_executado,
+      ocupacao: raw.requerido_ocupacao || raw.ocupacao_requerido,
     };
 
   const dadosBancarios =
@@ -128,32 +126,10 @@ const parseBankData = (raw) => {
   };
 };
 
-const formatPaymentDestination = (dadosBancarios) => {
-  if (!dadosBancarios) return "[Informar dados bancários]";
-  const parts = [];
-  if (dadosBancarios.pix) {
-    parts.push(`Chave PIX: ${dadosBancarios.pix}`);
-  }
-  const contaParts = [];
-  if (dadosBancarios.banco) contaParts.push(`Banco: ${dadosBancarios.banco}`);
-  if (dadosBancarios.agencia)
-    contaParts.push(`Agência: ${dadosBancarios.agencia}`);
-  if (dadosBancarios.conta) contaParts.push(`Conta: ${dadosBancarios.conta}`);
-  if (contaParts.length) parts.push(contaParts.join(", "));
-  if (!parts.length && dadosBancarios.raw) parts.push(dadosBancarios.raw);
-  return parts.length ? parts.join(" | ") : "[Informar dados bancários]";
-};
-
 const valueOrPlaceholder = (value, fallback = PLACEHOLDER_FIELD) => {
   if (value === undefined || value === null) return fallback;
   const trimmed = `${value}`.trim();
   return trimmed ? trimmed : fallback;
-};
-
-const percentOrPlaceholder = (value, fallback = "[PERCENTUAL]") => {
-  const normalized = valueOrPlaceholder(value, fallback);
-  if (normalized === fallback) return fallback;
-  return normalized.endsWith("%") ? normalized : `${normalized}%`;
 };
 
 const cleanText = (value, fallback = "") => {
@@ -162,134 +138,149 @@ const cleanText = (value, fallback = "") => {
   return text.length ? text : fallback;
 };
 
+function sanitizeLegalAbbreviations(text) {
+  // 1. Remove formatações Markdown de títulos que a IA possa ter colocado
+  let cleaned = text.replace(/#+\s*Dos Fatos/gi, "").replace(/\*\*Dos Fatos\*\*/gi, "");
+  // 2. Remove o título "Dos Fatos" se estiver solto no início
+  cleaned = cleaned.replace(/^Dos Fatos\n/i, "").trim();
+  // 3. Corrige abreviação de artigo (art/ 5 -> art. 5)
+  return cleaned.replace(/\b(art)\/\s*/gi, "$1. ");
+}
+
+// --- FUNÇÕES PRINCIPAIS DE GERAÇÃO ---
+
+/**
+ * Analisa o caso para gerar um resumo executivo para o Painel do Defensor.
+ * Usa o orquestrador para garantir alta disponibilidade.
+ */
 export const analyzeCase = async (fullText) => {
-  if (!process.env.GEMINI_API_KEY) {
-    throw new Error(
-      "A chave da API do Gemini não foi configurada no arquivo .env"
-    );
-  }
+  const systemPrompt = `Você é um assistente jurídico sênior e objetivo da Defensoria Pública.
+  Sua tarefa é analisar o relato de um caso e criar um resumo executivo claro para o defensor.
+  Não adicione saudações, frases introdutórias ou conclusões genéricas.`;
+
+  const userPrompt = `Analise o texto abaixo e retorne APENAS os seguintes tópicos:
+  1. Problema Central
+  2. Partes Envolvidas
+  3. Pedido Principal
+  4. Urgência (Sim/Não e por quê)
+  5. Área do Direito
+
+  --- TEXTO DO CASO ---
+  ${fullText}`;
 
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-
-    const prompt = `Você é um assistente jurídico sênior e objetivo. Sua tarefa é analisar o texto de um caso enviado a uma Defensoria Pública e criar um resumo claro e conciso para o defensor.
-
-    O resumo deve ser em formato de tópicos, destacando exclusivamente os seguintes pontos:
-    1. Problema Central
-    2. Partes Envolvidas
-    3. Pedido Principal
-    4. Urgência (Sim/Não e por quê)
-    5. Área do Direito
-
-    Texto do Caso para Análise:
-    ---
-    ${fullText}
-    ---
-
-    Apenas retorne os tópicos. Não adicione saudações ou frases introdutórias.`;
-
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    return response.text();
+    // Resumo para painel interno tem menor risco, mas passa pelo orquestrador para velocidade (Groq)
+    return await generateLegalText(systemPrompt, userPrompt, 0.3);
   } catch (error) {
-    console.error("Ocorreu um erro durante a análise com o Gemini:", error);
-    throw new Error("Falha ao gerar o resumo do caso com a IA.");
+    console.error("Erro na análise do caso:", error);
+    throw new Error("Falha ao gerar o resumo do caso.");
   }
 };
 
+/**
+ * Gera a seção "DOS FATOS" da petição.
+ * Usa o serviço blindado (Sanitização + Groq/Gemini).
+ */
 export const generateDosFatos = async (caseData = {}) => {
-  if (!process.env.GEMINI_API_KEY) {
-    throw new Error(
-      "A chave da API do Gemini não foi configurada no arquivo .env"
-    );
-  }
-
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
     const normalized = normalizePromptData(caseData);
     const relatoBase = cleanText(normalized.relato, "Relato detalhado não informado.");
 
     const formatDocumentList = (docs = []) => {
-      if (!Array.isArray(docs) || !docs.length) {
-        return "Nenhum documento ou prova informado.";
-      }
-      const filtered = docs
-        .map((doc) => cleanText(doc))
-        .filter((doc) => Boolean(doc));
-      if (!filtered.length) {
-        return "Nenhum documento ou prova informado.";
-      }
-      return filtered.map((doc, index) => `${index + 1}. ${doc}`).join("\n");
+      if (!Array.isArray(docs) || !docs.length) return "Nenhum documento ou prova informado.";
+      const filtered = docs.map((doc) => cleanText(doc)).filter((doc) => Boolean(doc));
+      return filtered.length ? filtered.map((doc, index) => `${index + 1}. ${doc}`).join("\n") : "Nenhum documento ou prova informado.";
     };
+
     const documentosList = formatDocumentList(caseData.documentos_informados);
+    
     const filhosInfo = cleanText(
-      caseData.filhos_info || caseData.filhosInfo,
+      caseData.filhos_info || caseData.filhosInfo || caseData.descricao_guarda,
       "Informações sobre filhos não foram apresentadas."
     );
-    const situacaoAssistido = cleanText(
-      caseData.dados_adicionais_requerente,
-      "Sem detalhes adicionais sobre o assistido."
-    );
-    const situacaoRequerido = cleanText(
-      caseData.dados_adicionais_requerido,
-      "Sem detalhes adicionais sobre o requerido."
-    );
+
+    // Preparação dos textos descritivos
+    let situacaoAssistido = cleanText(caseData.dados_adicionais_requerente, "");
+    if (caseData.situacao_financeira_genitora) {
+      situacaoAssistido += `\nSituação Financeira: ${caseData.situacao_financeira_genitora}`;
+    }
+    if (!situacaoAssistido) situacaoAssistido = "Sem detalhes adicionais sobre o assistido.";
+
+    let situacaoRequerido = cleanText(caseData.dados_adicionais_requerido, "");
+    if (caseData.requerido_tem_emprego_formal) {
+      situacaoRequerido += `\nPossui emprego formal? ${caseData.requerido_tem_emprego_formal}.`;
+    }
+    if (caseData.empregador_requerido_nome) {
+      situacaoRequerido += ` Empregador: ${caseData.empregador_requerido_nome}.`;
+    }
+    if (normalized.requerido.ocupacao) {
+      situacaoRequerido += ` Ocupação: ${normalized.requerido.ocupacao}.`;
+    }
+    if (!situacaoRequerido) situacaoRequerido = "Sem detalhes adicionais sobre o requerido.";
+
     const valorPensao = cleanText(normalized.valorMensalPensao, "Valor não informado");
-    const prompt = `**Persona:**
-Você é um assistente jurídico especialista em Direito de Família da Defensoria Pública da Bahia. Sua tarefa é redigir a seção "DOS FATOS" de uma petição de alimentos.
+    const bensPartilha = cleanText(caseData.bens_partilha);
+    const outrosPedidos = [];
+    if (bensPartilha) outrosPedidos.push(`Bens a partilhar: ${bensPartilha}`);
+    if (caseData.alimentos_para_ex_conjuge) outrosPedidos.push(`Alimentos para ex-cônjuge: ${caseData.alimentos_para_ex_conjuge}`);
+    const contextoExtra = outrosPedidos.length ? `\nOutros Pedidos/Detalhes: ${outrosPedidos.join("; ")}` : "";
 
-**Tarefa Principal:**
-Com base exclusivamente nos dados fornecidos abaixo, escreva um texto claro, conciso e juridicamente sólido para a seção "DOS FATOS".
+    // --- CONSTRUÇÃO DO MAPA DE PRIVACIDADE (PII MAP) ---
+    // Mapeia os dados reais para placeholders.
+    // O aiService vai trocar isso ANTES de enviar para a IA.
+    const piiMap = {};
+    const addToPii = (value, placeholder) => {
+      // Regra de segurança: só substitui se tiver mais de 3 chars e não for placeholder genérico
+      if (value && value.length > 3 && value !== "Não informado" && value !== "Valor não informado") {
+        piiMap[value] = placeholder;
+      }
+    };
 
-Regras obrigatórias:
-1. **Não invente informações.** Utilize apenas os dados fornecidos.
-2. **Estilo:** Adote um tom formal, técnico e objetivo.
-3. **Estrutura:** Inicie com um parágrafo de síntese. Depois, narre os fatos em ordem cronológica.
-4. **Foco:** Destaque apenas fatos relevantes para o pedido de alimentos (filiação, necessidades do alimentando, possibilidades do alimentante, falta de auxílio).
-5. **Terminologia:** Não use "menor" ou "incapaz". Use "criança" ou "adolescente".
-6. **Tamanho:** Produza um texto conciso, entre 3 e 5 parágrafos.
-7. **Provas:** Ao final, se houver documentos, mencione de forma sutil que a narrativa é corroborada pela documentação anexa.
+    addToPii(normalized.requerente?.nome, "[NOME_AUTOR]");
+    addToPii(normalized.requerente?.cpf, "[CPF_AUTOR]");
+    addToPii(normalized.requerido?.nome, "[NOME_REU]");
+    addToPii(normalized.requerido?.cpf, "[CPF_REU]");
+    // Se quiser, adicione mais campos aqui (ex: nome da criança se tiver separado)
 
---- DADOS DO CASO (Fonte Exclusiva) ---
-- Assistido: ${cleanText(
-      normalized.requerente?.nome,
-      "Nome do assistido não informado"
-    )} (${cleanText(
-      normalized.requerente?.cpf,
-      "CPF não informado"
-    )}), nascimento: ${cleanText(
-      normalized.requerente?.dataNascimento,
-      "sem data informada"
-    )}.
-- Requerido: ${cleanText(
-      normalized.requerido?.nome,
-      "Nome do requerido não informado"
-    )} (CPF ${cleanText(normalized.requerido?.cpf, "não informado")}).
-- Situação econômica do assistido: ${situacaoAssistido}
-- Situação econômica do requerido: ${situacaoRequerido}
-- Valor mensal pretendido para pensão e despesas extras: R$ ${valorPensao}
-- Informações sobre filhos/dependentes: ${filhosInfo}
-- Relato fornecido pelo assistido:
-\"\"\"${relatoBase}\"\"\"
-- Provas/documentos mencionados:
-${documentosList}
+    // --- PROMPTS ---
 
---- FIM DOS DADOS ---
-Agora, gere apenas o texto da seção "DOS FATOS", sem o título "DOS FATOS" e sem qualquer comentário adicional.`;
+    const systemPrompt = `Você é um Defensor Público experiente na Bahia.
+Seu estilo de escrita é extremamente formal, culto e padronizado (juridiquês clássico).
+Você DEVE utilizar os conectivos: "Insta salientar", "Ocorre que, no caso em tela", "Como é sabido", "aduzir".
+Não use listas ou tópicos na resposta final. Escreva apenas parágrafos coesos.`;
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const texto = response.text() || "";
-    return sanitizeLegalAbbreviations(texto.trim());
+    // No userPrompt, instruímos a IA a usar os placeholders que ela vai receber
+    // Ex: Ela vai receber "O autor [NOME_AUTOR]..." em vez de "O autor João..."
+    const userPrompt = `Redija APENAS o conteúdo textual da seção "DOS FATOS" de uma ${normalized.tipo_acao || "petição inicial"}.
+
+ATENÇÃO: NÃO inclua o título "DOS FATOS", "DOS FATOS E FUNDAMENTOS" ou qualquer cabeçalho. Comece diretamente pelo texto.
+
+Estrutura Lógica Obrigatória:
+1. **Vínculo:** "O autor ([NOME_AUTOR]) é filho do requerido ([NOME_REU]), conforme é possível aduzir..."
+2. **Necessidade:** "Ocorre que, no caso em tela..."
+3. **Dever:** "Como é sabido..."
+4. **Conflito:** "Insta salientar..."
+
+DADOS DO CASO:
+- Assistido: ${cleanText(normalized.requerente?.nome)} (CPF: ${cleanText(normalized.requerente?.cpf)})
+- Requerido: ${cleanText(normalized.requerido?.nome)} (CPF: ${cleanText(normalized.requerido?.cpf)})
+- Filhos/Guarda: ${filhosInfo}
+- Situação Mãe: ${situacaoAssistido}
+- Situação Pai: ${situacaoRequerido}
+- Valor Pedido: R$ ${valorPensao}
+- Relato Informal: """${relatoBase}"""
+- Documentos: ${documentosList}
+${contextoExtra}
+
+Adapte o texto se o relato informal contradizer o modelo padrão (ex: pai já paga algo), mas mantenha o tom formal.`;
+
+    // Chamada Segura: Envia o mapa PII para sanitização automática no aiService
+    const textoGerado = await generateLegalText(systemPrompt, userPrompt, 0.3, piiMap);
+    
+    return sanitizeLegalAbbreviations(textoGerado.trim());
+
   } catch (error) {
-    console.error(
-      "Erro ao gerar a seção 'Dos Fatos' com o Gemini:",
-      error
-    );
+    console.error("Erro ao gerar a seção 'Dos Fatos':", error);
     throw new Error("Falha ao gerar a seção 'Dos Fatos' com a IA.");
   }
 };
-
-function sanitizeLegalAbbreviations(text) {
-  return text.replace(/\b(art)\/\s*/gi, "$1. ");
-}

@@ -21,7 +21,7 @@ export const authMiddleware = (req, res, next) => {
   try {
     // 3. Verifica se o token é válido usando o segredo
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.defensor = decoded; // Adiciona os dados do defensor na requisição
+    req.user = decoded; // Padronizado para req.user para funcionar com os controllers
     next(); // Se o token for válido, permite que a requisição continue
   } catch (error) {
     res.status(401).json({ error: "Token inválido." });

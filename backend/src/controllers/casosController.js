@@ -1,4 +1,5 @@
 ﻿import { supabase } from "../config/supabase.js";
+import crypto from "crypto";
 import mammoth from "mammoth";
 import {
   generateCredentials,
@@ -14,6 +15,8 @@ import {
   normalizePromptData,
 } from "../services/geminiService.js";
 import { getVaraByTipoAcao } from "../config/varasMapping.js";
+import { hashPassword } from "../services/securityService.js";
+import { verifyPassword } from "../services/securityService.js";
 
 // Tempo de expiração (em segundos) para URLs assinadas do Supabase
 // Pode ser configurado pela env var SIGNED_URL_EXPIRES; padrão 24h (86400s)
@@ -173,7 +176,11 @@ const numeroParaExtenso = (valor) => {
 const calcularPercentualSalarioMinimo = (valorMensalPensao) => {
   if (!valorMensalPensao) return "";
   const valorNumerico = Number(valorMensalPensao);
-  if (!salarioMinimoAtual || Number.isNaN(valorNumerico) || valorNumerico <= 0) {
+  if (
+    !salarioMinimoAtual ||
+    Number.isNaN(valorNumerico) ||
+    valorNumerico <= 0
+  ) {
     return "";
   }
   const percentual = (valorNumerico / salarioMinimoAtual) * 100;
@@ -213,7 +220,12 @@ const buildSignedUrl = async (bucket, storedValue) => {
     .createSignedUrl(objectPath, signedExpires);
 
   if (error) {
-    console.error(`Falha ao gerar signed URL para ${objectPath}:`, error);
+    // Diferencia erro de arquivo inexistente (comum em uploads falhos antigos) de outros erros
+    if (error.message && error.message.includes("Object not found")) {
+      console.warn(`[Storage] Arquivo ausente (Link órfão no Banco): ${objectPath}`);
+    } else {
+      console.warn(`[Storage] Erro ao gerar URL para ${objectPath}:`, error);
+    }
     return null;
   }
 
@@ -257,7 +269,10 @@ const ensureText = (value, fallback = "[PREENCHER]") => {
 const sanitizeInlineText = (value) => {
   if (value === null || value === undefined) return value;
   const text = String(value);
-  return text.replace(/\s*\n+\s*/g, " ").replace(/\s{2,}/g, " ").trim();
+  return text
+    .replace(/\s*\n+\s*/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 };
 
 const ensureInlineValue = (value) => {
@@ -344,7 +359,10 @@ const buildFallbackDosFatos = (caseData = {}) => {
     );
   }
 
-  const situacaoAssistido = [caseData.situacao_financeira_genitora, caseData.dados_adicionais_requerente]
+  const situacaoAssistido = [
+    caseData.situacao_financeira_genitora,
+    caseData.dados_adicionais_requerente,
+  ]
     .map(safe)
     .filter(Boolean)
     .join(" ");
@@ -370,9 +388,12 @@ const buildFallbackDosFatos = (caseData = {}) => {
     safe(caseData.dia_pagamento_fixado);
   if (valorPretendido || diaPagamento) {
     paragraphs.push(
-      `Diante desse contexto, requer-se a fixação de alimentos no valor de ${valorPretendido ||
-        "[valor a ser definido]"}` +
-        (diaPagamento ? `, com vencimento no dia ${diaPagamento} de cada mês.` : ".")
+      `Diante desse contexto, requer-se a fixação de alimentos no valor de ${
+        valorPretendido || "[valor a ser definido]"
+      }` +
+        (diaPagamento
+          ? `, com vencimento no dia ${diaPagamento} de cada mês.`
+          : ".")
     );
   }
 
@@ -381,9 +402,7 @@ const buildFallbackDosFatos = (caseData = {}) => {
   }
 
   const documentosInformados = Array.isArray(caseData.documentos_informados)
-    ? caseData.documentos_informados
-        .map((doc) => safe(doc))
-        .filter(Boolean)
+    ? caseData.documentos_informados.map((doc) => safe(doc)).filter(Boolean)
     : [];
   if (documentosInformados.length) {
     const resumoDocs = documentosInformados.slice(0, 3).join("; ");
@@ -415,7 +434,7 @@ const buildDocxTemplatePayload = (
     baseData.vara;
   const cidadeAssinatura =
     baseData.cidade_assinatura || normalizedData.cidadeDataAssinatura;
-  
+
   const valorCausaNumero = calcularValorCausa(
     baseData.valor_mensal_pensao || baseData.valor_pensao || 0
   );
@@ -505,11 +524,9 @@ const buildDocxTemplatePayload = (
     ),
     executado_email: ensureText(baseData.requerido_email),
     executado_telefone: ensureText(baseData.requerido_telefone),
-    
+
     valor_pensao: ensureText(baseData.valor_pensao),
-    percentual_definitivo_salario_min: ensureText(
-      percentualDefinitivoBase
-    ),
+    percentual_definitivo_salario_min: ensureText(percentualDefinitivoBase),
     percentual_definitivo_extras: ensureText(
       baseData.percentual_definitivo_extras
     ),
@@ -624,32 +641,27 @@ export const criarNovoCaso = async (req, res) => {
       // DIVÓRCIO
       regime_bens,
       retorno_nome_solteira,
-        alimentos_para_ex_conjuge,
-      } = dados_formulario;
-      const { valor_mensal_pensao } = dados_formulario;
+      alimentos_para_ex_conjuge,
+    } = dados_formulario;
+    const { valor_mensal_pensao } = dados_formulario;
 
     const formattedAssistidoNascimento = formatDateBr(
       assistido_data_nascimento
     );
     const formattedDataInicioRelacao = formatDateBr(data_inicio_relacao);
     const formattedDataSeparacao = formatDateBr(data_separacao);
-      const formattedDiaPagamentoRequerido = formatDateBr(
-        dia_pagamento_requerido
-      );
-      const formattedDiaPagamentoFixado = formatDateBr(dia_pagamento_fixado);
-      const formattedValorPensao = formatCurrencyBr(
-        valor_mensal_pensao
-      );
-      const formattedValorTotalDebitoExecucao = formatCurrencyBr(
-        valor_total_debito_execucao
-      );
-      const percentualSalarioMinimoCalculado = calcularPercentualSalarioMinimo(
-        valor_mensal_pensao
-      );
-
-    const documentosInformadosArray = JSON.parse(
-      documentos_informados || "[]"
+    const formattedDiaPagamentoRequerido = formatDateBr(
+      dia_pagamento_requerido
     );
+    const formattedDiaPagamentoFixado = formatDateBr(dia_pagamento_fixado);
+    const formattedValorPensao = formatCurrencyBr(valor_mensal_pensao);
+    const formattedValorTotalDebitoExecucao = formatCurrencyBr(
+      valor_total_debito_execucao
+    );
+    const percentualSalarioMinimoCalculado =
+      calcularPercentualSalarioMinimo(valor_mensal_pensao);
+
+    const documentosInformadosArray = JSON.parse(documentos_informados || "[]");
     const { protocolo, chaveAcesso } = generateCredentials(tipoAcao);
     const chaveAcessoHash = hashKeyWithSalt(chaveAcesso);
 
@@ -753,15 +765,15 @@ export const criarNovoCaso = async (req, res) => {
       descricao_guarda,
       situacao_financeira_genitora,
       processo_titulo_numero,
-        cidade_assinatura,
-        cidadeDataAssinatura: cidade_assinatura,
-        valor_total_extenso,
-        valor_debito_extenso,
-        percentual_definitivo_salario_min,
-        percentual_definitivo_extras,
-        valor_pensao: formattedValorPensao,
-        valor_mensal_pensao,
-        percentual_salario_minimo: percentualSalarioMinimoCalculado,
+      cidade_assinatura,
+      cidadeDataAssinatura: cidade_assinatura,
+      valor_total_extenso,
+      valor_debito_extenso,
+      percentual_definitivo_salario_min,
+      percentual_definitivo_extras,
+      valor_pensao: formattedValorPensao,
+      valor_mensal_pensao,
+      percentual_salario_minimo: percentualSalarioMinimoCalculado,
       dia_pagamento_requerido: formattedDiaPagamentoRequerido,
       dados_bancarios_deposito,
       requerido_tem_emprego_formal,
@@ -835,27 +847,45 @@ export const criarNovoCaso = async (req, res) => {
       if (req.files.audio) {
         const audioFile = req.files.audio[0];
         const filePath = `${protocolo}/${audioFile.filename}`;
-        await supabase.storage
+        const { error: audioErr } = await supabase.storage
           .from("audios")
           .upload(filePath, await fs.readFile(audioFile.path), {
             contentType: audioFile.mimetype,
           });
-        url_audio = filePath;
+        
+        if (audioErr) {
+          console.error("Erro ao fazer upload do áudio:", audioErr);
+          avisos.push("Não foi possível salvar o áudio no armazenamento.");
+        } else {
+          url_audio = filePath;
+        }
       }
       if (req.files.documentos) {
         for (const docFile of req.files.documentos) {
           const filePath = `${protocolo}/${docFile.filename}`;
           const fileData = await fs.readFile(docFile.path);
           if (docFile.originalname.toLowerCase().includes("peticao")) {
-            await supabase.storage
+            const { error: petErr } = await supabase.storage
               .from("peticoes")
               .upload(filePath, fileData, { contentType: docFile.mimetype });
-            url_peticao = filePath;
+            
+            if (petErr) {
+              console.error("Erro ao fazer upload da petição:", petErr);
+              avisos.push(`Erro ao salvar petição: ${docFile.originalname}`);
+            } else {
+              url_peticao = filePath;
+            }
           } else {
-            await supabase.storage
+            const { error: docErr } = await supabase.storage
               .from("documentos")
               .upload(filePath, fileData, { contentType: docFile.mimetype });
-            urls_documentos.push(filePath);
+            
+            if (docErr) {
+              console.error("Erro ao fazer upload do documento:", docErr);
+              avisos.push(`Erro ao salvar documento: ${docFile.originalname}`);
+            } else {
+              urls_documentos.push(filePath);
+            }
           }
         }
       }
@@ -1010,13 +1040,10 @@ export const regenerarDosFatos = async (req, res) => {
     const formattedValorTotalDebitoExecucao = formatCurrencyBr(
       valor_total_debito_execucao
     );
-    const percentualSalarioMinimoCalculado = calcularPercentualSalarioMinimo(
-      valor_mensal_pensao
-    );
+    const percentualSalarioMinimoCalculado =
+      calcularPercentualSalarioMinimo(valor_mensal_pensao);
 
-    const documentosInformadosArray = Array.isArray(
-      caso.documentos_informados
-    )
+    const documentosInformadosArray = Array.isArray(caso.documentos_informados)
       ? caso.documentos_informados
       : [];
     const varaMapeada = getVaraByTipoAcao(tipoAcao || caso.tipo_acao);
@@ -1032,9 +1059,8 @@ export const regenerarDosFatos = async (req, res) => {
       telefone_assistido: telefone || caso.telefone_assistido,
       tipo_acao: tipoAcao || caso.tipo_acao,
       acao_especifica:
-        (tipoAcao || caso.tipo_acao || "")
-          .split(" - ")[1]
-          ?.trim() || (tipoAcao || caso.tipo_acao || "").trim(),
+        (tipoAcao || caso.tipo_acao || "").split(" - ")[1]?.trim() ||
+        (tipoAcao || caso.tipo_acao || "").trim(),
       relato_texto: relato || caso.relato_texto,
       documentos_informados: documentosInformadosArray,
       resumo_ia: caso.resumo_ia,
@@ -1165,10 +1191,7 @@ export const regenerarDosFatos = async (req, res) => {
 
     res.status(200).json(casoAtualizado);
   } catch (error) {
-    console.error(
-      "Erro ao regenerar a seção 'Dos Fatos' para o caso:",
-      error
-    );
+    console.error("Erro ao regenerar a seção 'Dos Fatos' para o caso:", error);
     res.status(500).json({ error: "Falha ao gerar a seção dos fatos." });
   }
 };
@@ -1176,10 +1199,34 @@ export const regenerarDosFatos = async (req, res) => {
 // --- FUNÇÃO PARA LISTAR TODOS OS CASOS ---
 export const listarCasos = async (req, res) => {
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from("casos")
-      .select("*")
+      .select(
+        `
+        id,
+        created_at,
+        protocolo,
+        nome_assistido,
+        cpf_assistido,
+        tipo_acao,
+        status,
+        numero_solar,      
+        numero_processo    
+      `
+      )
       .order("created_at", { ascending: false });
+
+    // --- FILTRO POR CPF (Correção para Recepção) ---
+    // Se vier ?cpf=123 na URL, filtramos apenas esse assistido
+    if (req.query.cpf) {
+      const cpfLimpo = req.query.cpf.replace(/\D/g, "");
+      if (cpfLimpo) {
+        query = query.eq("cpf_assistido", cpfLimpo);
+      }
+    }
+
+    const { data, error } = await query;
+
     if (error) throw error;
     const casosComLinks = await Promise.all(
       (data || []).map((caso) => attachSignedUrls(caso))
@@ -1190,7 +1237,77 @@ export const listarCasos = async (req, res) => {
     res.status(500).json({ error: "Falha ao buscar casos." });
   }
 };
+// backend/src/controllers/casosController.js
 
+export const finalizarCasoSolar = async (req, res) => {
+  try {
+    const { id } = req.params;
+    // Recebendo os dois números: Solar (Interno) e Processo (TJ/PJE)
+    const { numero_solar, numero_processo } = req.body;
+
+    // Validação básica
+    if (!req.file) {
+      return res
+        .status(400)
+        .json({ error: "O arquivo da Capa Processual (PDF) é obrigatório." });
+    }
+    if (!numero_solar || !numero_processo) {
+      return res
+        .status(400)
+        .json({ error: "Número Solar e Número do Processo são obrigatórios." });
+    }
+
+    // 1. Upload do Arquivo para o bucket 'capa_processual'
+    // Nome padronizado para evitar sobrescrita acidental
+    const timestamp = Date.now();
+    const filePath = `capa_${id}_${timestamp}.pdf`;
+
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from("capa_processual") // Nome exato do bucket que você criou
+      .upload(filePath, await fs.readFile(req.file.path), {
+        contentType: "application/pdf",
+        upsert: false,
+      });
+
+    if (uploadError) throw uploadError;
+
+    // 2. Gerar URL Pública (Permitido pela policy que criamos)
+    const { data: publicUrlData } = supabase.storage
+      .from("capa_processual")
+      .getPublicUrl(filePath);
+
+    const url_capa_processual = publicUrlData.publicUrl;
+
+    // 3. Atualizar o Caso no Banco
+    const { data, error: dbError } = await supabase
+      .from("casos")
+      .update({
+        numero_solar: numero_solar,
+        numero_processo: numero_processo, // Salvando o número para o assistido ver
+        url_capa_processual: url_capa_processual,
+        status: "encaminhado_solar", // Novo status de conclusão
+      })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (dbError) throw dbError;
+
+    // Limpeza do arquivo temporário do servidor
+    await fs.unlink(req.file.path);
+
+    res
+      .status(200)
+      .json({ message: "Caso finalizado com sucesso!", caso: data });
+  } catch (error) {
+    console.error("Erro ao finalizar caso:", error);
+    // Tenta limpar arquivo se der erro
+    if (req.file) await fs.unlink(req.file.path).catch(() => {});
+    res
+      .status(500)
+      .json({ error: "Erro ao finalizar caso e subir capa processual." });
+  }
+};
 // --- FUNÇÃO PARA OBTER DETALHES DE UM CASO ---
 export const obterDetalhesCaso = async (req, res) => {
   try {
@@ -1209,19 +1326,129 @@ export const obterDetalhesCaso = async (req, res) => {
     res.status(500).json({ error: "Falha ao buscar detalhes do caso." });
   }
 };
+export const buscarPorCpf = async (req, res) => {
+  try {
+    const { cpf } = req.query; // Recebe via ?cpf=123...
 
+    // Remove pontuação se houver
+    const cpfLimpo = cpf.replace(/\D/g, "");
+
+    const { data, error } = await supabase
+      .from("casos")
+      .select(
+        "id, nome_assistido, cpf_assistido, status, protocolo, created_at"
+      )
+      .eq("cpf_assistido", cpfLimpo)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+    res.json(data);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Erro ao buscar por CPF." });
+  }
+};
+
+// Reseta a chave e devolve uma nova para a recepcionista anotar
+export const resetarChaveAcesso = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // 1. Gerar uma nova chave no padrão DPB-XXXXX-0XXXXX
+    const randomPart1 = crypto.randomBytes(3).readUIntBE(0, 3) % 100000;
+    const randomPart2 = crypto.randomBytes(3).readUIntBE(0, 3) % 100000;
+    const novaChave = `DPB-${randomPart1
+      .toString()
+      .padStart(5, "0")}-0${randomPart2.toString().padStart(5, "0")}`;
+
+    // 2. Hash da senha usando hashKeyWithSalt (mesmo do cadastro)
+    // Isso garante compatibilidade com o verifyKey do statusController
+    const chave_hash = hashKeyWithSalt(novaChave);
+
+    // 3. Atualizar no Banco
+    const { error } = await supabase
+      .from("casos")
+      .update({ chave_acesso_hash: chave_hash })
+      .eq("id", id);
+
+    if (error) throw error;
+
+    // 4. Retornar a chave SEM HASH para a recepcionista ver (uma única vez)
+    res.json({
+      message: "Chave resetada com sucesso.",
+      novaChave: novaChave,
+      aviso: "Anote esta chave agora. Ela não poderá ser vista novamente.",
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Erro ao resetar chave." });
+  }
+};
+export const consultarStatusCaso = async (req, res) => {
+  try {
+    // 1. Agora recebemos CPF e CHAVE (não mais protocolo)
+    const { cpf, chave } = req.query;
+
+    if (!cpf || !chave) {
+      return res
+        .status(400)
+        .json({ error: "CPF e Chave de Acesso são obrigatórios." });
+    }
+
+    // 2. Limpeza do CPF (remove pontos e traços para evitar erros de busca)
+    const cpfLimpo = cpf.replace(/\D/g, "");
+
+    // 3. Busca o caso pelo CPF
+    const { data: caso, error } = await supabase
+      .from("casos")
+      .select(
+        "id, status, chave_acesso_hash, nome_assistido, numero_processo, url_capa_processual"
+      )
+      .eq("cpf_assistido", cpfLimpo)
+      .single();
+
+    if (error || !caso) {
+      // Dica de segurança: Não dizer se o CPF não existe ou se a chave tá errada
+      return res
+        .status(404)
+        .json({ error: "Dados inválidos ou caso não encontrado." });
+    }
+
+    // 4. Verifica a Chave (Hash)
+    // Precisamos importar 'verifyPassword' do securityService no topo do arquivo se não tiver
+    // import { verifyPassword } from "../services/securityService.js";
+    const chaveValida = await verifyPassword(chave, caso.chave_acesso_hash);
+
+    if (!chaveValida) {
+      return res
+        .status(401)
+        .json({ error: "Dados inválidos ou caso não encontrado." });
+    }
+
+    // 5. Retorna os dados seguros
+    res.json({
+      status: caso.status,
+      nome_assistido: caso.nome_assistido,
+      numero_processo: caso.numero_processo,
+      url_capa_processual: caso.url_capa_processual,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Erro ao consultar status." });
+  }
+};
 export const atualizarStatusCaso = async (req, res) => {
   try {
     const { id } = req.params; // Pega o ID do caso da URL
     const { status } = req.body; // Pega o novo status do corpo da requisição
-
+    if (status === "encaminhado_solar") {
+      return res.status(400).json({
+        error:
+          "Para finalizar o caso, utilize a área de 'Finalização e Encaminhamento' anexando a Capa Processual.",
+      });
+    }
     // Validação simples para garantir que o status é um dos valores esperados
-    const statusPermitidos = [
-      "recebido",
-      "em_analise",
-      "aguardando_docs",
-      "finalizado",
-    ];
+    const statusPermitidos = ["recebido", "em_analise", "aguardando_docs"];
     if (!status || !statusPermitidos.includes(status)) {
       return res.status(400).json({ error: "Status inválido." });
     }

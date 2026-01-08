@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { Link } from "react-router-dom";
-import { Eye } from "lucide-react";
+import { Eye, Search } from "lucide-react";
 import { API_BASE } from "../../../utils/apiBase";
 
 const statusStyles = {
@@ -18,6 +18,7 @@ const normalizeStatus = (value) => (value || "recebido").toLowerCase();
 
 export const Casos = () => {
   const [casos, setCasos] = useState([]);
+  const [busca, setBusca] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const { token } = useAuth();
@@ -46,6 +47,16 @@ export const Casos = () => {
       fetchCasos();
     }
   }, [token]);
+
+  // Filtro de busca
+  const casosFiltrados = casos.filter((caso) => {
+    const termo = busca.toLowerCase();
+    return (
+      caso.nome_assistido?.toLowerCase().includes(termo) ||
+      caso.protocolo?.toLowerCase().includes(termo) ||
+      caso.cpf_assistido?.includes(termo)
+    );
+  });
 
   if (loading) {
     return (
@@ -78,15 +89,27 @@ export const Casos = () => {
 
       <section className="card p-0 overflow-hidden">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between border-b border-soft px-6 py-4">
-          <div>
+          <div className="flex-1">
             <h2 className="heading-2">Listagem oficial</h2>
             <p className="text-sm text-muted">
               {casos.length} registros importados do Assistente Def Sul.
             </p>
           </div>
-          <Link to="/painel" className="btn btn-secondary text-sm">
-            Voltar ao dashboard
-          </Link>
+
+          {/* CAMPO DE BUSCA */}
+          <div className="relative w-full md:w-72">
+            <Search
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted"
+              size={18}
+            />
+            <input
+              type="text"
+              placeholder="Buscar nome, CPF ou protocolo..."
+              className="input pl-10 py-2 text-sm"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+            />
+          </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -97,18 +120,20 @@ export const Casos = () => {
                 <th className="px-4 py-3">Nome do cidadão</th>
                 <th className="px-4 py-3">Data de abertura</th>
                 <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3 text-right">Ações</th>
+                <th className="px-4 py-3 text-right">Ações</th>
               </tr>
             </thead>
             <tbody>
-              {casos.length === 0 ? (
+              {casosFiltrados.length === 0 ? (
                 <tr>
                   <td colSpan="5" className="text-center p-8 text-muted">
-                    Nenhum caso encontrado.
+                    {casos.length === 0
+                      ? "Nenhum caso encontrado."
+                      : "Nenhum resultado para a busca."}
                   </td>
                 </tr>
               ) : (
-                casos.map((caso) => {
+                casosFiltrados.map((caso) => {
                   const statusKey = normalizeStatus(caso.status);
                   const badgeStyle =
                     statusStyles[statusKey] || statusStyles.default;

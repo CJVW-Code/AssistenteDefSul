@@ -1,6 +1,4 @@
-﻿// Centraliza a base URL da API com boas práticas e fallbacks seguros.
-// Prioriza VITE_API_URL; em dev usa localhost; em produção pode usar o mesmo host com prefixo /api.
-
+﻿
 export function getApiBase() {
   try {
     const envUrl = (typeof import.meta !== 'undefined' && import.meta && import.meta.env && import.meta.env.VITE_API_URL) || '';
@@ -23,3 +21,37 @@ export function getApiBase() {
 }
 
 export const API_BASE = getApiBase();
+
+export const authFetch = async (endpoint, options = {}) => {
+  // 1. Pega o token atual
+  const token = localStorage.getItem("defensorToken");
+  
+  // 2. Prepara os headers padrão
+  const headers = {
+    'Content-Type': 'application/json',
+    ...options.headers,
+  };
+
+  // 3. Injeta o Token se existir
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  // 4. Faz a requisição
+  // Nota: endpoint não precisa incluir API_BASE se passar só o caminho (ex: '/casos')
+  const url = endpoint.startsWith('http') ? endpoint : `${API_BASE}${endpoint}`;
+  
+  const response = await fetch(url, {
+    ...options,
+    headers
+  });
+
+  // 5. DETECTA SESSÃO EXPIRADA
+  if (response.status === 401) {
+    // Dispara o evento que o AuthContext vai escutar
+    window.dispatchEvent(new Event('auth:session-expired'));
+    throw new Error('Sessão expirada');
+  }
+
+  return response;
+};

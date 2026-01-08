@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { documentosPorAcao } from "../../../data/documentos.js";
 import { API_BASE } from "../../../utils/apiBase";
+import { useToast } from "../../../contexts/ToastContext";
 
 // 1. Estado Inicial Consolidado
 const initialState = {
@@ -292,6 +293,7 @@ const normalizeDecimalForSubmit = (value = "", decimals = 2) => {
 const currencyFields = new Set(["valorMensalPensao", "valorTotalDebitoExecucao"]);
 
 export const FormularioSubmissao = () => {
+  const { toast } = useToast();
   const [formState, dispatch] = useReducer(formReducer, initialState);
   const [statusMessage, setStatusMessage] = useState("");
   const [isRecording, setIsRecording] = useState(false);
@@ -441,7 +443,7 @@ export const FormularioSubmissao = () => {
       setIsRecording(true);
     } catch (err) {
       console.error("Erro microfone:", err);
-      alert("Não foi possível acessar o microfone.");
+      toast.error("Não foi possível acessar o microfone.");
     }
   };
 
@@ -702,7 +704,11 @@ export const FormularioSubmissao = () => {
     // Arquivos e Arrays
     formData.append("documentos_informados", JSON.stringify(formState.documentosMarcados));
     if (formState.audioBlob) formData.append("audio", formState.audioBlob, "gravacao.webm");
-    formState.documentFiles.forEach((file) => formData.append("documentos", file));
+    formState.documentFiles.forEach((file) => {
+      // Sanitiza o nome do arquivo (remove acentos) para evitar erros de encoding no servidor
+      const safeName = file.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      formData.append("documentos", file, safeName);
+    });
 
     try {
       const response = await fetch(`${API_BASE}/casos/novo`, { method: "POST", body: formData });
@@ -711,7 +717,7 @@ export const FormularioSubmissao = () => {
       setGeneratedCredentials({ chaveAcesso: data.chaveAcesso, protocolo: data.protocolo });
     } catch (error) {
       console.error("Erro:", error);
-      alert(`Erro: ${error.message}`);
+      toast.error(`Erro: ${error.message}`);
     } finally {
       setLoading(false);
       timers.forEach(clearTimeout);
@@ -774,17 +780,20 @@ export const FormularioSubmissao = () => {
         <h3 className="text-2xl font-bold text-green-400 mb-4">Cadastro Realizado!</h3>
         <div className="bg-surface border border-soft p-4 rounded-xl mb-4 text-left space-y-3">
           <div>
-            <p className="text-xs text-muted uppercase font-bold">Protocolo</p>
-            <p className="text-xl font-mono text-amber-400">{generatedCredentials.protocolo}</p>
+            <p className="text-xs text-muted uppercase font-bold">CPF (Seu Login)</p>
+            <p className="text-xl font-mono text-white">{formState.cpf}</p>
           </div>
           <div>
-            <p className="text-xs text-muted uppercase font-bold">Chave de Acesso</p>
+            <p className="text-xs text-muted uppercase font-bold">Sua Senha (Chave de Acesso)</p>
             <p className="text-xl font-mono text-amber-400">{generatedCredentials.chaveAcesso}</p>
+          </div>
+          <div className="pt-2 border-t border-soft/50">
+            <p className="text-xs text-muted">Protocolo do sistema: <span className="font-mono text-white">{generatedCredentials.protocolo}</span></p>
           </div>
         </div>
         <div className="bg-amber-500/10 p-3 rounded border border-amber-500/30 text-amber-200 text-sm text-left flex gap-2">
           <AlertTriangle className="w-5 h-5 shrink-0" />
-          <p>Guarde esses dados! Você precisará deles para consultar o andamento do seu caso.</p>
+          <p>Tire um print! Você precisará do seu CPF e desta Chave de Acesso para consultar o andamento.</p>
         </div>
         <button 
           onClick={() => { 
