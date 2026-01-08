@@ -1453,7 +1453,7 @@ export const FormularioSubmissao = () => {
               {/* Checklist e Upload */}
               {listaDeDocumentos.length > 0 && (
                 <div className="bg-surface p-4 rounded-lg border border-soft">
-                  <h3 className="heading-3 mb-3">Checklist de Documentos Necessários</h3>
+                  <h3 className="heading-3 mb-3">Lista de documentos</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
                     {listaDeDocumentos.map((doc) => (
                       <label key={doc} className="flex items-start gap-2 p-2 rounded-md cursor-pointer text-sm transition-colors hover:bg-primary/5 select-none">
@@ -1518,7 +1518,7 @@ export const FormularioSubmissao = () => {
             </p>
             <div className="flex flex-col sm:flex-row gap-3">
               <button type="button" onClick={handleChecklistReview} className="btn btn-ghost border border-soft flex-1">
-                Revisar checklist
+                Revisar lista de documentos
               </button>
               <button type="button" onClick={handleChecklistConfirm} className="btn btn-primary flex-1">
                 OK, enviar assim mesmo

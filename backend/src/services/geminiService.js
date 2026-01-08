@@ -1,5 +1,6 @@
 import { generateLegalText } from "./aiService.js";
 import dotenv from "dotenv";
+import { valueOrPlaceholder, cleanText, parseBankData, sanitizeLegalAbbreviations } from "../utils/commonUtils.js";
 
 dotenv.config();
 
@@ -107,45 +108,6 @@ export const normalizePromptData = (raw = {}) => {
   };
 };
 
-const parseBankData = (raw) => {
-  if (!raw || typeof raw !== "string") return {};
-  const text = raw.trim();
-  if (!text) return {};
-
-  const match = (pattern) => {
-    const result = text.match(pattern);
-    return result ? result[1].trim() : undefined;
-  };
-
-  return {
-    raw: text,
-    pix: match(/pix[:\-]?\s*([^\n|]+)/i),
-    banco: match(/banco[:\-]?\s*([^\n|]+)/i),
-    agencia: match(/ag[êe]ncia[:\-]?\s*([\w\-]+)/i),
-    conta: match(/conta[:\-]?\s*([\w\-]+)/i),
-  };
-};
-
-const valueOrPlaceholder = (value, fallback = PLACEHOLDER_FIELD) => {
-  if (value === undefined || value === null) return fallback;
-  const trimmed = `${value}`.trim();
-  return trimmed ? trimmed : fallback;
-};
-
-const cleanText = (value, fallback = "") => {
-  if (value === undefined || value === null) return fallback;
-  const text = String(value).trim();
-  return text.length ? text : fallback;
-};
-
-function sanitizeLegalAbbreviations(text) {
-  // 1. Remove formatações Markdown de títulos que a IA possa ter colocado
-  let cleaned = text.replace(/#+\s*Dos Fatos/gi, "").replace(/\*\*Dos Fatos\*\*/gi, "");
-  // 2. Remove o título "Dos Fatos" se estiver solto no início
-  cleaned = cleaned.replace(/^Dos Fatos\n/i, "").trim();
-  // 3. Corrige abreviação de artigo (art/ 5 -> art. 5)
-  return cleaned.replace(/\b(art)\/\s*/gi, "$1. ");
-}
 
 // --- FUNÇÕES PRINCIPAIS DE GERAÇÃO ---
 

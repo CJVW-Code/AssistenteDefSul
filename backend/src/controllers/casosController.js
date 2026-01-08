@@ -1354,7 +1354,7 @@ export const resetarChaveAcesso = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // 1. Gerar uma nova chave no padrão DPB-XXXXX-0XXXXX
+// 1. Gerar uma nova chave no padrão DPB-XXXXX-0XXXXX
     const randomPart1 = crypto.randomBytes(3).readUIntBE(0, 3) % 100000;
     const randomPart2 = crypto.randomBytes(3).readUIntBE(0, 3) % 100000;
     const novaChave = `DPB-${randomPart1

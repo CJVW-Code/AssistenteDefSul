@@ -57,7 +57,7 @@ export const ConsultaStatus = () => {
           />
           <input
             type="text"
-            placeholder="CPF do Solicitante"
+            placeholder="Informe seu CPF"
             value={cpf}
             onChange={(e) => setCpf(e.target.value)}
             required
@@ -71,7 +71,7 @@ export const ConsultaStatus = () => {
           />
           <input
             type="text"
-            placeholder="Chave de Acesso"
+            placeholder="Informe sua Chave de Acesso"
             value={chave}
             onChange={(e) => setChave(e.target.value)}
             required

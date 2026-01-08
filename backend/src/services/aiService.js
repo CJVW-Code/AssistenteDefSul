@@ -1,17 +1,13 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import Groq from "groq-sdk";
 import dotenv from "dotenv";
+import { escapeRegExp } from "../utils/commonUtils.js";
 
 dotenv.config();
 
 // Inicialização dos Clientes
 const geminiClient = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const groqClient = new Groq({ apiKey: process.env.GROQ_API_KEY });
-
-// Função auxiliar para escapar caracteres especiais em Regex (segurança)
-function escapeRegExp(string) {
-  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
 
 /**
  * SERVIÇO 1: VISÃO (OCR) - Exclusivo Gemini 2.5 Flash
