@@ -12,6 +12,7 @@ import {
   Scale,
 } from "lucide-react";
 import { API_BASE } from "../../../utils/apiBase";
+import { useToast } from "../../../contexts/ToastContext";
 
 const statusOptions = [
   { value: "recebido", label: "Recebido" },
@@ -95,12 +96,11 @@ const CollapsibleText = ({
 export const DetalhesCaso = () => {
   const { id } = useParams();
   const { token } = useAuth();
+  const { toast } = useToast();
   const [caso, setCaso] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
   const [showReview, setShowReview] = useState(false);
-  const [toast, setToast] = useState(null);
-  const [showToastModal, setShowToastModal] = useState(false);
   const [numSolar, setNumSolar] = useState("");
   const [numProcesso, setNumProcesso] = useState("");
   const [arquivoCapa, setArquivoCapa] = useState(null);
@@ -146,7 +146,7 @@ export const DetalhesCaso = () => {
       setCaso(casoAtualizado);
     } catch (error) {
       console.error(error);
-      alert(error.message);
+      toast.error(error.message);
     } finally {
       setIsUpdating(false);
     }
@@ -192,23 +192,17 @@ export const DetalhesCaso = () => {
 
       const updatedCaso = await response.json();
       setCaso(updatedCaso);
-      setToast({
-        type: "success",
-        message:
-          "Sessão dos fatos gerada com sucesso! Recarregue a página antes de baixar a nova petição.",
-      });
-      setShowToastModal(true);
+      toast.success("Sessão dos fatos gerada com sucesso! Recarregue a página.");
     } catch (error) {
       console.error(error);
-      setToast({ type: "error", message: error.message });
-      setShowToastModal(true);
+      toast.error(error.message);
     }
   };
 
   const handleFinalizarCaso = async (e) => {
     e.preventDefault();
     if (!arquivoCapa || !numSolar || !numProcesso) {
-      alert("Por favor, preencha todos os campos e anexe a capa.");
+      toast.warning("Por favor, preencha todos os campos e anexe a capa.");
       return;
     }
 
@@ -229,31 +223,18 @@ export const DetalhesCaso = () => {
 
       if (!response.ok) throw new Error("Erro ao finalizar caso.");
 
-      alert("Caso finalizado e capa enviada com sucesso!");
+      toast.success("Caso finalizado e capa enviada com sucesso!");
       // Recarrega os dados da página
       window.location.reload();
     } catch (error) {
       console.error(error);
-      alert("Erro ao finalizar: " + error.message);
+      toast.error("Erro ao finalizar: " + error.message);
     } finally {
       setEnviandoFinalizacao(false);
     }
   };
   return (
     <div className="space-y-8 pb-24">
-      {showToastModal && toast && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-          <div className="bg-surface border border-soft rounded-2xl max-w-md w-full p-6 space-y-4 text-center shadow-2xl">
-            <p className="text-sm text-muted">{toast.message}</p>
-            <button
-              className="btn btn-primary w-full"
-              onClick={() => setShowToastModal(false)}
-            >
-              OK
-            </button>
-          </div>
-        </div>
-      )}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <Link

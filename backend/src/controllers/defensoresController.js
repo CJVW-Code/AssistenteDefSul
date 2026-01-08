@@ -5,23 +5,31 @@ import { generateToken } from "../config/jwt.js";
 // --- FUNÇÃO DE CADASTRO (Atualizada com Cargo) ---
 export const registrarDefensor = async (req, res) => {
   try {
+    // --- SEGURANÇA: VERIFICAÇÃO DE ADMIN ---
+    // Garante que apenas usuários com cargo 'admin' possam criar novos usuários.
+    // O objeto 'req.user' é populado pelo authMiddleware.
+    if (!req.user || req.user.cargo !== "admin") {
+      return res
+        .status(403)
+        .json({
+          error:
+            "Acesso negado. Apenas administradores podem cadastrar novos membros.",
+        });
+    }
+    // ---------------------------------------
+
     // 1. Recebemos o 'cargo' (se não vier, assume 'operador')
     const { nome, email, senha, cargo = "operador" } = req.body;
 
-    // 2. Mantemos sua regra de negócio original (Domínio da Defensoria)
-    if (!email || !email.endsWith("@defensoria.ba.def.br")) {
-      return res.status(400).json({
-        error:
-          "Cadastro permitido apenas para emails com domínio @defensoria.ba.def.br",
-      });
-    }
-
     // 3. Validamos se o cargo é válido (Segurança extra)
-    const cargosValidos = ["admin", "operador", "recepcao"];
+    const cargosValidos = ["admin", "defensor", "estagiario", "recepcao"];
     if (!cargosValidos.includes(cargo)) {
       return res
         .status(400)
-        .json({ error: "Cargo inválido. Use: admin, operador ou recepcao." });
+        .json({
+          error:
+            "Cargo inválido. Use: admin, defensor, estagiario ou recepcao.",
+        });
     }
 
     const senha_hash = await hashPassword(senha);
@@ -108,5 +116,117 @@ export const loginDefensor = async (req, res) => {
   } catch (err) {
     console.error("Erro no login:", err);
     res.status(500).json({ error: "Falha ao fazer login." });
+  }
+};
+
+// --- LISTAR EQUIPE (Apenas Admin) ---
+export const listarDefensores = async (req, res) => {
+  try {
+    // Segurança: Apenas admin pode ver a lista completa
+    if (!req.user || req.user.cargo !== "admin") {
+      return res.status(403).json({ error: "Acesso negado." });
+    }
+
+    const { data, error } = await supabase
+      .from("defensores")
+      .select("id, nome, email, cargo, created_at")
+      .order("nome", { ascending: true });
+
+    if (error) throw error;
+
+    res.json(data);
+  } catch (err) {
+    console.error("Erro ao listar equipe:", err);
+    res.status(500).json({ error: "Erro ao buscar membros da equipe." });
+  }
+};
+
+// --- ATUALIZAR MEMBRO (Apenas Admin) ---
+export const atualizarDefensor = async (req, res) => {
+  try {
+    if (!req.user || req.user.cargo !== "admin") {
+      return res.status(403).json({ error: "Acesso negado." });
+    }
+
+    const { id } = req.params;
+    const { nome, email, cargo } = req.body;
+
+    const cargosValidos = ["admin", "defensor", "estagiario", "recepcao"];
+    if (cargo && !cargosValidos.includes(cargo)) {
+      return res.status(400).json({ error: "Cargo inválido." });
+    }
+
+    const { data, error } = await supabase
+      .from("defensores")
+      .update({ nome, email, cargo })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.json(data);
+  } catch (err) {
+    console.error("Erro ao atualizar membro:", err);
+    res.status(500).json({ error: "Erro ao atualizar dados." });
+  }
+};
+
+// --- DELETAR MEMBRO (Apenas Admin) ---
+export const deletarDefensor = async (req, res) => {
+  try {
+    if (!req.user || req.user.cargo !== "admin") {
+      return res.status(403).json({ error: "Acesso negado." });
+    }
+
+    const { id } = req.params;
+
+    // Evitar que o admin se delete
+    if (id === req.user.id) {
+      return res
+        .status(400)
+        .json({ error: "Você não pode excluir sua própria conta." });
+    }
+
+    const { error } = await supabase.from("defensores").delete().eq("id", id);
+
+    if (error) throw error;
+
+    res.json({ message: "Membro removido com sucesso." });
+  } catch (err) {
+    console.error("Erro ao deletar membro:", err);
+    res.status(500).json({ error: "Erro ao excluir usuário." });
+  }
+};
+
+// --- RESETAR SENHA (Apenas Admin) ---
+export const resetarSenhaDefensor = async (req, res) => {
+  try {
+    if (!req.user || req.user.cargo !== "admin") {
+      return res.status(403).json({ error: "Acesso negado." });
+    }
+
+    const { id } = req.params;
+    const { novaSenha } = req.body;
+
+    if (!novaSenha || novaSenha.length < 6) {
+      return res
+        .status(400)
+        .json({ error: "A nova senha deve ter pelo menos 6 caracteres." });
+    }
+
+    const senha_hash = await hashPassword(novaSenha);
+
+    const { error } = await supabase
+      .from("defensores")
+      .update({ senha_hash })
+      .eq("id", id);
+
+    if (error) throw error;
+
+    res.json({ message: "Senha alterada com sucesso." });
+  } catch (err) {
+    console.error("Erro ao resetar senha:", err);
+    res.status(500).json({ error: "Erro ao alterar senha." });
   }
 };

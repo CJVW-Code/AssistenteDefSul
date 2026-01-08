@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { Shield, LogIn, ArrowLeft } from "lucide-react";
+import { Shield, LogIn, ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { ThemeToggle } from "../../../components/ThemeToggle";
 
 export const Login = () => {
@@ -9,6 +9,7 @@ export const Login = () => {
   const [senha, setSenha] = useState("");
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const navigate = useNavigate();
   const { login } = useAuth();
@@ -78,14 +79,23 @@ export const Login = () => {
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium text-muted">Senha</label>
-              <input
-                type="password"
-                placeholder="Digite sua senha"
-                value={senha}
-                onChange={(e) => setSenha(e.target.value)}
-                required
-                className="input"
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Digite sua senha"
+                  value={senha}
+                  onChange={(e) => setSenha(e.target.value)}
+                  required
+                  className="input pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-white"
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
             </div>
             {error && <p className="alert alert-error">{error}</p>}
             <button

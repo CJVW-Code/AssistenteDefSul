@@ -18,9 +18,11 @@ export const Sidebar = () => {
   if (!auth) return null;
 
   // Lógica de Cargos
-  const userCargo = user?.cargo || "Defensor";
+  const userCargo = user?.cargo || "estagiario";
   const isAdmin = userCargo === "admin";
   const isRecepcao = userCargo === "recepcao";
+  // Defensor e Estagiário têm permissões similares de visualização
+  const isJuridico = ["admin", "defensor", "estagiario"].includes(userCargo);
 
   const isActive = (path) => {
     return location.pathname === path
@@ -63,8 +65,8 @@ export const Sidebar = () => {
         </div>
 
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-          {/* DASHBOARD (Todos menos Recepção) */}
-          {!isRecepcao && (
+          {/* DASHBOARD (Jurídico apenas) */}
+          {isJuridico && (
             <Link to="/painel" className={navLinkClass("/painel")}>
               <LayoutDashboard size={20} />
               Dashboard
@@ -72,7 +74,7 @@ export const Sidebar = () => {
           )}
 
           {/* MENU RECEPÇÃO */}
-          {isRecepcao && (
+          {(isRecepcao || isAdmin) && (
             <Link
               to="/painel/recepcao"
               className={navLinkClass("/painel/recepcao")}
@@ -82,8 +84,8 @@ export const Sidebar = () => {
             </Link>
           )}
 
-          {/* MENU CASOS (Recepção NÃO vê) */}
-          {!isRecepcao && (
+          {/* MENU CASOS (Jurídico apenas) */}
+          {isJuridico && (
             <Link to="/painel/casos" className={navLinkClass("/painel/casos")}>
               <FolderKanban size={20} />
               Casos e Triagem
@@ -92,9 +94,9 @@ export const Sidebar = () => {
 
           {/* MENU ADMIN */}
           {isAdmin && (
-            <Link
-              to="/painel/cadastro"
-              className={navLinkClass("/painel/cadastro")}
+            <Link // Alterado rota para refletir a nova página
+              to="/painel/equipe"
+              className={navLinkClass("/painel/equipe")}
             >
               <UserPlus size={20} />
               Gerenciar Equipe
@@ -117,7 +119,7 @@ export const Sidebar = () => {
       {/* --- MOBILE NAVBAR (FUNDO DA TELA - DINÂMICO) --- */}
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-surface/95 border-t border-soft backdrop-blur px-2 py-2 flex items-center justify-around z-40">
         {/* DASHBOARD MOBILE */}
-        {!isRecepcao && (
+        {isJuridico && (
           <NavLink to="/painel" end className={mobileLinkClass}>
             {({ isActive }) => (
               <>
@@ -131,7 +133,7 @@ export const Sidebar = () => {
         )}
 
         {/* RECEPÇÃO MOBILE */}
-        {isRecepcao && (
+        {(isRecepcao || isAdmin) && (
           <NavLink to="/painel/recepcao" className={mobileLinkClass}>
             {({ isActive }) => (
               <>
@@ -145,7 +147,7 @@ export const Sidebar = () => {
         )}
 
         {/* CASOS MOBILE */}
-        {!isRecepcao && (
+        {isJuridico && (
           <NavLink to="/painel/casos" className={mobileLinkClass}>
             {({ isActive }) => (
               <>
@@ -160,7 +162,7 @@ export const Sidebar = () => {
 
         {/* ADMIN MOBILE */}
         {isAdmin && (
-          <NavLink to="/painel/cadastro" className={mobileLinkClass}>
+          <NavLink to="/painel/equipe" className={mobileLinkClass}>
             {({ isActive }) => (
               <>
                 <div className={mobileIconClass(isActive)}>

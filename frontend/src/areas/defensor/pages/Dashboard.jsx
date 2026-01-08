@@ -7,6 +7,8 @@ import {
   Inbox,
   CheckCircle2,
   AlertTriangle,
+  BarChart3,
+  PieChart,
 } from "lucide-react";
 import { jwtDecode } from "jwt-decode";
 import { API_BASE } from "../../../utils/apiBase";
@@ -19,14 +21,12 @@ const statusStyles = {
   default: "bg-slate-100 text-slate-700 border-slate-200",
 };
 
-const normalizeStatus = (status) =>
-  (status || "recebido").toLowerCase().trim();
+const normalizeStatus = (status) => (status || "recebido").toLowerCase().trim();
 
 const summaryFilters = {
   ativos: (caso) => normalizeStatus(caso.status) !== "finalizado",
   em_analise: (caso) => normalizeStatus(caso.status) === "em_analise",
-  aguardando_docs: (caso) =>
-    normalizeStatus(caso.status) === "aguardando_docs",
+  aguardando_docs: (caso) => normalizeStatus(caso.status) === "aguardando_docs",
   finalizado: (caso) => normalizeStatus(caso.status) === "finalizado",
 };
 
@@ -87,6 +87,33 @@ export const Dashboard = () => {
     return { total, finalizados, aguardandoDocs, emAnalise, ativos };
   }, [casos]);
 
+  // --- ESTATÍSTICAS DO SISTEMA (Novo) ---
+  const stats = useMemo(() => {
+    if (!casos.length) return null;
+
+    // 1. Tipos de Ação mais comuns
+    const tipos = {};
+    casos.forEach((c) => {
+      const tipo = c.tipo_acao || "Outros";
+      tipos[tipo] = (tipos[tipo] || 0) + 1;
+    });
+    const topTipos = Object.entries(tipos)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 3);
+
+    // 2. Representação (Filhos vs Próprio)
+    const representacao = { proprio: 0, representacao: 0 };
+    casos.forEach((c) => {
+      // Lógica baseada em campos do formulário (se disponível no objeto caso)
+      // Assumindo que o backend retorna 'dados_formulario' ou similar
+      if (c.dados_formulario?.assistidoEhIncapaz === "sim")
+        representacao.representacao++;
+      else representacao.proprio++;
+    });
+
+    return { topTipos, representacao };
+  }, [casos]);
+
   const filteredCasos = useMemo(() => {
     if (!statusFilter || !summaryFilters[statusFilter]) {
       return casos;
@@ -145,9 +172,9 @@ export const Dashboard = () => {
               Olá, Dr(a). {defensor?.nome || "Defensor"}
             </h1>
             <p className="text-white/80 max-w-2xl mt-2">
-              Acompanhe os casos recebidos pelo Assistente Def Sul,
-              identifique pendências de documentos e avance nos atendimentos
-              com conforto visual inspirado pelo nosso novo design system.
+              Acompanhe os casos recebidos pelo Assistente Def Sul, identifique
+              pendências de documentos e avance nos atendimentos com conforto
+              visual inspirado pelo nosso novo design system.
             </p>
           </div>
           <Link
@@ -232,6 +259,74 @@ export const Dashboard = () => {
         })}
       </section>
 
+      {/* --- SEÇÃO DE INTELIGÊNCIA DE DADOS --- */}
+      {/* Exibe apenas para ADMIN */}
+      {stats && defensor?.cargo === "admin" && (
+        <section className="grid gap-6 md:grid-cols-2">
+          <div className="card space-y-4 hover:scale-[1.02] transition-transform duration-300 cursor-default border-l-4 border-l-primary">
+            <div className="flex items-center gap-2 text-primary">
+              <BarChart3 size={20} />
+              <h3 className="font-bold uppercase tracking-wider text-xs">
+                Demandas Recorrentes
+              </h3>
+            </div>
+            <div className="space-y-3">
+              {stats.topTipos.map(([tipo, qtd], idx) => (
+                <div key={tipo} className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="font-mono text-muted text-sm">
+                      0{idx + 1}
+                    </span>
+                    <span className="font-medium">{tipo}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-24 h-2 bg-soft rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-primary"
+                        style={{ width: `${(qtd / resumo.total) * 100}%` }}
+                      ></div>
+                    </div>
+                    <span className="text-sm text-muted">{qtd}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="card space-y-4 hover:scale-[1.02] transition-transform duration-300 cursor-default border-l-4 border-l-purple-500">
+            <div className="flex items-center gap-2 text-purple-400">
+              <PieChart size={20} />
+              <h3 className="font-bold uppercase tracking-wider text-xs">
+                Perfil do Atendimento
+              </h3>
+            </div>
+            <div className="flex items-center justify-center h-full gap-8">
+              <div className="text-center">
+                <p className="text-3xl font-bold text-white">
+                  {stats.representacao.representacao}
+                </p>
+                <p className="text-xs text-muted uppercase mt-1">
+                  Representando
+                  <br />
+                  Menores
+                </p>
+              </div>
+              <div className="w-px h-12 bg-soft"></div>
+              <div className="text-center">
+                <p className="text-3xl font-bold text-white">
+                  {stats.representacao.proprio}
+                </p>
+                <p className="text-xs text-muted uppercase mt-1">
+                  Em causa
+                  <br />
+                  própria
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       <section className="card p-0 overflow-hidden">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between border-b border-soft px-6 py-4">
           <div>
@@ -291,10 +386,13 @@ export const Dashboard = () => {
                         </span>
                         <div className="flex items-center gap-2 text-sm text-muted">
                           <Clock size={16} />
-                          {new Date(caso.created_at).toLocaleDateString("pt-BR", {
-                            day: "2-digit",
-                            month: "short",
-                          })}
+                          {new Date(caso.created_at).toLocaleDateString(
+                            "pt-BR",
+                            {
+                              day: "2-digit",
+                              month: "short",
+                            }
+                          )}
                         </div>
                       </div>
                     </div>

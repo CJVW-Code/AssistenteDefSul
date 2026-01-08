@@ -1,4 +1,4 @@
-﻿import React, { useState } from "react";
+﻿﻿import React, { useState } from "react";
 import { motion } from "framer-motion";
 import {
   Search,
@@ -7,14 +7,14 @@ import {
   CheckCircle,
   FileText,
   Clock,
+  HelpCircle,
 } from "lucide-react";
 import { API_BASE } from "../../../utils/apiBase";
 
 export const ConsultaStatus = () => {
-  // 1. CORREÇÃO: O estado deve se chamar 'caso' para guardar o objeto todo
-  const [protocolo, setProtocolo] = useState("");
+  const [cpf, setCpf] = useState("");
   const [chave, setChave] = useState("");
-  const [caso, setCaso] = useState(null); // <--- Mudamos de 'status' para 'caso'
+  const [caso, setCaso] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -24,9 +24,10 @@ export const ConsultaStatus = () => {
     setCaso(null); // Limpa a busca anterior
     setError(null);
 
+    const cpfLimpo = cpf.replace(/\D/g, "");
     try {
       const response = await fetch(
-        `${API_BASE}/status?protocolo=${protocolo}&chave=${chave}`
+        `${API_BASE}/status?cpf=${cpfLimpo}&chave=${chave}`
       );
       const data = await response.json();
 
@@ -34,7 +35,6 @@ export const ConsultaStatus = () => {
         throw new Error(data.error || "Não foi possível consultar o status.");
       }
 
-      // 2. CORREÇÃO: Salvamos o objeto inteiro (status + numero_processo + url)
       setCaso(data);
     } catch (err) {
       setError(err.message);
@@ -57,9 +57,9 @@ export const ConsultaStatus = () => {
           />
           <input
             type="text"
-            placeholder="Protocolo"
-            value={protocolo}
-            onChange={(e) => setProtocolo(e.target.value)}
+            placeholder="CPF do Solicitante"
+            value={cpf}
+            onChange={(e) => setCpf(e.target.value)}
             required
             className="w-full pl-10 pr-4 py-3 bg-app rounded-lg border border-soft focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all text-white"
           />
@@ -79,6 +79,15 @@ export const ConsultaStatus = () => {
           />
         </div>
 
+        {/* MENSAGEM DE AJUDA DA CHAVE */}
+        <div className="flex items-start gap-2 text-xs text-muted bg-surface p-3 rounded border border-soft">
+          <HelpCircle size={16} className="shrink-0 mt-0.5 text-primary" />
+          <p>
+            Esqueceu a chave? Compareça a uma unidade da defensoria para resetar
+            apresentando documentos para comprovação da identidade.
+          </p>
+        </div>
+
         <button
           type="submit"
           disabled={loading}
@@ -95,7 +104,6 @@ export const ConsultaStatus = () => {
         </div>
       )}
 
-      {/* 3. CORREÇÃO: Verificação de segurança (caso &&) para não quebrar a tela */}
       {caso && (
         <>
           {caso.status === "encaminhado_solar" ? (
@@ -115,39 +123,54 @@ export const ConsultaStatus = () => {
                 gerado. Abaixo estão os dados do seu processo judicial.
               </p>
 
-              {/* EXIBIÇÃO DO NÚMERO DO PROCESSO */}
-              <div className="bg-surface border border-soft p-4 rounded-lg mb-4">
-                <label className="text-xs text-muted uppercase font-bold tracking-wider">
-                  Número do Processo
-                </label>
-                <div className="flex items-center justify-between mt-1">
-                  <span className="text-2xl font-mono text-white select-all">
-                    {caso.numero_processo || "Número indisponível"}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      navigator.clipboard.writeText(caso.numero_processo)
-                    }
-                    className="text-primary hover:text-white text-sm"
-                  >
-                    Copiar
-                  </button>
+              {/* EXIBIÇÃO DOS NÚMEROS */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div className="bg-surface border border-soft p-4 rounded-lg">
+                  <label className="text-xs text-muted uppercase font-bold tracking-wider">
+                    Número do Processo
+                  </label>
+                  <div className="flex items-center justify-between mt-1">
+                    <span className="text-2xl font-mono text-white select-all">
+                      {caso.numero_processo || "Número indisponível"}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        navigator.clipboard.writeText(caso.numero_processo)
+                      }
+                      className="text-primary hover:text-white text-sm"
+                    >
+                      Copiar
+                    </button>
+                  </div>
+                </div>
+
+                <div className="bg-surface border border-soft p-4 rounded-lg">
+                  <label className="text-xs text-muted uppercase font-bold tracking-wider">
+                    Atendimento Solar
+                  </label>
+                  <div className="mt-1">
+                    <span className="text-xl font-mono text-white select-all">
+                      {caso.numero_solar || "N/A"}
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              {/* BOTÃO DA CAPA PROCESSUAL */}
-              {caso.url_capa_processual && (
-                <a
-                  href={caso.url_capa_processual}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn btn-primary w-full flex items-center justify-center gap-2 py-3"
-                >
-                  <FileText size={20} />
-                  Baixar Capa do Processo (PDF)
-                </a>
-              )}
+              {/* BOTÕES DE DOWNLOAD */}
+              <div className="space-y-3">
+                {caso.url_capa_processual && (
+                  <a
+                    href={caso.url_capa_processual}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn btn-ghost border border-soft w-full flex items-center justify-center gap-2 py-3 hover:bg-surface"
+                  >
+                    <FileText size={20} />
+                    Baixar Capa do Processo
+                  </a>
+                )}
+              </div>
             </div>
           ) : (
             // --- TELA DE STATUS NORMAL (EM ANÁLISE) ---

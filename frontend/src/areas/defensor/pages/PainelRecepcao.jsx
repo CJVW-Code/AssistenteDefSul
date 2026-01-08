@@ -2,9 +2,13 @@ import React, { useState } from "react";
 import { Search, RotateCcw, CheckCircle } from "lucide-react";
 import { API_BASE } from "../../../utils/apiBase";
 import { useAuth } from "../contexts/AuthContext";
+import { useToast } from "../../../contexts/ToastContext";
+import { useConfirm } from "../../../contexts/ConfirmContext";
 
 export const PainelRecepcao = () => {
   const { token } = useAuth();
+  const { toast } = useToast();
+  const { confirm } = useConfirm();
   const [cpfBusca, setCpfBusca] = useState("");
   const [casosEncontrados, setCasosEncontrados] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -19,7 +23,8 @@ export const PainelRecepcao = () => {
     try {
       const cpfLimpo = cpfBusca.replace(/\D/g, "");
       const response = await fetch(
-        `${API_BASE}/casos/buscar-cpf?cpf=${cpfLimpo}`,
+        // Alterado para evitar conflito com rota /casos/:id no backend
+        `${API_BASE}/casos?cpf=${cpfLimpo}&exact=true`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -27,10 +32,10 @@ export const PainelRecepcao = () => {
 
       const data = await response.json();
       setCasosEncontrados(data);
-      if (data.length === 0) alert("Nenhum caso encontrado para este CPF.");
+      if (data.length === 0) toast.info("Nenhum caso encontrado para este CPF.");
     } catch (error) {
       console.error(error);
-      alert("Erro ao buscar.");
+      toast.error("Erro ao buscar.");
     } finally {
       setLoading(false);
     }
@@ -38,11 +43,13 @@ export const PainelRecepcao = () => {
 
   const handleResetarChave = async (casoId) => {
     if (
-      !window.confirm(
-        "Tem certeza? A chave antiga deixará de funcionar imediatamente."
-      )
-    )
+      !(await confirm(
+        "A chave antiga deixará de funcionar imediatamente.",
+        "Resetar Chave de Acesso?"
+      ))
+    ) {
       return;
+    }
 
     try {
       const response = await fetch(
@@ -58,11 +65,11 @@ export const PainelRecepcao = () => {
       if (response.ok) {
         setNovaChaveInfo(data.novaChave);
       } else {
-        alert("Erro: " + data.error);
+        toast.error("Erro: " + data.error);
       }
     } catch (error) {
       console.error(error);
-      alert("Erro ao conectar ao servidor.");
+      toast.error("Erro ao conectar ao servidor.");
     }
   };
 

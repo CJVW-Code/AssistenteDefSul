@@ -3,6 +3,12 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 // Importando Contextos
 import { AuthProvider, useAuth } from "./areas/defensor/contexts/AuthContext";
+import { ToastProvider } from "./contexts/ToastContext";
+import { ConfirmProvider } from "./contexts/ConfirmContext";
+
+// Importando Componentes UI Globais
+import { ToastContainer } from "./components/ui/ToastContainer";
+import { ConfirmModal } from "./components/ui/ConfirmModal";
 
 // Importando Layouts e Páginas
 import { LayoutCidadao } from "./areas/cidadao/pages/LayoutCidadao";
@@ -16,6 +22,7 @@ import { Dashboard } from "./areas/defensor/pages/Dashboard";
 import { Casos } from "./areas/defensor/pages/Casos";
 import { DetalhesCaso } from "./areas/defensor/pages/DetalhesCaso";
 import { PainelRecepcao } from "./areas/defensor/pages/PainelRecepcao";
+import { GerenciarEquipe } from "./areas/defensor/pages/GerenciarEquipe";
 
 // --- COMPONENTES DE SEGURANÇA ---
 
@@ -50,52 +57,93 @@ const AdminRoute = ({ children }) => {
   return children;
 };
 
+// 3. Protege rotas da RECEPÇÃO (Admin também acessa) 🔍
+const RecepcaoRoute = ({ children }) => {
+  const { user, loading } = useAuth();
+
+  if (loading) return null;
+
+  // Se não for recepção nem admin, bloqueia
+  if (user?.cargo !== "recepcao" && user?.cargo !== "admin") {
+    return <Navigate to="/painel" />;
+  }
+
+  return children;
+};
+
 function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <Routes>
-          {/* GRUPO DE ROTAS DO CIDADÃO */}
-          <Route element={<LayoutCidadao />}>
-            <Route path="/" element={<PaginaInicialCidadao />} />
-          </Route>
+        <ToastProvider>
+          <ConfirmProvider>
+            {/* Componentes Globais de UI */}
+            <ToastContainer />
+            <ConfirmModal />
 
-          {/* ROTA DE LOGIN DO DEFENSOR (Pública) */}
-          <Route path="/painel/login" element={<Login />} />
+            <Routes>
+              {/* GRUPO DE ROTAS DO CIDADÃO */}
+              <Route element={<LayoutCidadao />}>
+                <Route path="/" element={<PaginaInicialCidadao />} />
+              </Route>
 
-          {/* --- ÁREA RESTRITA (PROTEGIDA) --- */}
-          {/* Envolvemos o Layout com o ProtectedRoute */}
-          <Route
-            path="/painel"
-            element={
-              <ProtectedRoute>
-                <Layout />
-              </ProtectedRoute>
-            }
-          >
-            {/* Rota Padrão (Dashboard) */}
-            <Route index element={<Dashboard />} />
+              {/* ROTA DE LOGIN DO DEFENSOR (Pública) */}
+              <Route path="/painel/login" element={<Login />} />
 
-            {/* Rotas Comuns */}
-            <Route path="casos" element={<Casos />} />
-            <Route path="casos/:id" element={<DetalhesCaso />} />
-            <Route path="recepcao" element={<PainelRecepcao />} />
+              {/* --- ÁREA RESTRITA (PROTEGIDA) --- */}
+              {/* Envolvemos o Layout com o ProtectedRoute */}
+              <Route
+                path="/painel"
+                element={
+                  <ProtectedRoute>
+                    <Layout />
+                  </ProtectedRoute>
+                }
+              >
+                {/* Rota Padrão (Dashboard) */}
+                <Route index element={<Dashboard />} />
 
-            {/* --- ROTA BLINDADA DO ADMIN (CADASTRO) --- */}
-            {/* Só o Admin entra aqui */}
-            <Route
-              path="cadastro"
-              element={
-                <AdminRoute>
-                  <Cadastro />
-                </AdminRoute>
-              }
-            />
-          </Route>
+                {/* Rotas Comuns */}
+                <Route path="casos" element={<Casos />} />
+                <Route path="casos/:id" element={<DetalhesCaso />} />
 
-          {/* Redirecionamento para evitar erros 404 */}
-          <Route path="*" element={<Navigate to="/" />} />
-        </Routes>
+                {/* Rota Protegida da Recepção */}
+                <Route
+                  path="recepcao"
+                  element={
+                    <RecepcaoRoute>
+                      <PainelRecepcao />
+                    </RecepcaoRoute>
+                  }
+                />
+
+                {/* Rota de Gestão de Equipe (Admin) */}
+                <Route
+                  path="equipe"
+                  element={
+                    <AdminRoute>
+                      <GerenciarEquipe />
+                    </AdminRoute>
+                  }
+                />
+
+                {/* --- ROTA BLINDADA DO ADMIN (CADASTRO) --- */}
+                {/* Só o Admin entra aqui */}
+                <Route
+                  path="cadastro"
+                  element={
+                    <AdminRoute>
+                      <Cadastro />
+                    </AdminRoute>
+                  }
+                />
+              </Route>
+
+              {/* Redirecionamento para evitar erros 404 */}
+              <Route path="*" element={<Navigate to="/" />} />
+            </Routes>
+          </ConfirmProvider>
+        </ToastProvider>
       </AuthProvider>
     </BrowserRouter>
   );

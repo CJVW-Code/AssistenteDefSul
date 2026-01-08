@@ -1,4 +1,5 @@
 ﻿import { supabase } from "../config/supabase.js";
+import crypto from "crypto";
 import mammoth from "mammoth";
 import {
   generateCredentials,
@@ -219,7 +220,12 @@ const buildSignedUrl = async (bucket, storedValue) => {
     .createSignedUrl(objectPath, signedExpires);
 
   if (error) {
-    console.error(`Falha ao gerar signed URL para ${objectPath}:`, error);
+    // Diferencia erro de arquivo inexistente (comum em uploads falhos antigos) de outros erros
+    if (error.message && error.message.includes("Object not found")) {
+      console.warn(`[Storage] Arquivo ausente (Link órfão no Banco): ${objectPath}`);
+    } else {
+      console.warn(`[Storage] Erro ao gerar URL para ${objectPath}:`, error);
+    }
     return null;
   }
 
@@ -841,27 +847,45 @@ export const criarNovoCaso = async (req, res) => {
       if (req.files.audio) {
         const audioFile = req.files.audio[0];
         const filePath = `${protocolo}/${audioFile.filename}`;
-        await supabase.storage
+        const { error: audioErr } = await supabase.storage
           .from("audios")
           .upload(filePath, await fs.readFile(audioFile.path), {
             contentType: audioFile.mimetype,
           });
-        url_audio = filePath;
+        
+        if (audioErr) {
+          console.error("Erro ao fazer upload do áudio:", audioErr);
+          avisos.push("Não foi possível salvar o áudio no armazenamento.");
+        } else {
+          url_audio = filePath;
+        }
       }
       if (req.files.documentos) {
         for (const docFile of req.files.documentos) {
           const filePath = `${protocolo}/${docFile.filename}`;
           const fileData = await fs.readFile(docFile.path);
           if (docFile.originalname.toLowerCase().includes("peticao")) {
-            await supabase.storage
+            const { error: petErr } = await supabase.storage
               .from("peticoes")
               .upload(filePath, fileData, { contentType: docFile.mimetype });
-            url_peticao = filePath;
+            
+            if (petErr) {
+              console.error("Erro ao fazer upload da petição:", petErr);
+              avisos.push(`Erro ao salvar petição: ${docFile.originalname}`);
+            } else {
+              url_peticao = filePath;
+            }
           } else {
-            await supabase.storage
+            const { error: docErr } = await supabase.storage
               .from("documentos")
               .upload(filePath, fileData, { contentType: docFile.mimetype });
-            urls_documentos.push(filePath);
+            
+            if (docErr) {
+              console.error("Erro ao fazer upload do documento:", docErr);
+              avisos.push(`Erro ao salvar documento: ${docFile.originalname}`);
+            } else {
+              urls_documentos.push(filePath);
+            }
           }
         }
       }
@@ -1175,7 +1199,7 @@ export const regenerarDosFatos = async (req, res) => {
 // --- FUNÇÃO PARA LISTAR TODOS OS CASOS ---
 export const listarCasos = async (req, res) => {
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from("casos")
       .select(
         `
@@ -1191,6 +1215,18 @@ export const listarCasos = async (req, res) => {
       `
       )
       .order("created_at", { ascending: false });
+
+    // --- FILTRO POR CPF (Correção para Recepção) ---
+    // Se vier ?cpf=123 na URL, filtramos apenas esse assistido
+    if (req.query.cpf) {
+      const cpfLimpo = req.query.cpf.replace(/\D/g, "");
+      if (cpfLimpo) {
+        query = query.eq("cpf_assistido", cpfLimpo);
+      }
+    }
+
+    const { data, error } = await query;
+
     if (error) throw error;
     const casosComLinks = await Promise.all(
       (data || []).map((caso) => attachSignedUrls(caso))
@@ -1318,14 +1354,16 @@ export const resetarChaveAcesso = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // 1. Gerar uma nova chave aleatória simples (ex: "ABC-1234")
-    // Dica: Usamos chars maiúsculos e números para facilitar leitura
-    const novaChave = Math.random().toString(36).slice(2, 8).toUpperCase();
+    // 1. Gerar uma nova chave no padrão DPB-XXXXX-0XXXXX
+    const randomPart1 = crypto.randomBytes(3).readUIntBE(0, 3) % 100000;
+    const randomPart2 = crypto.randomBytes(3).readUIntBE(0, 3) % 100000;
+    const novaChave = `DPB-${randomPart1
+      .toString()
+      .padStart(5, "0")}-0${randomPart2.toString().padStart(5, "0")}`;
 
-    // 2. Hash da senha (igual fazemos no cadastro)
-    // Importe a função 'hashPassword' do securityService no topo do arquivo se não tiver
-    // Se não tiver importado, adicione: import { hashPassword } from "../services/securityService.js";
-    const chave_hash = await hashPassword(novaChave);
+    // 2. Hash da senha usando hashKeyWithSalt (mesmo do cadastro)
+    // Isso garante compatibilidade com o verifyKey do statusController
+    const chave_hash = hashKeyWithSalt(novaChave);
 
     // 3. Atualizar no Banco
     const { error } = await supabase
