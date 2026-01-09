@@ -27,7 +27,7 @@ export const ConsultaStatus = () => {
     const cpfLimpo = cpf.replace(/\D/g, "");
     try {
       const response = await fetch(
-        `${API_BASE}/api/status?cpf=${cpfLimpo}&chave=${chave}`
+        `${API_BASE}/status?cpf=${cpfLimpo}&chave=${chave}`
       );
       const data = await response.json();
 
