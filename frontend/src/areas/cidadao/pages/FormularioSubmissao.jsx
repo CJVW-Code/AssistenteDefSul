@@ -564,8 +564,8 @@ export const FormularioSubmissao = () => {
       assistidoNacionalidade: "assistido_nacionalidade",
       assistidoEstadoCivil: "assistido_estado_civil",
       dataNascimentoAssistido: "assistido_data_nascimento",
-      assistidoRgNumero: "assistido_RgNumero",
-      assistidoRgOrgao: "assistido_RgOrgao",
+      assistidoRgNumero: "assistido_rg_numero",
+      assistidoRgOrgao: "assistido_rg_orgao",
 
       // Representante
       representanteNome: "representante_nome",
