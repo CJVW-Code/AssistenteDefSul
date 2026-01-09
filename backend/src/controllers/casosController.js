@@ -847,7 +847,7 @@ export const criarNovoCaso = async (req, res) => {
     const formattedDiaPagamentoFixado = formatDateBr(dia_pagamento_fixado);
     const formattedValorPensao = formatCurrencyBr(valor_mensal_pensao);
     const formattedValorTotalDebitoExecucao = formatCurrencyBr(
-      valor_total_debito_execucao
+      dados_formulario.valor_total_debito_execucao
     );
     const percentualSalarioMinimoCalculado =
       calcularPercentualSalarioMinimo(valor_mensal_pensao);
@@ -999,5 +999,172 @@ export const criarNovoCaso = async (req, res) => {
   }
 };
 
-// Resto do arquivo (regenerarDosFatos, listarCasos, etc.) permanece igual
-// ... (código existente)    if (req.files) {
+export const listarCasos = async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("casos")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    res.status(200).json(data);
+  } catch (error) {
+    console.error("Erro ao listar casos:", error);
+    res.status(500).json({ error: "Erro ao listar casos." });
+  }
+};
+
+export const obterDetalhesCaso = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const { data, error } = await supabase
+      .from("casos")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (error) throw error;
+    if (!data) return res.status(404).json({ error: "Caso não encontrado." });
+
+    const casoComUrls = await attachSignedUrls(data);
+    res.status(200).json(casoComUrls);
+  } catch (error) {
+    console.error("Erro ao obter caso:", error);
+    res.status(500).json({ error: "Erro ao obter detalhes do caso." });
+  }
+};
+
+export const atualizarStatusCaso = async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+
+  try {
+    const { data, error } = await supabase
+      .from("casos")
+      .update({ status })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.status(200).json(data);
+  } catch (error) {
+    console.error("Erro ao atualizar status:", error);
+    res.status(500).json({ error: "Erro ao atualizar status." });
+  }
+};
+
+export const regenerarDosFatos = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const { data: caso, error } = await supabase
+      .from("casos")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (error || !caso) throw new Error("Caso não encontrado");
+
+    const dados = caso.dados_formulario || caso;
+    if (!dados.relato_texto && caso.relato_texto) {
+      dados.relato_texto = caso.relato_texto;
+    }
+
+    const dosFatosTexto = await generateDosFatos(dados);
+
+    const { error: updateError } = await supabase
+      .from("casos")
+      .update({ peticao_inicial_rascunho: `DOS FATOS\n\n${dosFatosTexto}` })
+      .eq("id", id);
+
+    if (updateError) throw updateError;
+
+    res.json({ message: "Texto regenerado", texto: dosFatosTexto });
+  } catch (error) {
+    console.error("Erro ao regenerar:", error);
+    res.status(500).json({ error: "Falha ao regenerar texto." });
+  }
+};
+
+export const buscarPorCpf = async (req, res) => {
+  const cpf = req.params.cpf || req.query.cpf;
+
+  try {
+    const { data, error } = await supabase
+      .from("casos")
+      .select("*")
+      .eq("cpf_assistido", cpf);
+
+    if (error) throw error;
+
+    res.status(200).json(data);
+  } catch (error) {
+    console.error("Erro ao buscar por CPF:", error);
+    res.status(500).json({ error: "Erro ao buscar casos por CPF." });
+  }
+};
+
+export const finalizarCasoSolar = async (req, res) => {
+  const { id } = req.params;
+  const { numero_solar } = req.body;
+  let url_capa_processual = null;
+
+  try {
+    if (req.file) {
+      const file = req.file;
+      const filePath = `capas/${id}_${Date.now()}_${file.originalname}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from(storageBuckets.documentos)
+        .upload(filePath, await fs.readFile(file.path), {
+          contentType: file.mimetype,
+        });
+
+      if (uploadError) throw uploadError;
+      url_capa_processual = filePath;
+
+      // Remove arquivo temporário
+      await fs.unlink(file.path);
+    }
+
+    const { data, error } = await supabase
+      .from("casos")
+      .update({
+        status: "finalizado",
+        numero_solar,
+        url_capa_processual,
+        finalizado_em: new Date(),
+      })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.status(200).json(data);
+  } catch (error) {
+    console.error("Erro ao finalizar caso:", error);
+    res.status(500).json({ error: "Erro ao finalizar caso." });
+  }
+};
+
+export const resetarChaveAcesso = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const { data: caso } = await supabase.from("casos").select("tipo_acao").eq("id", id).single();
+    if (!caso) throw new Error("Caso não encontrado");
+
+    const { chaveAcesso } = generateCredentials(caso.tipo_acao);
+    const chaveAcessoHash = hashKeyWithSalt(chaveAcesso);
+
+    const { error } = await supabase.from("casos").update({ chave_acesso_hash: chaveAcessoHash }).eq("id", id);
+    if (error) throw error;
+
+    res.status(200).json({ novaChave: chaveAcesso });
+  } catch (error) {
+    console.error("Erro ao resetar chave:", error);
+    res.status(500).json({ error: "Erro ao resetar chave." });
+  }
+};
