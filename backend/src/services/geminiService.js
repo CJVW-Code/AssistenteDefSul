@@ -172,8 +172,14 @@ export const analyzeCase = async (fullText) => {
     // Resumo para painel interno tem menor risco, mas passa pelo orquestrador para velocidade (Groq)
     return await generateLegalText(systemPrompt, userPrompt, 0.3);
   } catch (error) {
-    console.error("Erro na análise do caso:", error);
-    throw new Error("Falha ao gerar o resumo do caso.");
+    console.error("❌ Erro na análise do caso:", error.message);
+    // Melhor tratamento de erros com mensagens mais específicas
+    if (error.message.includes("Timeout")) {
+      console.warn("⏱️  Análise do caso atingiu timeout. Continuando sem resumo automático.");
+      return null;
+    } else {
+      throw new Error("Falha ao gerar o resumo do caso: " + error.message);
+    }
   }
 };
 
@@ -276,11 +282,19 @@ Adapte o texto se o relato informal contradizer o modelo padrão (ex: pai já pa
 
     // Chamada Segura: Envia o mapa PII para sanitização automática no aiService
     const textoGerado = await generateLegalText(systemPrompt, userPrompt, 0.3, piiMap);
-    
     return sanitizeLegalAbbreviations(textoGerado.trim());
-
   } catch (error) {
-    console.error("Erro ao gerar a seção 'Dos Fatos':", error);
-    throw new Error("Falha ao gerar a seção 'Dos Fatos' com a IA.");
+    console.error("❌ Erro ao gerar a seção 'Dos Fatos' com IA:", error.message);
+
+    // Melhor tratamento de erros com fallback automático
+    if (error.message.includes("Timeout")) {
+      console.warn("⏱️  Geração dos Fatos atingiu timeout. Usando fallback local...");
+      // Usa o fallback local em vez de falhar completamente
+      return buildFallbackDosFatos(caseData);
+    } else {
+      console.error("🔄 Ativando fallback devido a erro na IA:", error.message);
+      // Para outros erros, também usa fallback em vez de falhar
+      return buildFallbackDosFatos(caseData);
+    }
   }
 };

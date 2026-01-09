@@ -17,14 +17,14 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Rota Defensores
-app.use("/api/defensores", defensoresRoutes);
+app.use("/defensores", defensoresRoutes);
 
 // Rota principal de casos
-app.use("/api/casos", casosRoutes);
+app.use("/casos", casosRoutes);
 
 // Rota para consultar status
-app.use("/api/status", statusRoutes);
-app.use("/api/debug", debugRoutes);
+app.use("/status", statusRoutes);
+app.use("/debug", debugRoutes);
 
 // Rota de "saúde" do sistema
 app.get("/health", (req, res) => {

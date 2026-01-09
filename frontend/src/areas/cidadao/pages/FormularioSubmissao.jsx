@@ -218,13 +218,16 @@ const formatPhone = (value = "") => {
 };
 
 const formatRgNumber = (value = "") => {
-  const digits = stripNonDigits(value).slice(0, 9);
+  const digits = stripNonDigits(value).slice(0, 11);
   if (digits.length <= 2) return digits;
   if (digits.length <= 5) return `${digits.slice(0, 2)}.${digits.slice(2)}`;
   if (digits.length <= 8) {
     return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5)}`;
   }
-  return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}-${digits.slice(8)}`;
+  if (digits.length <= 10) {
+    return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}-${digits.slice(8)}`;
+  }
+  return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}.${digits.slice(8, 10)}-${digits.slice(10)}`;
 };
 
 const formatCurrencyMask = (value = "") => {
@@ -1453,7 +1456,7 @@ export const FormularioSubmissao = () => {
               {/* Checklist e Upload */}
               {listaDeDocumentos.length > 0 && (
                 <div className="bg-surface p-4 rounded-lg border border-soft">
-                  <h3 className="heading-3 mb-3">Checklist de Documentos Necessários</h3>
+                  <h3 className="heading-3 mb-3">Lista de Documentos Necessários</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
                     {listaDeDocumentos.map((doc) => (
                       <label key={doc} className="flex items-start gap-2 p-2 rounded-md cursor-pointer text-sm transition-colors hover:bg-primary/5 select-none">

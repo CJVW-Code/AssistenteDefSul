@@ -34,7 +34,7 @@ export const LayoutCidadao = () => {
           </p>
           <p className="text-muted max-w-2xl mx-auto">
             Nosso serviço é totalmente gratuito, garantindo seu acesso à justiça
-            de forma gratuita comforme o Art.5º da constituição Federal.
+            de forma gratuita conforme o Art.5º da constituição Federal.
           </p>
         </header>
         <Outlet />{" "}

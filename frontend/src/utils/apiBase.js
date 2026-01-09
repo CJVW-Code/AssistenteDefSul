@@ -12,12 +12,12 @@ export function getApiBase() {
   if (typeof window !== 'undefined' && window.location && window.location.origin) {
     const origin = window.location.origin;
     if (/localhost|127\.0\.0\.1/.test(origin)) {
-      return 'http://localhost:8001/api';
+      return 'http://localhost:8001';
     }
-    return origin.replace(/\/$/, '') + '/api';
+    return origin.replace(/\/$/, '');
   }
 
-  return 'http://localhost:8001/api';
+  return 'http://localhost:8001';
 }
 
 export const API_BASE = getApiBase();

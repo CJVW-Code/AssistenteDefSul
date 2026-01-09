@@ -1,6 +1,9 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAI } from "@google-generative-ai";
 import Groq from "groq-sdk";
 import dotenv from "dotenv";
+
+// Configuração de timeout para chamadas de IA (em milissegundos)
+const IA_TIMEOUT_MS = 30000; // 30 segundos
 
 dotenv.config();
 
@@ -83,12 +86,21 @@ export const generateLegalText = async (systemPrompt, userPrompt, temperature = 
   console.log("---------------------------------------------------\n");
   let generatedText = "";
 
-  // --- ETAPA 2: CHAMADA À IA (Com texto anonimizado) ---
-  
+  // --- ETAPA 2: CHAMADA À IA (Com texto anonimizado e timeout) ---
+
+  // Função para criar uma Promise de timeout
+  const createTimeoutPromise = (timeoutMs, errorMessage) => {
+    return new Promise((_, reject) => {
+      setTimeout(() => {
+        reject(new Error(errorMessage));
+      }, timeoutMs);
+    });
+  };
+
   try {
     // TENTATIVA 1: Groq (Llama 3.3) - Prioridade: Velocidade
     try {
-      const completion = await groqClient.chat.completions.create({
+      const groqPromise = groqClient.chat.completions.create({
         messages: [
           { role: "system", content: safeSystemPrompt },
           { role: "user", content: safeUserPrompt },
@@ -97,23 +109,44 @@ export const generateLegalText = async (systemPrompt, userPrompt, temperature = 
         temperature: temperature,
         max_tokens: 4096,
       });
+
+      // Adiciona timeout à chamada Groq
+      const groqWithTimeout = Promise.race([
+        groqPromise,
+        createTimeoutPromise(IA_TIMEOUT_MS, "Timeout: Chamada Groq excedeu o limite de tempo")
+      ]);
+
+      const completion = await groqWithTimeout;
       generatedText = completion.choices[0]?.message?.content || "";
-      
+
     } catch (groqError) {
       console.warn("⚠️ Groq instável ou Rate Limit. Ativando Fallback para Gemini...", groqError.message);
-      
+
       // TENTATIVA 2: Gemini 2.5 Flash (Fallback: Segurança)
-      const model = geminiClient.getGenerativeModel({ model: "gemini-2.5-flash" });
-      
-      // Gemini não usa roles separados, concatenamos
-      const fullPrompt = `${safeSystemPrompt}\n\n--- INSTRUÇÃO DO USUÁRIO ---\n${safeUserPrompt}`;
-      
-      const result = await model.generateContent(fullPrompt);
-      const response = await result.response;
-      generatedText = response.text();
+      try {
+        const model = geminiClient.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+        // Gemini não usa roles separados, concatenamos
+        const fullPrompt = `${safeSystemPrompt}\n\n--- INSTRUÇÃO DO USUÁRIO ---\n${safeUserPrompt}`;
+
+        // Adiciona timeout à chamada Gemini
+        const geminiCall = model.generateContent(fullPrompt);
+        const geminiWithTimeout = Promise.race([
+          geminiCall,
+          createTimeoutPromise(IA_TIMEOUT_MS, "Timeout: Chamada Gemini excedeu o limite de tempo")
+        ]);
+
+        const result = await geminiWithTimeout;
+        const response = await result.response;
+        generatedText = response.text();
+
+      } catch (geminiError) {
+        console.error("❌ Erro na chamada Gemini:", geminiError.message);
+        throw new Error("Ambos os serviços de IA falharam ou excederam o tempo limite.");
+      }
     }
   } catch (error) {
-    console.error("❌ Erro Crítico IA:", error);
+    console.error("❌ Erro Crítico IA:", error.message);
     throw new Error("Serviço de Inteligência Artificial indisponível no momento.");
   }
 
