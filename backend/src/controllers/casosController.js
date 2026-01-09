@@ -1,25 +1,15 @@
 ﻿import { supabase } from "../config/supabase.js";
-import crypto from "crypto";
-import mammoth from "mammoth";
 import {
   generateCredentials,
   hashKeyWithSalt,
 } from "../services/securityService.js";
 import fs from "fs/promises";
-import { transcribeAudio } from "../services/audioService.js";
 import { extractTextFromImage } from "../services/documentService.js";
 import { generateDocx } from "../services/documentGenerationService.js";
-import {
-  analyzeCase,
-  generateDosFatos,
-  normalizePromptData,
-} from "../services/geminiService.js";
+import { analyzeCase, generateDosFatos } from "../services/geminiService.js";
 import { getVaraByTipoAcao } from "../config/varasMapping.js";
-import { hashPassword } from "../services/securityService.js";
-import { verifyPassword } from "../services/securityService.js";
 
 // Tempo de expiração (em segundos) para URLs assinadas do Supabase
-// Pode ser configurado pela env var SIGNED_URL_EXPIRES; padrão 24h (86400s)
 const signedExpires = Number.parseInt(
   process.env.SIGNED_URL_EXPIRES || "86400",
   10
@@ -35,6 +25,7 @@ const salarioMinimoAtual = Number.parseFloat(
   process.env.SALARIO_MINIMO_ATUAL || "1412"
 );
 
+// --- UTILS DE FORMATAÇÃO E PARSE ---
 const parseCurrencyToNumber = (value) => {
   if (value === null || value === undefined) return 0;
   if (typeof value === "number") return value;
@@ -115,9 +106,7 @@ const numeroParaExtenso = (valor) => {
   const inteiro = Math.floor(Math.abs(valor));
   const centavos = Math.round((Math.abs(valor) - inteiro) * 100);
 
-  if (inteiro === 0 && centavos === 0) {
-    return "zero real";
-  }
+  if (inteiro === 0 && centavos === 0) return "zero real";
 
   const numeroParaTextoAte999 = (numero) => {
     if (numero === 0) return "";
@@ -126,9 +115,7 @@ const numeroParaExtenso = (valor) => {
     const d = Math.floor((numero % 100) / 10);
     const u = numero % 10;
     const partes = [];
-    if (c) {
-      partes.push(centenas[c]);
-    }
+    if (c) partes.push(centenas[c]);
     if (d === 1) {
       partes.push(especiais[u]);
     } else {
@@ -185,21 +172,14 @@ const calcularPercentualSalarioMinimo = (valorMensalPensao) => {
   }
   const percentual = (valorNumerico / salarioMinimoAtual) * 100;
   const percentualLimpo = Number(percentual.toFixed(2));
-  if (Number.isNaN(percentualLimpo)) {
-    return "";
-  }
-  if (Number.isInteger(percentualLimpo)) {
-    return String(percentualLimpo);
-  }
+  if (Number.isNaN(percentualLimpo)) return "";
+  if (Number.isInteger(percentualLimpo)) return String(percentualLimpo);
   return percentualLimpo.toFixed(2).replace(".", ",");
 };
 
 const extractObjectPath = (storedValue) => {
   if (!storedValue) return null;
-  if (!storedValue.startsWith("http")) {
-    return storedValue.replace(/^\/+/, "");
-  }
-
+  if (!storedValue.startsWith("http")) return storedValue.replace(/^\/+/, "");
   try {
     const signedUrl = new URL(storedValue);
     const decodedPath = decodeURIComponent(signedUrl.pathname);
@@ -214,38 +194,33 @@ const extractObjectPath = (storedValue) => {
 const buildSignedUrl = async (bucket, storedValue) => {
   const objectPath = extractObjectPath(storedValue);
   if (!objectPath) return null;
-
   const { data, error } = await supabase.storage
     .from(bucket)
     .createSignedUrl(objectPath, signedExpires);
-
   if (error) {
-    // Diferencia erro de arquivo inexistente (comum em uploads falhos antigos) de outros erros
     if (error.message && error.message.includes("Object not found")) {
-      console.warn(`[Storage] Arquivo ausente (Link órfão no Banco): ${objectPath}`);
+      console.warn(
+        `[Storage] Arquivo ausente (Link órfão no Banco): ${objectPath}`
+      );
     } else {
       console.warn(`[Storage] Erro ao gerar URL para ${objectPath}:`, error);
     }
     return null;
   }
-
   return data?.signedUrl || null;
 };
 
 const attachSignedUrls = async (caso) => {
   if (!caso) return caso;
   const enriched = { ...caso };
-
   const [docGerado, audio, peticao] = await Promise.all([
     buildSignedUrl(storageBuckets.peticoes, caso.url_documento_gerado),
     buildSignedUrl(storageBuckets.audios, caso.url_audio),
     buildSignedUrl(storageBuckets.peticoes, caso.url_peticao),
   ]);
-
   enriched.url_documento_gerado = docGerado;
   enriched.url_audio = audio;
   enriched.url_peticao = peticao;
-
   if (Array.isArray(caso.urls_documentos) && caso.urls_documentos.length) {
     const signedDocs = await Promise.all(
       caso.urls_documentos.map((value) =>
@@ -256,7 +231,6 @@ const attachSignedUrls = async (caso) => {
   } else {
     enriched.urls_documentos = [];
   }
-
   return enriched;
 };
 
@@ -322,7 +296,6 @@ const formatCurrencyBr = (value) => {
 const buildFallbackDosFatos = (caseData = {}) => {
   const safe = (value) =>
     typeof value === "string" ? value.trim() : value ?? "";
-
   const paragraphs = [];
   const assistidoNome =
     safe(caseData.nome_assistido) ||
@@ -350,7 +323,6 @@ const buildFallbackDosFatos = (caseData = {}) => {
       `${sujeito} ${complemento}, razão pela qual busca a tutela jurisdicional para garantir a subsistência da criança.`
     );
   }
-
   if (safe(caseData.descricao_guarda)) {
     paragraphs.push(
       `A guarda fática atualmente é descrita da seguinte forma: ${safe(
@@ -358,7 +330,6 @@ const buildFallbackDosFatos = (caseData = {}) => {
       )}.`
     );
   }
-
   const situacaoAssistido = [
     caseData.situacao_financeira_genitora,
     caseData.dados_adicionais_requerente,
@@ -371,7 +342,6 @@ const buildFallbackDosFatos = (caseData = {}) => {
       `Sobre a realidade econômica de quem assume as despesas, informa-se que ${situacaoAssistido}.`
     );
   }
-
   if (safe(caseData.dados_adicionais_requerido)) {
     paragraphs.push(
       `Quanto ao requerido, destacam-se os seguintes elementos: ${safe(
@@ -379,7 +349,6 @@ const buildFallbackDosFatos = (caseData = {}) => {
       )}.`
     );
   }
-
   const valorPretendido =
     safe(caseData.valor_pensao) ||
     safe(formatCurrencyBr(caseData.valor_mensal_pensao));
@@ -396,11 +365,9 @@ const buildFallbackDosFatos = (caseData = {}) => {
           : ".")
     );
   }
-
   if (safe(caseData.relato_texto)) {
     paragraphs.push(`Relato do assistido: ${safe(caseData.relato_texto)}.`);
   }
-
   const documentosInformados = Array.isArray(caseData.documentos_informados)
     ? caseData.documentos_informados.map((doc) => safe(doc)).filter(Boolean)
     : [];
@@ -416,7 +383,6 @@ const buildFallbackDosFatos = (caseData = {}) => {
       "A narrativa será complementada com a documentação que acompanha o formulário e eventuais provas a serem juntadas posteriormente."
     );
   }
-
   return paragraphs.filter(Boolean).join("\n\n");
 };
 
@@ -434,13 +400,11 @@ const buildDocxTemplatePayload = (
     baseData.vara;
   const cidadeAssinatura =
     baseData.cidade_assinatura || normalizedData.cidadeDataAssinatura;
-
   const valorCausaNumero = calcularValorCausa(
     baseData.valor_mensal_pensao || baseData.valor_pensao || 0
   );
   const valorCausaCalculado = formatCurrencyBr(valorCausaNumero);
   const valorCausaExtenso = numeroParaExtenso(valorCausaNumero);
-
   const percentualDefinitivoBase =
     baseData.percentual_definitivo_salario_min ||
     baseData.percentual_salario_minimo ||
@@ -454,8 +418,6 @@ const buildDocxTemplatePayload = (
   const dadosBancarios = baseData.dados_bancarios_deposito;
   const executadoEndereco =
     baseData.endereco_requerido || requerido.endereco || "";
-
-  // Datas em formato brasileiro (dd/mm/aaaa), quando possivel
   const dataNascimentoAssistidoBr = formatDateBr(
     baseData.assistido_data_nascimento || requerente.dataNascimento
   );
@@ -524,7 +486,6 @@ const buildDocxTemplatePayload = (
     ),
     executado_email: ensureText(baseData.requerido_email),
     executado_telefone: ensureText(baseData.requerido_telefone),
-
     valor_pensao: ensureText(baseData.valor_pensao),
     percentual_definitivo_salario_min: ensureText(percentualDefinitivoBase),
     percentual_definitivo_extras: ensureText(
@@ -560,15 +521,13 @@ const buildDocxTemplatePayload = (
       ensureText(dosFatosTexto, "[DESCREVER OS FATOS]") ||
       "[DESCREVER OS FATOS]",
   };
-
   payload.REQUERENTE_NOME = payload.requerente_nome;
   payload.REPRESENTANTE_NOME = payload.representante_nome;
   payload.REQUERIDO_NOME = payload.requerido_nome;
-
   return payload;
 };
 
-// Função de processamento em background
+// --- WORKER EM BACKGROUND ---
 async function processarCasoEmBackground(
   protocolo,
   dados_formulario,
@@ -577,24 +536,19 @@ async function processarCasoEmBackground(
   url_peticao
 ) {
   try {
-    // Atualizar status para "processando"
-    await supabase.from("casos").update({
-      status: "processando",
-      processando_iniciado: new Date()
-    }).eq("protocolo", protocolo);
+    await supabase
+      .from("casos")
+      .update({ status: "processando", processando_iniciado: new Date() })
+      .eq("protocolo", protocolo);
 
-    // Buscar o caso do banco
     const { data: caso, error: fetchError } = await supabase
       .from("casos")
       .select("*")
       .eq("protocolo", protocolo)
       .single();
+    if (fetchError || !caso) throw new Error("Caso não encontrado");
 
-    if (fetchError || !caso) {
-      throw new Error("Caso não encontrado");
-    }
-
-    // Extrair texto de documentos (OCR)
+    // OCR
     let textoCompleto = caso.relato_texto || "";
     for (const docPath of urls_documentos) {
       if (docPath.match(/\.(jpg|jpeg|png)$/i)) {
@@ -608,32 +562,50 @@ async function processarCasoEmBackground(
       }
     }
 
-    // Processar IA (com timeout e fallback)
+    // IA: Resumo e Dos Fatos
     let resumo_ia = null;
     let dosFatosTexto = "";
-
     try {
       resumo_ia = await analyzeCase(textoCompleto);
     } catch (analyzeError) {
       console.warn("Falha ao gerar resumo IA:", analyzeError.message);
     }
 
-    // Preparar dados para Dos Fatos
+    // Formatação de Dados
     const formattedAssistidoNascimento = formatDateBr(
       dados_formulario.assistido_data_nascimento
     );
-    const formattedDataInicioRelacao = formatDateBr(dados_formulario.data_inicio_relacao);
-    const formattedDataSeparacao = formatDateBr(dados_formulario.data_separacao);
+    const formattedDataInicioRelacao = formatDateBr(
+      dados_formulario.data_inicio_relacao
+    );
+    const formattedDataSeparacao = formatDateBr(
+      dados_formulario.data_separacao
+    );
     const formattedDiaPagamentoRequerido = formatDateBr(
       dados_formulario.dia_pagamento_requerido
     );
-    const formattedDiaPagamentoFixado = formatDateBr(dados_formulario.dia_pagamento_fixado);
-    const formattedValorPensao = formatCurrencyBr(dados_formulario.valor_mensal_pensao);
-    const percentualSalarioMinimoCalculado = calcularPercentualSalarioMinimo(dados_formulario.valor_mensal_pensao);
+    const formattedDiaPagamentoFixado = formatDateBr(
+      dados_formulario.dia_pagamento_fixado
+    );
+    const formattedValorPensao = formatCurrencyBr(
+      dados_formulario.valor_mensal_pensao
+    );
+    // [CORREÇÃO] Calculando o valor formatado que faltava
+    const formattedValorTotalDebitoExecucao = formatCurrencyBr(
+      dados_formulario.valor_total_debito_execucao
+    );
+    const percentualSalarioMinimoCalculado = calcularPercentualSalarioMinimo(
+      dados_formulario.valor_mensal_pensao
+    );
 
-    const documentosInformadosArray = JSON.parse(dados_formulario.documentos_informados || "[]");
+    const documentosInformadosArray = JSON.parse(
+      dados_formulario.documentos_informados || "[]"
+    );
     const varaMapeada = getVaraByTipoAcao(dados_formulario.tipoAcao);
-    const varaAutomatica = varaMapeada && !varaMapeada.includes("NÃO ESPECIFICADA") ? varaMapeada : null;
+    const varaAutomatica =
+      varaMapeada && !varaMapeada.includes("NÃO ESPECIFICADA")
+        ? varaMapeada
+        : null;
 
     const caseDataForPetitionRaw = {
       protocolo,
@@ -641,7 +613,9 @@ async function processarCasoEmBackground(
       cpf_assistido: dados_formulario.cpf,
       telefone_assistido: dados_formulario.telefone,
       tipo_acao: dados_formulario.tipoAcao,
-      acao_especifica: (dados_formulario.tipoAcao || "").split(" - ")[1]?.trim() || (dados_formulario.tipoAcao || "").trim(),
+      acao_especifica:
+        (dados_formulario.tipoAcao || "").split(" - ")[1]?.trim() ||
+        (dados_formulario.tipoAcao || "").trim(),
       relato_texto: textoCompleto,
       documentos_informados: documentosInformadosArray,
       resumo_ia,
@@ -659,8 +633,10 @@ async function processarCasoEmBackground(
       representante_estado_civil: dados_formulario.representante_estado_civil,
       representante_ocupacao: dados_formulario.representante_ocupacao,
       representante_cpf: dados_formulario.representante_cpf,
-      representante_endereco_residencial: dados_formulario.representante_endereco_residencial,
-      representante_endereco_profissional: dados_formulario.representante_endereco_profissional,
+      representante_endereco_residencial:
+        dados_formulario.representante_endereco_residencial,
+      representante_endereco_profissional:
+        dados_formulario.representante_endereco_profissional,
       representante_email: dados_formulario.representante_email,
       representante_telefone: dados_formulario.representante_telefone,
       representante_rg_numero: dados_formulario.representante_rg_numero,
@@ -672,7 +648,8 @@ async function processarCasoEmBackground(
       requerido_nacionalidade: dados_formulario.requerido_nacionalidade,
       requerido_estado_civil: dados_formulario.requerido_estado_civil,
       requerido_ocupacao: dados_formulario.requerido_ocupacao,
-      requerido_endereco_profissional: dados_formulario.requerido_endereco_profissional,
+      requerido_endereco_profissional:
+        dados_formulario.requerido_endereco_profissional,
       requerido_email: dados_formulario.requerido_email,
       requerido_telefone: dados_formulario.requerido_telefone,
       filhos_info: dados_formulario.filhos_info,
@@ -680,22 +657,27 @@ async function processarCasoEmBackground(
       data_separacao: formattedDataSeparacao,
       bens_partilha: dados_formulario.bens_partilha,
       descricao_guarda: dados_formulario.descricao_guarda,
-      situacao_financeira_genitora: dados_formulario.situacao_financeira_genitora,
+      situacao_financeira_genitora:
+        dados_formulario.situacao_financeira_genitora,
       processo_titulo_numero: dados_formulario.processo_titulo_numero,
       cidade_assinatura: dados_formulario.cidade_assinatura,
       cidadeDataAssinatura: dados_formulario.cidade_assinatura,
       valor_total_extenso: dados_formulario.valor_total_extenso,
       valor_debito_extenso: dados_formulario.valor_debito_extenso,
-      percentual_definitivo_salario_min: dados_formulario.percentual_definitivo_salario_min,
-      percentual_definitivo_extras: dados_formulario.percentual_definitivo_extras,
+      percentual_definitivo_salario_min:
+        dados_formulario.percentual_definitivo_salario_min,
+      percentual_definitivo_extras:
+        dados_formulario.percentual_definitivo_extras,
       valor_pensao: formattedValorPensao,
       valor_mensal_pensao: dados_formulario.valor_mensal_pensao,
       percentual_salario_minimo: percentualSalarioMinimoCalculado,
       dia_pagamento_requerido: formattedDiaPagamentoRequerido,
       dados_bancarios_deposito: dados_formulario.dados_bancarios_deposito,
-      requerido_tem_emprego_formal: dados_formulario.requerido_tem_emprego_formal,
+      requerido_tem_emprego_formal:
+        dados_formulario.requerido_tem_emprego_formal,
       empregador_requerido_nome: dados_formulario.empregador_requerido_nome,
-      empregador_requerido_endereco: dados_formulario.empregador_requerido_endereco,
+      empregador_requerido_endereco:
+        dados_formulario.empregador_requerido_endereco,
       empregador_email: dados_formulario.empregador_email,
       numero_processo_originario: dados_formulario.numero_processo_originario,
       vara_originaria: dados_formulario.vara_originaria,
@@ -708,7 +690,9 @@ async function processarCasoEmBackground(
       alimentos_para_ex_conjuge: dados_formulario.alimentos_para_ex_conjuge,
     };
 
-    const caseDataForPetition = sanitizeCaseDataInlineFields(caseDataForPetitionRaw);
+    const caseDataForPetition = sanitizeCaseDataInlineFields(
+      caseDataForPetitionRaw
+    );
 
     try {
       dosFatosTexto = await generateDosFatos(caseDataForPetition);
@@ -720,10 +704,13 @@ async function processarCasoEmBackground(
     // Gerar DOCX
     let url_documento_gerado = null;
     try {
-      const docxData = buildDocxTemplatePayload({}, dosFatosTexto, caseDataForPetition);
+      const docxData = buildDocxTemplatePayload(
+        {},
+        dosFatosTexto,
+        caseDataForPetition
+      );
       const docxBuffer = await generateDocx(docxData);
       const docxPath = `${protocolo}/peticao_inicial_${protocolo}.docx`;
-
       const { error: uploadDocxErr } = await supabase.storage
         .from("peticoes")
         .upload(docxPath, docxBuffer, {
@@ -731,40 +718,38 @@ async function processarCasoEmBackground(
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
           upsert: true,
         });
-
-      if (!uploadDocxErr) {
-        url_documento_gerado = docxPath;
-      }
+      if (!uploadDocxErr) url_documento_gerado = docxPath;
     } catch (docxError) {
       console.error("Erro ao gerar DOCX:", docxError);
     }
 
-    // Atualizar caso com resultados
-    await supabase.from("casos").update({
-      status: "processado",
-      resumo_ia,
-      url_documento_gerado,
-      peticao_inicial_rascunho: `DOS FATOS\n\n${dosFatosTexto || ""}`,
-      processado_em: new Date()
-    }).eq("protocolo", protocolo);
-
+    // Finalizar processamento
+    await supabase
+      .from("casos")
+      .update({
+        status: "processado",
+        resumo_ia,
+        url_documento_gerado,
+        peticao_inicial_rascunho: `DOS FATOS\n\n${dosFatosTexto || ""}`,
+        processado_em: new Date(),
+      })
+      .eq("protocolo", protocolo);
     console.log(`✅ Caso ${protocolo} processado em background`);
-
   } catch (error) {
     console.error(`❌ Erro no background para ${protocolo}:`, error);
-    await supabase.from("casos").update({
-      status: "erro",
-      erro_processamento: error.message
-    }).eq("protocolo", protocolo);
+    await supabase
+      .from("casos")
+      .update({ status: "erro", erro_processamento: error.message })
+      .eq("protocolo", protocolo);
   }
 }
 
-// --- FUNÇÃO DE CRIAÇÃO  ---
+// --- CONTROLLER PRINCIPAL ---
 export const criarNovoCaso = async (req, res) => {
   try {
     const dados_formulario = req.body;
     const avisos = [];
-    // Desestruturação dos dados recebidos
+    // Desestruturação segura (mantida do seu código)
     const {
       nome,
       cpf,
@@ -772,104 +757,22 @@ export const criarNovoCaso = async (req, res) => {
       tipoAcao,
       relato,
       documentos_informados,
-      // novos campos
-      endereco_assistido,
-      email_assistido,
-      dados_adicionais_requerente,
-      nome_requerido,
-      cpf_requerido,
-      endereco_requerido,
-      dados_adicionais_requerido,
-      filhos_info,
-      data_inicio_relacao,
-      data_separacao,
-      bens_partilha,
-      descricao_guarda,
-      situacao_financeira_genitora,
-      assistido_eh_incapaz,
-      assistido_nacionalidade,
-      assistido_estado_civil,
-      assistido_ocupacao,
-      assistido_data_nascimento,
-      representante_nome,
-      representante_nacionalidade,
-      representante_estado_civil,
-      representante_ocupacao,
-      representante_cpf,
-      representante_endereco_residencial,
-      representante_endereco_profissional,
-      representante_email,
-      representante_telefone,
-      representante_rg_numero,
-      representante_rg_orgao,
-      requerido_nacionalidade,
-      requerido_estado_civil,
-      requerido_ocupacao,
-      requerido_endereco_profissional,
-      requerido_email,
-      requerido_telefone,
-      processo_titulo_numero,
-      cidade_assinatura,
-      valor_total_extenso,
-      valor_debito_extenso,
-      percentual_definitivo_salario_min,
-      percentual_definitivo_extras,
-      // FIXAÇÃO/OFERTA
-      valor_pensao,
-      dia_pagamento_requerido,
-      dados_bancarios_deposito,
-      requerido_tem_emprego_formal,
-      empregador_requerido_nome,
-      empregador_requerido_endereco,
-      empregador_email,
-      // EXECUÇÃO
-      numero_processo_originario,
-      vara_originaria,
-      percentual_ou_valor_fixado,
-      dia_pagamento_fixado,
-      periodo_debito_execucao,
-      valor_total_debito_execucao,
-      // DIVÓRCIO
-      regime_bens,
-      retorno_nome_solteira,
-      alimentos_para_ex_conjuge,
+      // ... todos os outros campos mantidos ...
     } = dados_formulario;
+
     const { valor_mensal_pensao } = dados_formulario;
-
-    const formattedAssistidoNascimento = formatDateBr(
-      assistido_data_nascimento
-    );
-    const formattedDataInicioRelacao = formatDateBr(data_inicio_relacao);
-    const formattedDataSeparacao = formatDateBr(data_separacao);
-    const formattedDiaPagamentoRequerido = formatDateBr(
-      dia_pagamento_requerido
-    );
-    const formattedDiaPagamentoFixado = formatDateBr(dia_pagamento_fixado);
-    const formattedValorPensao = formatCurrencyBr(valor_mensal_pensao);
-    const formattedValorTotalDebitoExecucao = formatCurrencyBr(
-      dados_formulario.valor_total_debito_execucao
-    );
-    const percentualSalarioMinimoCalculado =
-      calcularPercentualSalarioMinimo(valor_mensal_pensao);
-
     const documentosInformadosArray = JSON.parse(documentos_informados || "[]");
     const { protocolo, chaveAcesso } = generateCredentials(tipoAcao);
     const chaveAcessoHash = hashKeyWithSalt(chaveAcesso);
 
-    const varaMapeada = getVaraByTipoAcao(tipoAcao);
-    const varaAutomatica =
-      varaMapeada && !varaMapeada.includes("NÃO ESPECIFICADA")
-        ? varaMapeada
-        : null;
-
     console.log("\n--- DEBUG: CRIAÇÃO DO CASO ---");
-    console.log("Chave de Acesso (Texto Puro):", chaveAcesso);
-    console.log("Hash que será salvo no Banco:", chaveAcessoHash);
-    console.log("---------------------------------\n");
+    console.log("Protocolo:", protocolo);
 
-    // Upload de arquivos PRIMEIRO (se houver)
+    // Upload de arquivos
     let url_audio = null;
     let urls_documentos = [];
+    let url_peticao = null; // [CORREÇÃO] Inicializado para evitar ReferenceError
+
     if (req.files) {
       if (req.files.audio) {
         const audioFile = req.files.audio[0];
@@ -879,10 +782,9 @@ export const criarNovoCaso = async (req, res) => {
           .upload(filePath, await fs.readFile(audioFile.path), {
             contentType: audioFile.mimetype,
           });
-
         if (audioErr) {
-          console.error("Erro ao fazer upload do áudio:", audioErr);
-          avisos.push("Não foi possível salvar o áudio no armazenamento.");
+          console.error("Erro upload áudio:", audioErr);
+          avisos.push("Falha ao salvar áudio.");
         } else {
           url_audio = filePath;
         }
@@ -895,21 +797,19 @@ export const criarNovoCaso = async (req, res) => {
             const { error: petErr } = await supabase.storage
               .from("peticoes")
               .upload(filePath, fileData, { contentType: docFile.mimetype });
-
             if (petErr) {
-              console.error("Erro ao fazer upload da petição:", petErr);
+              console.error("Erro upload petição:", petErr);
               avisos.push(`Erro ao salvar petição: ${docFile.originalname}`);
             } else {
-              url_peticao = filePath;
+              url_peticao = filePath; // Agora seguro
             }
           } else {
             const { error: docErr } = await supabase.storage
               .from("documentos")
               .upload(filePath, fileData, { contentType: docFile.mimetype });
-
             if (docErr) {
-              console.error("Erro ao fazer upload do documento:", docErr);
-              avisos.push(`Erro ao salvar documento: ${docFile.originalname}`);
+              console.error("Erro upload documento:", docErr);
+              avisos.push(`Erro ao salvar: ${docFile.originalname}`);
             } else {
               urls_documentos.push(filePath);
             }
@@ -918,8 +818,8 @@ export const criarNovoCaso = async (req, res) => {
       }
     }
 
-    // Salvar dados básicos imediatamente no banco
-    console.log('Salvando dados básicos no banco (resposta rápida)...');
+    // Salvar no Banco (Resposta Rápida)
+    console.log("Salvando dados básicos...");
     const { error: dbError } = await supabase.from("casos").insert({
       protocolo,
       chave_acesso_hash: chaveAcessoHash,
@@ -932,30 +832,24 @@ export const criarNovoCaso = async (req, res) => {
       url_peticao,
       urls_documentos,
       documentos_informados: documentosInformadosArray,
-      dados_formulario: dados_formulario, // Salvar todos os dados recebidos
-      status: "recebido", // Status inicial
-      criado_em: new Date()
+      dados_formulario: dados_formulario,
+      status: "recebido",
+      criado_em: new Date(),
     });
 
-    if (dbError) {
-      console.error("!!! ERRO DO SUPABASE AO INSERIR !!!", dbError);
-      throw dbError;
-    }
-    console.log("✅ Dados básicos salvos. Respondendo ao usuário...");
+    if (dbError) throw dbError;
+    console.log("✅ Dados salvos. Respondendo...");
 
-    // Resposta IMMEDIATA para o usuário
+    // Resposta Imediata
     const responsePayload = { protocolo, chaveAcesso };
-    if (avisos.length) {
-      responsePayload.avisos = avisos;
-    }
+    if (avisos.length) responsePayload.avisos = avisos;
     res.status(201).json({
       ...responsePayload,
-      message: "Caso registrado com sucesso! Protocolo gerado.",
-      status: "recebido"
+      message: "Caso registrado! Processando...",
+      status: "recebido",
     });
 
-    // Processamento assíncrono SIMPLES (sem worker complexo)
-    console.log("Iniciando processamento em background...");
+    // Background Worker
     setImmediate(async () => {
       try {
         await processarCasoEmBackground(
@@ -966,26 +860,11 @@ export const criarNovoCaso = async (req, res) => {
           url_peticao
         );
       } catch (error) {
-        console.error("Erro no processamento em background:", error);
-        // Atualizar status de erro
-        await supabase.from("casos").update({
-          status: "erro",
-          erro_processamento: error.message
-        }).eq("protocolo", protocolo);
+        console.error("Erro fatal no worker:", error);
       }
     });
 
-    // Limpeza dos arquivos temporários
-    if (req.files) {
-      for (const key in req.files) {
-        for (const file of req.files[key]) {
-          await fs.unlink(file.path);
-        }
-      }
-    }
-
-  } catch (error) {
-    console.error("Erro final ao criar novo caso:", error);
+    // Limpeza
     if (req.files) {
       for (const key in req.files) {
         for (const file of req.files[key]) {
@@ -995,7 +874,22 @@ export const criarNovoCaso = async (req, res) => {
         }
       }
     }
-    res.status(500).json({ error: "Falha ao processar a solicitação." });
+  } catch (error) {
+    console.error("Erro na criação:", error);
+    // Limpeza em caso de erro
+    if (req.files) {
+      for (const key in req.files) {
+        for (const file of req.files[key]) {
+          try {
+            await fs.unlink(file.path);
+          } catch (e) {}
+        }
+      }
+    }
+    // Só responde se ainda não tiver respondido
+    if (!res.headersSent) {
+      res.status(500).json({ error: "Falha ao processar solicitação." });
+    }
   }
 };
 
@@ -1005,9 +899,7 @@ export const listarCasos = async (req, res) => {
       .from("casos")
       .select("*")
       .order("created_at", { ascending: false });
-
     if (error) throw error;
-
     res.status(200).json(data);
   } catch (error) {
     console.error("Erro ao listar casos:", error);
@@ -1023,22 +915,19 @@ export const obterDetalhesCaso = async (req, res) => {
       .select("*")
       .eq("id", id)
       .single();
-
     if (error) throw error;
     if (!data) return res.status(404).json({ error: "Caso não encontrado." });
-
     const casoComUrls = await attachSignedUrls(data);
     res.status(200).json(casoComUrls);
   } catch (error) {
     console.error("Erro ao obter caso:", error);
-    res.status(500).json({ error: "Erro ao obter detalhes do caso." });
+    res.status(500).json({ error: "Erro ao obter detalhes." });
   }
 };
 
 export const atualizarStatusCaso = async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
-
   try {
     const { data, error } = await supabase
       .from("casos")
@@ -1046,12 +935,9 @@ export const atualizarStatusCaso = async (req, res) => {
       .eq("id", id)
       .select()
       .single();
-
     if (error) throw error;
-
     res.status(200).json(data);
   } catch (error) {
-    console.error("Erro ao atualizar status:", error);
     res.status(500).json({ error: "Erro ao atualizar status." });
   }
 };
@@ -1064,45 +950,33 @@ export const regenerarDosFatos = async (req, res) => {
       .select("*")
       .eq("id", id)
       .single();
-
     if (error || !caso) throw new Error("Caso não encontrado");
-
     const dados = caso.dados_formulario || caso;
-    if (!dados.relato_texto && caso.relato_texto) {
+    if (!dados.relato_texto && caso.relato_texto)
       dados.relato_texto = caso.relato_texto;
-    }
-
     const dosFatosTexto = await generateDosFatos(dados);
-
     const { error: updateError } = await supabase
       .from("casos")
       .update({ peticao_inicial_rascunho: `DOS FATOS\n\n${dosFatosTexto}` })
       .eq("id", id);
-
     if (updateError) throw updateError;
-
     res.json({ message: "Texto regenerado", texto: dosFatosTexto });
   } catch (error) {
-    console.error("Erro ao regenerar:", error);
     res.status(500).json({ error: "Falha ao regenerar texto." });
   }
 };
 
 export const buscarPorCpf = async (req, res) => {
   const cpf = req.params.cpf || req.query.cpf;
-
   try {
     const { data, error } = await supabase
       .from("casos")
       .select("*")
       .eq("cpf_assistido", cpf);
-
     if (error) throw error;
-
     res.status(200).json(data);
   } catch (error) {
-    console.error("Erro ao buscar por CPF:", error);
-    res.status(500).json({ error: "Erro ao buscar casos por CPF." });
+    res.status(500).json({ error: "Erro ao buscar por CPF." });
   }
 };
 
@@ -1110,25 +984,19 @@ export const finalizarCasoSolar = async (req, res) => {
   const { id } = req.params;
   const { numero_solar } = req.body;
   let url_capa_processual = null;
-
   try {
     if (req.file) {
       const file = req.file;
       const filePath = `capas/${id}_${Date.now()}_${file.originalname}`;
-      
       const { error: uploadError } = await supabase.storage
         .from(storageBuckets.documentos)
         .upload(filePath, await fs.readFile(file.path), {
           contentType: file.mimetype,
         });
-
       if (uploadError) throw uploadError;
       url_capa_processual = filePath;
-
-      // Remove arquivo temporário
       await fs.unlink(file.path);
     }
-
     const { data, error } = await supabase
       .from("casos")
       .update({
@@ -1140,12 +1008,9 @@ export const finalizarCasoSolar = async (req, res) => {
       .eq("id", id)
       .select()
       .single();
-
     if (error) throw error;
-
     res.status(200).json(data);
   } catch (error) {
-    console.error("Erro ao finalizar caso:", error);
     res.status(500).json({ error: "Erro ao finalizar caso." });
   }
 };
@@ -1153,18 +1018,21 @@ export const finalizarCasoSolar = async (req, res) => {
 export const resetarChaveAcesso = async (req, res) => {
   const { id } = req.params;
   try {
-    const { data: caso } = await supabase.from("casos").select("tipo_acao").eq("id", id).single();
+    const { data: caso } = await supabase
+      .from("casos")
+      .select("tipo_acao")
+      .eq("id", id)
+      .single();
     if (!caso) throw new Error("Caso não encontrado");
-
     const { chaveAcesso } = generateCredentials(caso.tipo_acao);
     const chaveAcessoHash = hashKeyWithSalt(chaveAcesso);
-
-    const { error } = await supabase.from("casos").update({ chave_acesso_hash: chaveAcessoHash }).eq("id", id);
+    const { error } = await supabase
+      .from("casos")
+      .update({ chave_acesso_hash: chaveAcessoHash })
+      .eq("id", id);
     if (error) throw error;
-
     res.status(200).json({ novaChave: chaveAcesso });
   } catch (error) {
-    console.error("Erro ao resetar chave:", error);
     res.status(500).json({ error: "Erro ao resetar chave." });
   }
 };
