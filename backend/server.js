@@ -29,7 +29,7 @@ app.use((req, res, next) => {
 });
 
 // A rota do QStash precisa do corpo bruto (raw body)
-app.use("/api/jobs", express.raw({ type: "application/json" }), jobsRoutes);
+app.use("/api/jobs", express.raw(), jobsRoutes);
 
 // Para todas as outras rotas, use o parser JSON explicitamente
 app.use("/api/defensores", express.json(), defensoresRoutes);
@@ -38,6 +38,10 @@ app.use("/api/status", express.json(), statusRoutes);
 app.use("/api/debug", express.json(), debugRoutes);
 
 // Rota de "saúde" do sistema
+app.get("/", (req, res) => {
+  res.json({ status: "OK", message: "Def. Sul Bahia API is running" });
+});
+
 app.get("/health", (req, res) => {
   res.json({ status: "OK", message: "Def. Sul Bahia API is running" });
 });
