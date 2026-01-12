@@ -11,6 +11,7 @@
     "@logtail/node": "^0.4.15",
     "@logtail/winston": "^0.4.15",
     "@supabase/supabase-js": "^2.39.0",
+    "@upstash/qstash": "^2.5.0",
     "bcrypt": "^5.1.1",
     "cors": "^2.8.5",
     "docxtemplater": "^3.42.0",
