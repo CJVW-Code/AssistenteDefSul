@@ -5,8 +5,9 @@ import statusRoutes from "./src/routes/status.js";
 import casosRoutes from "./src/routes/casos.js";
 import defensoresRoutes from "./src/routes/defensores.js";
 import debugRoutes from "./src/routes/debug.js";
+import jobsRoutes from "./src/routes/jobs.js";
 import logger from "./src/utils/logger.js";
-import { iniciarFilaProcessamento } from "./src/services/queueService.js";
+// import { iniciarFilaProcessamento } from "./src/services/queueService.js";
 
 dotenv.config();
 
@@ -39,6 +40,7 @@ app.use("/api/casos", casosRoutes);
 // Rota para consultar status
 app.use("/api/status", statusRoutes);
 app.use("/api/debug", debugRoutes);
+app.use("/api/jobs", jobsRoutes);
 
 // Rota de "saúde" do sistema
 app.get("/health", (req, res) => {
@@ -54,5 +56,5 @@ app.use((err, req, res, next) => {
 // Inicia o servidor
 app.listen(PORT, "0.0.0.0", () => {
   logger.info(`🚀 Servidor rodando na porta ${PORT}`);
-  iniciarFilaProcessamento(); // <--- Inicia o loop da fila
+  // iniciarFilaProcessamento(); // <--- Inicia o loop da fila
 });

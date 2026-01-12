@@ -1,9 +1,9 @@
-﻿import { supabase } from "../config/supabase.js";
+﻿import { Client } from "@upstash/qstash";
+import { supabase } from "../config/supabase.js";
 import {
   generateCredentials,
   hashKeyWithSalt,
 } from "../services/securityService.js";
-import fs from "fs/promises";
 import { visionOCR } from "../services/aiService.js";
 import { generateDocx } from "../services/documentGenerationService.js";
 import { analyzeCase, generateDosFatos } from "../services/geminiService.js";
@@ -530,6 +530,11 @@ const buildDocxTemplatePayload = (
   return payload;
 };
 
+// --- QSTASH CLIENT ---
+const qstashClient = new Client({
+  token: process.env.QSTASH_TOKEN,
+});
+
 // --- WORKER EM BACKGROUND ---
 // Agora exportamos para usar no queueService
 // E removemos os argumentos extras, pois vamos buscar tudo do banco para garantir consistência
@@ -783,7 +788,6 @@ export const criarNovoCaso = async (req, res) => {
   try {
     const dados_formulario = req.body;
     const avisos = [];
-    // Desestruturação segura (mantida do seu código)
     const {
       nome,
       cpf,
@@ -791,34 +795,26 @@ export const criarNovoCaso = async (req, res) => {
       tipoAcao,
       relato,
       documentos_informados,
-      // ... todos os outros campos mantidos ...
     } = dados_formulario;
 
-    const { valor_mensal_pensao } = dados_formulario;
     const documentosInformadosArray = JSON.parse(documentos_informados || "[]");
     const { protocolo, chaveAcesso } = generateCredentials(tipoAcao);
     const chaveAcessoHash = hashKeyWithSalt(chaveAcesso);
 
-    logger.info(
-      `Iniciando criação de caso. Protocolo: ${protocolo}, Tipo: ${tipoAcao}`
-    );
+    logger.info(`Iniciando criação de caso. Protocolo: ${protocolo}, Tipo: ${tipoAcao}`);
 
-    // Upload de arquivos com tratamento de erros robusto
     let url_audio = null;
     let urls_documentos = [];
     let url_peticao = null;
 
     if (req.files) {
-      // Processar áudio com try-catch
       if (req.files.audio && req.files.audio[0]) {
         try {
           const audioFile = req.files.audio[0];
-          const filePath = `${protocolo}/${audioFile.filename}`;
+          const filePath = `${protocolo}/${audioFile.originalname}`;
           const { error: audioErr } = await supabase.storage
             .from("audios")
-            .upload(filePath, await fs.readFile(audioFile.path), {
-              contentType: audioFile.mimetype,
-            });
+            .upload(filePath, audioFile.buffer, { contentType: audioFile.mimetype });
           if (audioErr) {
             logger.error("Erro upload áudio:", { error: audioErr });
             avisos.push("Falha ao salvar áudio.");
@@ -831,21 +827,16 @@ export const criarNovoCaso = async (req, res) => {
         }
       }
 
-      // Processar documentos com try-catch individual
       if (req.files.documentos && req.files.documentos.length > 0) {
         for (const docFile of req.files.documentos) {
           try {
-            const filePath = `${protocolo}/${docFile.filename}`;
-            const fileData = await fs.readFile(docFile.path);
-
+            const filePath = `${protocolo}/${docFile.originalname}`;
             if (docFile.originalname.toLowerCase().includes("peticao")) {
               const { error: petErr } = await supabase.storage
                 .from("peticoes")
-                .upload(filePath, fileData, { contentType: docFile.mimetype });
+                .upload(filePath, docFile.buffer, { contentType: docFile.mimetype });
               if (petErr) {
-                logger.error(`Erro upload petição (${docFile.originalname}):`, {
-                  error: petErr,
-                });
+                logger.error(`Erro upload petição (${docFile.originalname}):`, { error: petErr });
                 avisos.push(`Erro ao salvar petição: ${docFile.originalname}`);
               } else {
                 url_peticao = filePath;
@@ -853,11 +844,9 @@ export const criarNovoCaso = async (req, res) => {
             } else {
               const { error: docErr } = await supabase.storage
                 .from("documentos")
-                .upload(filePath, fileData, { contentType: docFile.mimetype });
+                .upload(filePath, docFile.buffer, { contentType: docFile.mimetype });
               if (docErr) {
-                logger.error(`Erro upload documento (${docFile.originalname}):`, {
-                  error: docErr,
-                });
+                logger.error(`Erro upload documento (${docFile.originalname}):`, { error: docErr });
                 avisos.push(`Erro ao salvar: ${docFile.originalname}`);
               } else {
                 urls_documentos.push(filePath);
@@ -870,12 +859,10 @@ export const criarNovoCaso = async (req, res) => {
         }
       }
     } else if (dados_formulario.documentFiles && dados_formulario.documentFiles.length > 0) {
-      // Aviso se arquivos foram selecionados mas não chegaram
       logger.warn(`Upload falhou: ${dados_formulario.documentFiles.length} arquivos não recebidos pelo servidor`);
       avisos.push("Aviso: Arquivos selecionados não foram recebidos pelo servidor.");
     }
 
-    // Salvar no Banco (Resposta Rápida)
     logger.debug("Salvando dados básicos no Supabase...");
     const { error: dbError } = await supabase.from("casos").insert({
       protocolo,
@@ -890,50 +877,45 @@ export const criarNovoCaso = async (req, res) => {
       urls_documentos,
       documentos_informados: documentosInformadosArray,
       dados_formulario: dados_formulario,
-      status: "pendente", // <--- Mudado para 'pendente' para a fila pegar
+      status: "enfileirado", // Alterado de 'pendente' para 'enfileirado'
       created_at: new Date(),
     });
 
     if (dbError) throw dbError;
-    logger.info(`Caso ${protocolo} salvo. Iniciando processamento background.`);
+    logger.info(`Caso ${protocolo} salvo. Enviando para a fila de processamento QStash.`);
 
-    // Resposta Imediata
+    // ** NOVO: Enviar para o QStash **
+    try {
+      const targetUrl = `${process.env.API_BASE_URL}/api/jobs/process`;
+      await qstashClient.publishJSON({
+        url: targetUrl,
+        body: { protocolo: protocolo },
+        retries: 3, // QStash vai tentar até 3 vezes em caso de falha
+      });
+      logger.info(`QStash - Job para o protocolo ${protocolo} publicado com sucesso.`);
+    } catch (qstashError) {
+      logger.error(`QStash - Falha ao publicar job para o protocolo ${protocolo}:`, qstashError);
+      // O caso já foi salvo, mas o job não foi enfileirado.
+      // Poderíamos tentar atualizar o status para 'erro_fila' para sinalizar.
+      avisos.push("Crítico: Falha ao enviar caso para a fila de processamento.");
+      await supabase
+        .from("casos")
+        .update({ status: 'erro_fila', erro_processamento: 'Falha ao enfileirar no QStash' })
+        .eq('protocolo', protocolo);
+    }
+
     const responsePayload = { protocolo, chaveAcesso };
     if (avisos.length) responsePayload.avisos = avisos;
     res.status(201).json({
       ...responsePayload,
-      message: "Caso registrado! Aguardando processamento na fila.",
-      status: "pendente",
+      message: "Caso registrado e enviado para a fila de processamento!",
+      status: "enfileirado",
     });
-    
-    // REMOVIDO: setImmediate(...) 
-    // Agora o queueService vai pegar este caso automaticamente.
 
-    // Limpeza
-    if (req.files) {
-      for (const key in req.files) {
-        for (const file of req.files[key]) {
-          try {
-            await fs.unlink(file.path);
-          } catch (e) {}
-        }
-      }
-    }
   } catch (error) {
     logger.error(`Erro na criação do caso: ${error.message}`, {
       stack: error.stack,
     });
-    // Limpeza em caso de erro
-    if (req.files) {
-      for (const key in req.files) {
-        for (const file of req.files[key]) {
-          try {
-            await fs.unlink(file.path);
-          } catch (e) {}
-        }
-      }
-    }
-    // Só responde se ainda não tiver respondido
     if (!res.headersSent) {
       res.status(500).json({ error: "Falha ao processar solicitação." });
     }
@@ -1050,12 +1032,11 @@ export const finalizarCasoSolar = async (req, res) => {
       const filePath = `capas/${id}_${Date.now()}_${file.originalname}`;
       const { error: uploadError } = await supabase.storage
         .from(storageBuckets.documentos)
-        .upload(filePath, await fs.readFile(file.path), {
+        .upload(filePath, file.buffer, {
           contentType: file.mimetype,
         });
       if (uploadError) throw uploadError;
       url_capa_processual = filePath;
-      await fs.unlink(file.path);
     }
     const { data, error } = await supabase
       .from("casos")

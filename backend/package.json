@@ -20,7 +20,7 @@
     "multer": "^1.4.5-lts.1",
     "openai": "^4.20.1",
     "pizzip": "^3.1.6",
-    "tesseract.js": "^5.0.3",
+    "@upstash/qstash": "^2.5.0",
     "winston": "^3.19.0"
   },
   "devDependencies": {
