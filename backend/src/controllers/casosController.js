@@ -8,6 +8,7 @@ import { extractTextFromImage } from "../services/documentService.js";
 import { generateDocx } from "../services/documentGenerationService.js";
 import { analyzeCase, generateDosFatos } from "../services/geminiService.js";
 import { getVaraByTipoAcao } from "../config/varasMapping.js";
+import logger from "../utils/logger.js";
 
 // Tempo de expiração (em segundos) para URLs assinadas do Supabase
 const signedExpires = Number.parseInt(
@@ -186,7 +187,7 @@ const extractObjectPath = (storedValue) => {
     const match = decodedPath.match(/\/object\/(?:sign|public)\/[^/]+\/(.+)/);
     return match?.[1] || null;
   } catch (err) {
-    console.warn("Não foi possível interpretar URL armazenada:", err?.message);
+    logger.warn(`Não foi possível interpretar URL armazenada: ${err?.message}`);
     return null;
   }
 };
@@ -199,11 +200,13 @@ const buildSignedUrl = async (bucket, storedValue) => {
     .createSignedUrl(objectPath, signedExpires);
   if (error) {
     if (error.message && error.message.includes("Object not found")) {
-      console.warn(
+      logger.warn(
         `[Storage] Arquivo ausente (Link órfão no Banco): ${objectPath}`
       );
     } else {
-      console.warn(`[Storage] Erro ao gerar URL para ${objectPath}:`, error);
+      logger.error(`[Storage] Erro ao gerar URL para ${objectPath}:`, {
+        error,
+      });
     }
     return null;
   }
@@ -538,7 +541,7 @@ async function processarCasoEmBackground(
   try {
     await supabase
       .from("casos")
-      .update({ status: "processando", processando_iniciado: new Date() })
+      .update({ status: "processando", processing_started_at: new Date() })
       .eq("protocolo", protocolo);
 
     const { data: caso, error: fetchError } = await supabase
@@ -557,7 +560,7 @@ async function processarCasoEmBackground(
           const textoDaImagem = await extractTextFromImage(buffer);
           textoCompleto += `\n\n--- TEXTO EXTRAÍDO: ${docPath} ---\n${textoDaImagem}`;
         } catch (ocrError) {
-          console.warn("Falha no OCR:", ocrError.message);
+          logger.warn(`Falha no OCR para ${docPath}: ${ocrError.message}`);
         }
       }
     }
@@ -568,7 +571,7 @@ async function processarCasoEmBackground(
     try {
       resumo_ia = await analyzeCase(textoCompleto);
     } catch (analyzeError) {
-      console.warn("Falha ao gerar resumo IA:", analyzeError.message);
+      logger.warn(`Falha ao gerar resumo IA: ${analyzeError.message}`);
     }
 
     // Formatação de Dados
@@ -697,7 +700,7 @@ async function processarCasoEmBackground(
     try {
       dosFatosTexto = await generateDosFatos(caseDataForPetition);
     } catch (dosFatosError) {
-      console.warn("Falha ao gerar Dos Fatos IA:", dosFatosError.message);
+      logger.warn(`Falha ao gerar Dos Fatos IA: ${dosFatosError.message}`);
       dosFatosTexto = buildFallbackDosFatos(caseDataForPetition);
     }
 
@@ -720,7 +723,9 @@ async function processarCasoEmBackground(
         });
       if (!uploadDocxErr) url_documento_gerado = docxPath;
     } catch (docxError) {
-      console.error("Erro ao gerar DOCX:", docxError);
+      logger.error(`Erro ao gerar DOCX: ${docxError.message}`, {
+        stack: docxError.stack,
+      });
     }
 
     // Finalizar processamento
@@ -731,12 +736,14 @@ async function processarCasoEmBackground(
         resumo_ia,
         url_documento_gerado,
         peticao_inicial_rascunho: `DOS FATOS\n\n${dosFatosTexto || ""}`,
-        processado_em: new Date(),
+        processed_at: new Date(),
       })
       .eq("protocolo", protocolo);
-    console.log(`✅ Caso ${protocolo} processado em background`);
+    logger.info(`✅ Caso ${protocolo} processado com sucesso em background.`);
   } catch (error) {
-    console.error(`❌ Erro no background para ${protocolo}:`, error);
+    logger.error(`❌ Erro no background para ${protocolo}: ${error.message}`, {
+      stack: error.stack,
+    });
     await supabase
       .from("casos")
       .update({ status: "erro", erro_processamento: error.message })
@@ -765,8 +772,9 @@ export const criarNovoCaso = async (req, res) => {
     const { protocolo, chaveAcesso } = generateCredentials(tipoAcao);
     const chaveAcessoHash = hashKeyWithSalt(chaveAcesso);
 
-    console.log("\n--- DEBUG: CRIAÇÃO DO CASO ---");
-    console.log("Protocolo:", protocolo);
+    logger.info(
+      `Iniciando criação de caso. Protocolo: ${protocolo}, Tipo: ${tipoAcao}`
+    );
 
     // Upload de arquivos
     let url_audio = null;
@@ -783,7 +791,7 @@ export const criarNovoCaso = async (req, res) => {
             contentType: audioFile.mimetype,
           });
         if (audioErr) {
-          console.error("Erro upload áudio:", audioErr);
+          logger.error("Erro upload áudio:", { error: audioErr });
           avisos.push("Falha ao salvar áudio.");
         } else {
           url_audio = filePath;
@@ -798,7 +806,9 @@ export const criarNovoCaso = async (req, res) => {
               .from("peticoes")
               .upload(filePath, fileData, { contentType: docFile.mimetype });
             if (petErr) {
-              console.error("Erro upload petição:", petErr);
+              logger.error(`Erro upload petição (${docFile.originalname}):`, {
+                error: petErr,
+              });
               avisos.push(`Erro ao salvar petição: ${docFile.originalname}`);
             } else {
               url_peticao = filePath; // Agora seguro
@@ -808,7 +818,9 @@ export const criarNovoCaso = async (req, res) => {
               .from("documentos")
               .upload(filePath, fileData, { contentType: docFile.mimetype });
             if (docErr) {
-              console.error("Erro upload documento:", docErr);
+              logger.error(`Erro upload documento (${docFile.originalname}):`, {
+                error: docErr,
+              });
               avisos.push(`Erro ao salvar: ${docFile.originalname}`);
             } else {
               urls_documentos.push(filePath);
@@ -819,7 +831,7 @@ export const criarNovoCaso = async (req, res) => {
     }
 
     // Salvar no Banco (Resposta Rápida)
-    console.log("Salvando dados básicos...");
+    logger.debug("Salvando dados básicos no Supabase...");
     const { error: dbError } = await supabase.from("casos").insert({
       protocolo,
       chave_acesso_hash: chaveAcessoHash,
@@ -834,11 +846,11 @@ export const criarNovoCaso = async (req, res) => {
       documentos_informados: documentosInformadosArray,
       dados_formulario: dados_formulario,
       status: "recebido",
-      criado_em: new Date(),
+      created_at: new Date(),
     });
 
     if (dbError) throw dbError;
-    console.log("✅ Dados salvos. Respondendo...");
+    logger.info(`Caso ${protocolo} salvo. Iniciando processamento background.`);
 
     // Resposta Imediata
     const responsePayload = { protocolo, chaveAcesso };
@@ -860,7 +872,7 @@ export const criarNovoCaso = async (req, res) => {
           url_peticao
         );
       } catch (error) {
-        console.error("Erro fatal no worker:", error);
+        logger.error(`Erro fatal no worker (setImmediate): ${error.message}`);
       }
     });
 
@@ -875,7 +887,9 @@ export const criarNovoCaso = async (req, res) => {
       }
     }
   } catch (error) {
-    console.error("Erro na criação:", error);
+    logger.error(`Erro na criação do caso: ${error.message}`, {
+      stack: error.stack,
+    });
     // Limpeza em caso de erro
     if (req.files) {
       for (const key in req.files) {
@@ -902,7 +916,7 @@ export const listarCasos = async (req, res) => {
     if (error) throw error;
     res.status(200).json(data);
   } catch (error) {
-    console.error("Erro ao listar casos:", error);
+    logger.error(`Erro ao listar casos: ${error.message}`);
     res.status(500).json({ error: "Erro ao listar casos." });
   }
 };
@@ -920,7 +934,7 @@ export const obterDetalhesCaso = async (req, res) => {
     const casoComUrls = await attachSignedUrls(data);
     res.status(200).json(casoComUrls);
   } catch (error) {
-    console.error("Erro ao obter caso:", error);
+    logger.error(`Erro ao obter detalhes do caso ${id}: ${error.message}`);
     res.status(500).json({ error: "Erro ao obter detalhes." });
   }
 };
@@ -1003,7 +1017,7 @@ export const finalizarCasoSolar = async (req, res) => {
         status: "finalizado",
         numero_solar,
         url_capa_processual,
-        finalizado_em: new Date(),
+        finished_at: new Date(),
       })
       .eq("id", id)
       .select()

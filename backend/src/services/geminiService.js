@@ -1,5 +1,6 @@
 import { generateLegalText } from "./aiService.js";
 import dotenv from "dotenv";
+import logger from "../utils/logger.js";
 
 dotenv.config();
 
@@ -25,8 +26,10 @@ const PLACEHOLDER_FIELD = "[DADO PENDENTE]";
 // --- FUNÇÕES UTILITÁRIAS DE NORMALIZAÇÃO ---
 
 export const normalizePromptData = (raw = {}) => {
-  const requerente =
-    raw.requerente || raw.exequente || raw.assistido || raw.cliente || {
+  const requerente = raw.requerente ||
+    raw.exequente ||
+    raw.assistido ||
+    raw.cliente || {
       nome:
         raw.nome_assistido ||
         raw.requerente_nome ||
@@ -42,11 +45,14 @@ export const normalizePromptData = (raw = {}) => {
         raw.data_nascimento_assistido ||
         raw.data_nascimento_requerente,
       representante:
-        raw.representante_requerente || raw.representante || raw.representante_nome || undefined,
+        raw.representante_requerente ||
+        raw.representante ||
+        raw.representante_nome ||
+        undefined,
     };
 
-  const requerido =
-    raw.requerido || raw.executado || {
+  const requerido = raw.requerido ||
+    raw.executado || {
       nome:
         raw.nome_requerido ||
         raw.requerido_nome ||
@@ -81,18 +87,15 @@ export const normalizePromptData = (raw = {}) => {
     exequente: raw.exequente || requerente,
     executado: raw.executado || requerido,
     dadosBancarios,
-    valorMensalPensao:
-      raw.valorMensalPensao ?? raw.valor_mensal_pensao,
+    valorMensalPensao: raw.valorMensalPensao ?? raw.valor_mensal_pensao,
     diaPagamentoMensal: raw.diaPagamentoMensal ?? raw.dia_pagamento_requerido,
     periodoDevedor: raw.periodoDevedor || raw.periodo_debito_execucao,
-    valorTotalDebito:
-      raw.valorTotalDebito || raw.valor_total_debito_execucao,
+    valorTotalDebito: raw.valorTotalDebito || raw.valor_total_debito_execucao,
     cidadeDataAssinatura:
       raw.cidadeDataAssinatura ||
       raw.cidade_assinatura ||
       DEFAULT_CIDADE_ASSINATURA,
-    defensoraNome:
-      raw.defensoraNome || raw.defensora_nome || DEFAULT_DEFENSORA,
+    defensoraNome: raw.defensoraNome || raw.defensora_nome || DEFAULT_DEFENSORA,
     enderecoDPE: raw.enderecoDPE || raw.endereco_dpe || DEFAULT_ENDERECO_DPE,
     telefoneDPE: raw.telefoneDPE || raw.telefone_dpe || DEFAULT_TELEFONE_DPE,
     relato:
@@ -101,8 +104,7 @@ export const normalizePromptData = (raw = {}) => {
       raw.relatoBruto ||
       raw.relato_adicional ||
       "",
-    acao_especifica:
-      raw.acao_especifica || raw.tipo_acao || raw.tipoAcao || "",
+    acao_especifica: raw.acao_especifica || raw.tipo_acao || raw.tipoAcao || "",
     tipo_acao: raw.tipo_acao || raw.tipoAcao || "",
   };
 };
@@ -140,7 +142,9 @@ const cleanText = (value, fallback = "") => {
 
 function sanitizeLegalAbbreviations(text) {
   // 1. Remove formatações Markdown de títulos que a IA possa ter colocado
-  let cleaned = text.replace(/#+\s*Dos Fatos/gi, "").replace(/\*\*Dos Fatos\*\*/gi, "");
+  let cleaned = text
+    .replace(/#+\s*Dos Fatos/gi, "")
+    .replace(/\*\*Dos Fatos\*\*/gi, "");
   // 2. Remove o título "Dos Fatos" se estiver solto no início
   cleaned = cleaned.replace(/^Dos Fatos\n/i, "").trim();
   // 3. Corrige abreviação de artigo (art/ 5 -> art. 5)
@@ -172,10 +176,12 @@ export const analyzeCase = async (fullText) => {
     // Resumo para painel interno tem menor risco, mas passa pelo orquestrador para velocidade (Groq)
     return await generateLegalText(systemPrompt, userPrompt, 0.3);
   } catch (error) {
-    console.error("❌ Erro na análise do caso:", error.message);
+    logger.error(`❌ Erro na análise do caso (IA): ${error.message}`);
     // Melhor tratamento de erros com mensagens mais específicas
     if (error.message.includes("Timeout")) {
-      console.warn("⏱️  Análise do caso atingiu timeout. Continuando sem resumo automático.");
+      logger.warn(
+        "⏱️  Análise do caso atingiu timeout. Continuando sem resumo automático."
+      );
       return null;
     } else {
       throw new Error("Falha ao gerar o resumo do caso: " + error.message);
@@ -190,16 +196,24 @@ export const analyzeCase = async (fullText) => {
 export const generateDosFatos = async (caseData = {}) => {
   try {
     const normalized = normalizePromptData(caseData);
-    const relatoBase = cleanText(normalized.relato, "Relato detalhado não informado.");
+    const relatoBase = cleanText(
+      normalized.relato,
+      "Relato detalhado não informado."
+    );
 
     const formatDocumentList = (docs = []) => {
-      if (!Array.isArray(docs) || !docs.length) return "Nenhum documento ou prova informado.";
-      const filtered = docs.map((doc) => cleanText(doc)).filter((doc) => Boolean(doc));
-      return filtered.length ? filtered.map((doc, index) => `${index + 1}. ${doc}`).join("\n") : "Nenhum documento ou prova informado.";
+      if (!Array.isArray(docs) || !docs.length)
+        return "Nenhum documento ou prova informado.";
+      const filtered = docs
+        .map((doc) => cleanText(doc))
+        .filter((doc) => Boolean(doc));
+      return filtered.length
+        ? filtered.map((doc, index) => `${index + 1}. ${doc}`).join("\n")
+        : "Nenhum documento ou prova informado.";
     };
 
     const documentosList = formatDocumentList(caseData.documentos_informados);
-    
+
     const filhosInfo = cleanText(
       caseData.filhos_info || caseData.filhosInfo || caseData.descricao_guarda,
       "Informações sobre filhos não foram apresentadas."
@@ -210,7 +224,8 @@ export const generateDosFatos = async (caseData = {}) => {
     if (caseData.situacao_financeira_genitora) {
       situacaoAssistido += `\nSituação Financeira: ${caseData.situacao_financeira_genitora}`;
     }
-    if (!situacaoAssistido) situacaoAssistido = "Sem detalhes adicionais sobre o assistido.";
+    if (!situacaoAssistido)
+      situacaoAssistido = "Sem detalhes adicionais sobre o assistido.";
 
     let situacaoRequerido = cleanText(caseData.dados_adicionais_requerido, "");
     if (caseData.requerido_tem_emprego_formal) {
@@ -222,14 +237,23 @@ export const generateDosFatos = async (caseData = {}) => {
     if (normalized.requerido.ocupacao) {
       situacaoRequerido += ` Ocupação: ${normalized.requerido.ocupacao}.`;
     }
-    if (!situacaoRequerido) situacaoRequerido = "Sem detalhes adicionais sobre o requerido.";
+    if (!situacaoRequerido)
+      situacaoRequerido = "Sem detalhes adicionais sobre o requerido.";
 
-    const valorPensao = cleanText(normalized.valorMensalPensao, "Valor não informado");
+    const valorPensao = cleanText(
+      normalized.valorMensalPensao,
+      "Valor não informado"
+    );
     const bensPartilha = cleanText(caseData.bens_partilha);
     const outrosPedidos = [];
     if (bensPartilha) outrosPedidos.push(`Bens a partilhar: ${bensPartilha}`);
-    if (caseData.alimentos_para_ex_conjuge) outrosPedidos.push(`Alimentos para ex-cônjuge: ${caseData.alimentos_para_ex_conjuge}`);
-    const contextoExtra = outrosPedidos.length ? `\nOutros Pedidos/Detalhes: ${outrosPedidos.join("; ")}` : "";
+    if (caseData.alimentos_para_ex_conjuge)
+      outrosPedidos.push(
+        `Alimentos para ex-cônjuge: ${caseData.alimentos_para_ex_conjuge}`
+      );
+    const contextoExtra = outrosPedidos.length
+      ? `\nOutros Pedidos/Detalhes: ${outrosPedidos.join("; ")}`
+      : "";
 
     // --- CONSTRUÇÃO DO MAPA DE PRIVACIDADE (PII MAP) ---
     // Mapeia os dados reais para placeholders.
@@ -237,7 +261,12 @@ export const generateDosFatos = async (caseData = {}) => {
     const piiMap = {};
     const addToPii = (value, placeholder) => {
       // Regra de segurança: só substitui se tiver mais de 3 chars e não for placeholder genérico
-      if (value && value.length > 3 && value !== "Não informado" && value !== "Valor não informado") {
+      if (
+        value &&
+        value.length > 3 &&
+        value !== "Não informado" &&
+        value !== "Valor não informado"
+      ) {
         piiMap[value] = placeholder;
       }
     };
@@ -257,7 +286,9 @@ Não use listas ou tópicos na resposta final. Escreva apenas parágrafos coesos
 
     // No userPrompt, instruímos a IA a usar os placeholders que ela vai receber
     // Ex: Ela vai receber "O autor [NOME_AUTOR]..." em vez de "O autor João..."
-    const userPrompt = `Redija APENAS o conteúdo textual da seção "DOS FATOS" de uma ${normalized.tipo_acao || "petição inicial"}.
+    const userPrompt = `Redija APENAS o conteúdo textual da seção "DOS FATOS" de uma ${
+      normalized.tipo_acao || "petição inicial"
+    }.
 
 ATENÇÃO: NÃO inclua o título "DOS FATOS", "DOS FATOS E FUNDAMENTOS" ou qualquer cabeçalho. Comece diretamente pelo texto.
 
@@ -268,8 +299,12 @@ Estrutura Lógica Obrigatória:
 4. **Conflito:** "Insta salientar..."
 
 DADOS DO CASO:
-- Assistido: ${cleanText(normalized.requerente?.nome)} (CPF: ${cleanText(normalized.requerente?.cpf)})
-- Requerido: ${cleanText(normalized.requerido?.nome)} (CPF: ${cleanText(normalized.requerido?.cpf)})
+- Assistido: ${cleanText(normalized.requerente?.nome)} (CPF: ${cleanText(
+      normalized.requerente?.cpf
+    )})
+- Requerido: ${cleanText(normalized.requerido?.nome)} (CPF: ${cleanText(
+      normalized.requerido?.cpf
+    )})
 - Filhos/Guarda: ${filhosInfo}
 - Situação Mãe: ${situacaoAssistido}
 - Situação Pai: ${situacaoRequerido}
@@ -281,18 +316,27 @@ ${contextoExtra}
 Adapte o texto se o relato informal contradizer o modelo padrão (ex: pai já paga algo), mas mantenha o tom formal.`;
 
     // Chamada Segura: Envia o mapa PII para sanitização automática no aiService
-    const textoGerado = await generateLegalText(systemPrompt, userPrompt, 0.3, piiMap);
+    const textoGerado = await generateLegalText(
+      systemPrompt,
+      userPrompt,
+      0.3,
+      piiMap
+    );
     return sanitizeLegalAbbreviations(textoGerado.trim());
   } catch (error) {
-    console.error("❌ Erro ao gerar a seção 'Dos Fatos' com IA:", error.message);
+    logger.error(
+      `❌ Erro ao gerar a seção 'Dos Fatos' com IA: ${error.message}`
+    );
 
     // Melhor tratamento de erros com fallback automático
     if (error.message.includes("Timeout")) {
-      console.warn("⏱️  Geração dos Fatos atingiu timeout. Usando fallback local...");
+      logger.warn(
+        "⏱️  Geração dos Fatos atingiu timeout. Usando fallback local..."
+      );
       // Usa o fallback local em vez de falhar completamente
       return buildFallbackDosFatos(caseData);
     } else {
-      console.error("🔄 Ativando fallback devido a erro na IA:", error.message);
+      logger.warn(`🔄 Ativando fallback devido a erro na IA: ${error.message}`);
       // Para outros erros, também usa fallback em vez de falhar
       return buildFallbackDosFatos(caseData);
     }

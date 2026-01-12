@@ -1,6 +1,7 @@
 import { supabase } from "../config/supabase.js";
 import { hashPassword, verifyPassword } from "../services/securityService.js";
 import { generateToken } from "../config/jwt.js";
+import logger from "../utils/logger.js";
 
 // --- FUNÇÃO DE CADASTRO (Atualizada com Cargo) ---
 export const registrarDefensor = async (req, res) => {
@@ -9,12 +10,10 @@ export const registrarDefensor = async (req, res) => {
     // Garante que apenas usuários com cargo 'admin' possam criar novos usuários.
     // O objeto 'req.user' é populado pelo authMiddleware.
     if (!req.user || req.user.cargo !== "admin") {
-      return res
-        .status(403)
-        .json({
-          error:
-            "Acesso negado. Apenas administradores podem cadastrar novos membros.",
-        });
+      return res.status(403).json({
+        error:
+          "Acesso negado. Apenas administradores podem cadastrar novos membros.",
+      });
     }
     // ---------------------------------------
 
@@ -24,12 +23,9 @@ export const registrarDefensor = async (req, res) => {
     // 3. Validamos se o cargo é válido (Segurança extra)
     const cargosValidos = ["admin", "defensor", "estagiario", "recepcao"];
     if (!cargosValidos.includes(cargo)) {
-      return res
-        .status(400)
-        .json({
-          error:
-            "Cargo inválido. Use: admin, defensor, estagiario ou recepcao.",
-        });
+      return res.status(400).json({
+        error: "Cargo inválido. Use: admin, defensor, estagiario ou recepcao.",
+      });
     }
 
     const senha_hash = await hashPassword(senha);
@@ -65,7 +61,9 @@ export const registrarDefensor = async (req, res) => {
       },
     });
   } catch (err) {
-    console.error("Erro ao registrar defensor:", err);
+    logger.error(`Erro ao registrar defensor: ${err.message}`, {
+      stack: err.stack,
+    });
     res.status(500).json({ error: "Falha ao registrar defensor." });
   }
 };
@@ -114,7 +112,7 @@ export const loginDefensor = async (req, res) => {
       },
     });
   } catch (err) {
-    console.error("Erro no login:", err);
+    logger.error(`Erro no login (Email: ${email}): ${err.message}`);
     res.status(500).json({ error: "Falha ao fazer login." });
   }
 };
@@ -136,7 +134,7 @@ export const listarDefensores = async (req, res) => {
 
     res.json(data);
   } catch (err) {
-    console.error("Erro ao listar equipe:", err);
+    logger.error(`Erro ao listar equipe: ${err.message}`);
     res.status(500).json({ error: "Erro ao buscar membros da equipe." });
   }
 };
@@ -167,7 +165,7 @@ export const atualizarDefensor = async (req, res) => {
 
     res.json(data);
   } catch (err) {
-    console.error("Erro ao atualizar membro:", err);
+    logger.error(`Erro ao atualizar membro ${req.params.id}: ${err.message}`);
     res.status(500).json({ error: "Erro ao atualizar dados." });
   }
 };
@@ -194,7 +192,7 @@ export const deletarDefensor = async (req, res) => {
 
     res.json({ message: "Membro removido com sucesso." });
   } catch (err) {
-    console.error("Erro ao deletar membro:", err);
+    logger.error(`Erro ao deletar membro ${req.params.id}: ${err.message}`);
     res.status(500).json({ error: "Erro ao excluir usuário." });
   }
 };
@@ -226,7 +224,9 @@ export const resetarSenhaDefensor = async (req, res) => {
 
     res.json({ message: "Senha alterada com sucesso." });
   } catch (err) {
-    console.error("Erro ao resetar senha:", err);
+    logger.error(
+      `Erro ao resetar senha do membro ${req.params.id}: ${err.message}`
+    );
     res.status(500).json({ error: "Erro ao alterar senha." });
   }
 };
