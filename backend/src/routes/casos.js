@@ -12,7 +12,7 @@ import {
 } from "../controllers/casosController.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { upload } from "../middleware/upload.js"; // Usa sua configuração personalizada
-
+import { salvarFeedback } from "../controllers/casosController.js";
 const router = express.Router();
 
 // Configuração para upload de múltiplos arquivos (Criação)
@@ -38,5 +38,5 @@ router.post(
 router.post("/:id/resetar-chave", authMiddleware, resetarChaveAcesso);
 router.patch("/:id/status", authMiddleware, atualizarStatusCaso);
 router.delete("/:id", authMiddleware, deletarCaso);
-
+router.patch("/:id/feedback", authMiddleware, salvarFeedback);
 export default router;

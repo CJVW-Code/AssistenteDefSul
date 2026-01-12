@@ -15,7 +15,6 @@ const PORT = process.env.PORT || 8001;
 
 // Middlewares
 app.use(cors());
-app.use(express.urlencoded({ extended: true }));
 
 // Middleware de Logging de Requisições HTTP
 app.use((req, res, next) => {

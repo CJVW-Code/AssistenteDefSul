@@ -14,6 +14,8 @@ import {
   HelpCircle,
   Loader2,
   RefreshCw,
+  MessageSquare,
+  Save,
 } from "lucide-react";
 import { API_BASE } from "../../../utils/apiBase";
 import { useToast } from "../../../contexts/ToastContext";
@@ -128,6 +130,8 @@ export const DetalhesCaso = () => {
   const [caso, setCaso] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [feedback, setFeedback] = useState("");
+  const [savingFeedback, setSavingFeedback] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [showReview, setShowReview] = useState(false);
   const [showFullPetition, setShowFullPetition] = useState(false);
@@ -136,6 +140,7 @@ export const DetalhesCaso = () => {
   const [arquivoCapa, setArquivoCapa] = useState(null);
   const [enviandoFinalizacao, setEnviandoFinalizacao] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [feedbackInitialized, setFeedbackInitialized] = useState(false);
 
   const fetchDetalhes = useCallback(
     async (silent = false) => {
@@ -169,6 +174,14 @@ export const DetalhesCaso = () => {
     }
     return () => clearInterval(interval);
   }, [caso?.status, fetchDetalhes]);
+
+  // Inicializa o feedback apenas uma vez ao carregar o caso
+  useEffect(() => {
+    if (caso && !feedbackInitialized) {
+      setFeedback(caso.feedback || "");
+      setFeedbackInitialized(true);
+    }
+  }, [caso, feedbackInitialized]);
 
   const handleStatusChange = async (novoStatus) => {
     if (!caso || !novoStatus || novoStatus === caso.status) return;
@@ -245,6 +258,29 @@ export const DetalhesCaso = () => {
       toast.error(error.message);
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const handleSaveFeedback = async () => {
+    setSavingFeedback(true);
+    try {
+      const response = await fetch(`${API_BASE}/casos/${id}/feedback`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ feedback }),
+      });
+
+      if (!response.ok) throw new Error("Falha ao salvar anotações.");
+
+      toast.success("Anotações salvas com sucesso.");
+    } catch (error) {
+      console.error(error);
+      toast.error(error.message);
+    } finally {
+      setSavingFeedback(false);
     }
   };
 
@@ -618,6 +654,33 @@ export const DetalhesCaso = () => {
                 />
               </div>
             )}
+          </section>
+
+          {/* SEÇÃO DE FEEDBACK / ANOTAÇÕES */}
+          <section className="card space-y-4">
+            <div className="flex items-center gap-3">
+              <MessageSquare className="text-primary" />
+              <h2 className="heading-2">Anotações / Feedback</h2>
+            </div>
+            <p className="text-sm text-muted">
+              Espaço para observações internas sobre o caso ou ajustes necessários na minuta.
+            </p>
+            <textarea
+              className="input min-h-[120px] resize-y font-sans"
+              placeholder="Digite suas observações aqui..."
+              value={feedback}
+              onChange={(e) => setFeedback(e.target.value)}
+            />
+            <div className="flex justify-end">
+              <button
+                onClick={handleSaveFeedback}
+                disabled={savingFeedback}
+                className="btn btn-primary flex items-center gap-2"
+              >
+                <Save size={18} />
+                {savingFeedback ? "Salvando..." : "Salvar Anotações"}
+              </button>
+            </div>
           </section>
         </section>
 

@@ -1,4 +1,4 @@
-﻿import { supabase } from "../config/supabase.js";
+﻿﻿import { supabase } from "../config/supabase.js";
 import {
   generateCredentials,
   hashKeyWithSalt,
@@ -1068,6 +1068,24 @@ export const atualizarStatusCaso = async (req, res) => {
     res.status(200).json(data);
   } catch (error) {
     res.status(500).json({ error: "Erro ao atualizar status." });
+  }
+};
+
+export const salvarFeedback = async (req, res) => {
+  const { id } = req.params;
+  const { feedback } = req.body;
+  try {
+    const { data, error } = await supabase
+      .from("casos")
+      .update({ feedback })
+      .eq("id", id)
+      .select()
+      .single();
+    if (error) throw error;
+    res.status(200).json(data);
+  } catch (error) {
+    logger.error(`Erro ao salvar feedback ${id}: ${error.message}`);
+    res.status(500).json({ error: "Erro ao salvar feedback." });
   }
 };
 

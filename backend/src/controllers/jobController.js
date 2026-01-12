@@ -9,11 +9,11 @@ export const processJob = async (req, res) => {
       headers: req.headers,
     });
 
-    // Validação básica do payload
-    if (!req.body || !req.body.protocolo) {
-      logger.warn("⚠️ Payload inválido: protocolo ausente");
+    // Validação do payload
+    if (typeof req.body !== 'object' || req.body === null || !req.body.protocolo) {
+      logger.warn("⚠️ Payload inválido: corpo da requisição não é um objeto ou protocolo está ausente", { body: req.body });
       return res.status(400).json({
-        error: "Protocolo ausente no payload",
+        error: "Payload inválido: o corpo da requisição deve ser um objeto JSON com a propriedade 'protocolo'.",
         success: false,
       });
     }
