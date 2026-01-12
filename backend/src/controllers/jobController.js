@@ -1,20 +1,20 @@
-import logger from '../utils/logger.js';
-import { processarCasoEmBackground } from './casosController.js';
-import { supabase } from '../config/supabase.js';
+import logger from "../utils/logger.js";
+import { processarCasoEmBackground } from "./casosController.js";
+import { supabase } from "../config/supabase.js";
 
 export const processJob = async (req, res) => {
   try {
-    logger.info('📩 Job recebido do QStash:', {
+    logger.info("📩 Job recebido do QStash:", {
       body: req.body,
       headers: req.headers,
     });
 
     // Validação básica do payload
     if (!req.body || !req.body.protocolo) {
-      logger.warn('⚠️ Payload inválido: protocolo ausente');
+      logger.warn("⚠️ Payload inválido: protocolo ausente");
       return res.status(400).json({
-        error: 'Protocolo ausente no payload',
-        success: false
+        error: "Protocolo ausente no payload",
+        success: false,
       });
     }
 
@@ -30,30 +30,30 @@ export const processJob = async (req, res) => {
     if (fetchError || !caso) {
       logger.warn(`⚠️ Caso não encontrado: ${protocolo}`);
       return res.status(404).json({
-        error: 'Caso não encontrado',
+        error: "Caso não encontrado",
         protocolo,
-        success: false
+        success: false,
       });
     }
 
     // Verificar status atual do caso
-    if (caso.status === 'processado') {
+    if (caso.status === "processado") {
       logger.info(`✅ Caso já processado: ${protocolo}`);
       return res.status(200).json({
-        message: 'Caso já processado',
+        message: "Caso já processado",
         protocolo,
         status: caso.status,
-        success: true
+        success: true,
       });
     }
 
-    if (caso.status === 'processando') {
+    if (caso.status === "processando") {
       logger.info(`⏳ Caso já em processamento: ${protocolo}`);
       return res.status(200).json({
-        message: 'Caso já em processamento',
+        message: "Caso já em processamento",
         protocolo,
         status: caso.status,
-        success: true
+        success: true,
       });
     }
 
@@ -62,33 +62,50 @@ export const processJob = async (req, res) => {
       .from("casos")
       .update({
         status: "processando",
-        processing_started_at: new Date()
+        processing_started_at: new Date(),
       })
       .eq("protocolo", protocolo);
 
-    logger.info(`🔄 Iniciando processamento do caso ${protocolo} via QStash`);
-
-    // Chamar a função de processamento existente
-    await processarCasoEmBackground(
-      protocolo,
-      caso.dados_formulario,
-      caso.urls_documentos || [],
-      caso.url_audio,
-      caso.url_peticao
+    logger.info(
+      `🔄 Iniciando processamento do caso ${protocolo} via QStash (Background)`
     );
 
-    logger.info(`✅ Processamento concluído para o caso ${protocolo}`);
-
+    // Responde IMEDIATAMENTE ao QStash para evitar timeout (Erro 500)
     res.status(200).json({
-      message: 'Job processado com sucesso',
+      message: "Job recebido. Processamento iniciado em background.",
       protocolo,
-      success: true
+      success: true,
     });
 
+    // Executa o processamento pesado sem bloquear a resposta HTTP
+    setImmediate(async () => {
+      const startTime = Date.now();
+      logger.info(
+        `🚀 [Background] Iniciando processamento pesado para o caso ${protocolo}...`
+      );
+      try {
+        await processarCasoEmBackground(
+          protocolo,
+          caso.dados_formulario,
+          caso.urls_documentos || [],
+          caso.url_audio,
+          caso.url_peticao
+        );
+        const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+        logger.info(
+          `✅ [Background] Processamento concluído com sucesso para ${protocolo} em ${duration}s`
+        );
+      } catch (err) {
+        const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+        logger.error(
+          `❌ [Background] Erro crítico após ${duration}s no caso ${protocolo}: ${err.message}`
+        );
+      }
+    });
   } catch (error) {
     logger.error(`❌ Erro ao processar job QStash: ${error.message}`, {
       stack: error.stack,
-      body: req.body
+      body: req.body,
     });
 
     // Tentar atualizar o status para erro se o caso existir
@@ -98,18 +115,20 @@ export const processJob = async (req, res) => {
           .from("casos")
           .update({
             status: "erro",
-            erro_processamento: error.message
+            erro_processamento: error.message,
           })
           .eq("protocolo", req.body.protocolo);
       } catch (updateError) {
-        logger.error(`❌ Falha ao atualizar status de erro: ${updateError.message}`);
+        logger.error(
+          `❌ Falha ao atualizar status de erro: ${updateError.message}`
+        );
       }
     }
 
     res.status(500).json({
-      error: 'Erro ao processar job',
+      error: "Erro ao processar job",
       details: error.message,
-      success: false
+      success: false,
     });
   }
 };

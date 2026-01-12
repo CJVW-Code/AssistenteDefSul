@@ -235,7 +235,7 @@ export const Dashboard = () => {
               aria-pressed={active}
               className={`card text-left transition-all border-l-4 ${
                 active
-                  ? "border-l-primary shadow-xl ring-2 ring-primary/30 translate-y-[-2px]"
+                  ? "border-l-primary shadow-xl ring-2 ring-primary/30 -translate-y-0.5"
                   : "border-l-transparent hover:border-l-primary/60"
               }`}
             >

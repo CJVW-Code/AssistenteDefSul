@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import {
@@ -12,6 +12,8 @@ import {
   Scale,
   Trash2,
   HelpCircle,
+  Loader2,
+  RefreshCw,
 } from "lucide-react";
 import { API_BASE } from "../../../utils/apiBase";
 import { useToast } from "../../../contexts/ToastContext";
@@ -35,12 +37,18 @@ const statusBadges = {
 };
 
 const statusDescriptions = {
-  recebido: "O caso foi submetido e está na fila para processamento automático.",
-  processando: "O sistema está extraindo informações dos documentos e gerando a petição inicial.",
-  processado: "O processamento automático foi concluído. A petição está pronta para revisão.",
-  em_analise: "O caso está sendo analisado manualmente por um defensor ou estagiário.",
-  aguardando_docs: "O processo está pausado, aguardando o envio de documentos adicionais pelo cidadão.",
-  encaminhado_solar: "O caso foi finalizado e encaminhado para o sistema Solar da defensoria.",
+  recebido:
+    "O caso foi submetido e está na fila para processamento automático.",
+  processando:
+    "O sistema está extraindo informações dos documentos e gerando a minuta inicial.",
+  processado:
+    "O processamento automático foi concluído. A minuta está pronta para revisão.",
+  em_analise:
+    "O caso está sendo analisado manualmente por um defensor ou estagiário.",
+  aguardando_docs:
+    "O processo está pausado, aguardando o envio de documentos adicionais pelo cidadão.",
+  encaminhado_solar:
+    "O caso foi finalizado e encaminhado para o sistema Solar da defensoria.",
   finalizado: "O caso foi concluído.",
   erro: "Ocorreu um erro crítico durante o processamento automático. Verifique os logs do sistema.",
 };
@@ -119,6 +127,7 @@ export const DetalhesCaso = () => {
   const { confirm } = useConfirm();
   const [caso, setCaso] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [showReview, setShowReview] = useState(false);
   const [showFullPetition, setShowFullPetition] = useState(false);
@@ -128,8 +137,8 @@ export const DetalhesCaso = () => {
   const [enviandoFinalizacao, setEnviandoFinalizacao] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  useEffect(() => {
-    const fetchDetalhes = async () => {
+  const fetchDetalhes = useCallback(
+    async (silent = false) => {
       try {
         const response = await fetch(`${API_BASE}/casos/${id}`, {
           headers: { Authorization: `Bearer ${token}` },
@@ -140,11 +149,26 @@ export const DetalhesCaso = () => {
       } catch (error) {
         console.error(error);
       } finally {
-        setLoading(false);
+        if (!silent) setLoading(false);
       }
-    };
+    },
+    [id, token]
+  );
+
+  useEffect(() => {
     fetchDetalhes();
-  }, [id, token]);
+  }, [fetchDetalhes]);
+
+  // Polling automático se estiver processando
+  useEffect(() => {
+    let interval;
+    if (caso?.status === "processando") {
+      interval = setInterval(() => {
+        fetchDetalhes(true);
+      }, 5000);
+    }
+    return () => clearInterval(interval);
+  }, [caso?.status, fetchDetalhes]);
 
   const handleStatusChange = async (novoStatus) => {
     if (!caso || !novoStatus || novoStatus === caso.status) return;
@@ -199,6 +223,7 @@ export const DetalhesCaso = () => {
   );
 
   const handleGenerateFatos = async () => {
+    setIsGenerating(true);
     try {
       const response = await fetch(`${API_BASE}/casos/${id}/gerar-fatos`, {
         method: "POST",
@@ -214,10 +239,12 @@ export const DetalhesCaso = () => {
 
       const updatedCaso = await response.json();
       setCaso(updatedCaso);
-      toast.success("Sessão dos fatos gerada com sucesso! Recarregue a página.");
+      toast.success("Solicitação enviada. O sistema está processando...");
     } catch (error) {
       console.error(error);
       toast.error(error.message);
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -336,84 +363,193 @@ export const DetalhesCaso = () => {
                 <Eye size={18} />
                 Revisar dados preenchidos
               </button>
-              {showReview && (() => {
-                const dados = caso.dados_formulario || {};
-                const isRepresentacao = dados.assistido_eh_incapaz === "sim";
+              {showReview &&
+                (() => {
+                  const dados = caso.dados_formulario || {};
+                  const isRepresentacao = dados.assistido_eh_incapaz === "sim";
 
-                return (
-                  <div className="mt-4 space-y-6 border-t border-soft pt-6">
-                    {/* Seção do Beneficiário */}
-                    <div className="space-y-4">
-                      <h3 className="heading-3 text-primary">
-                        {isRepresentacao ? "Dados do Beneficiário (Criança/Adolescente)" : "Dados do Autor da Ação"}
-                      </h3>
-                      <div className="grid gap-4 md:grid-cols-2">
-                        {renderDataField("Nome Completo", dados.nome)}
-                        {renderDataField("CPF", dados.cpf)}
-                        {renderDataField("Data de Nascimento", dados.assistido_data_nascimento)}
-                        {renderDataField("Nacionalidade", dados.assistido_nacionalidade)}
-                        {renderDataField("Estado Civil", dados.assistido_estado_civil)}
-                        {renderDataField("Endereço Residencial", dados.endereco_assistido)}
-                        {renderDataField("Email", dados.email_assistido)}
-                        {renderDataField("Telefone de Contato", dados.telefone)}
-                        {renderDataField("RG", `${dados.assistido_rg_numero || ''} ${dados.assistido_rg_orgao || ''}`.trim())}
-                      </div>
-                    </div>
-
-                    {/* Seção do Representante (Condicional) */}
-                    {isRepresentacao && (
-                      <div className="space-y-4 pt-4 border-t border-soft">
-                        <h3 className="heading-3 text-primary">Dados do Representante Legal</h3>
+                  return (
+                    <div className="mt-4 space-y-6 border-t border-soft pt-6">
+                      {/* Seção do Beneficiário */}
+                      <div className="space-y-4">
+                        <h3 className="heading-3 text-primary">
+                          {isRepresentacao
+                            ? "Dados do Beneficiário (Criança/Adolescente)"
+                            : "Dados do Autor da Ação"}
+                        </h3>
                         <div className="grid gap-4 md:grid-cols-2">
-                          {renderDataField("Nome Completo", dados.representante_nome)}
-                          {renderDataField("CPF", dados.representante_cpf)}
-                          {renderDataField("Nacionalidade", dados.representante_nacionalidade)}
-                          {renderDataField("Estado Civil", dados.representante_estado_civil)}
-                          {renderDataField("Profissão", dados.representante_ocupacao)}
-                          {renderDataField("Endereço Residencial", dados.representante_endereco_residencial)}
-                          {renderDataField("Endereço Profissional", dados.representante_endereco_profissional)}
-                          {renderDataField("Email", dados.representante_email)}
-                          {renderDataField("Telefone", dados.representante_telefone)}
-                          {renderDataField("RG", `${dados.representante_rg_numero || ''} ${dados.representante_rg_orgao || ''}`.trim())}
+                          {renderDataField("Nome Completo", dados.nome)}
+                          {renderDataField("CPF", dados.cpf)}
+                          {renderDataField(
+                            "Data de Nascimento",
+                            dados.assistido_data_nascimento
+                          )}
+                          {renderDataField(
+                            "Nacionalidade",
+                            dados.assistido_nacionalidade
+                          )}
+                          {renderDataField(
+                            "Estado Civil",
+                            dados.assistido_estado_civil
+                          )}
+                          {renderDataField(
+                            "Endereço Residencial",
+                            dados.endereco_assistido
+                          )}
+                          {renderDataField("Email", dados.email_assistido)}
+                          {renderDataField(
+                            "Telefone de Contato",
+                            dados.telefone
+                          )}
+                          {renderDataField(
+                            "RG",
+                            `${dados.assistido_rg_numero || ""} ${
+                              dados.assistido_rg_orgao || ""
+                            }`.trim()
+                          )}
                         </div>
                       </div>
-                    )}
 
-                    {/* Seção do Requerido */}
-                    <div className="space-y-4 pt-4 border-t border-soft">
-                      <h3 className="heading-3 text-primary">Dados da Parte Contrária (Requerido)</h3>
-                      <div className="grid gap-4 md:grid-cols-2">
-                        {renderDataField("Nome Completo", dados.nome_requerido)}
-                        {renderDataField("CPF", dados.cpf_requerido)}
-                        {renderDataField("Endereço conhecido", dados.endereco_requerido)}
-                        {renderDataField("Telefone", dados.requerido_telefone)}
-                        {renderDataField("Email", dados.requerido_email)}
-                        {renderDataField("Profissão", dados.requerido_ocupacao)}
-                        {renderDataField("Endereço de Trabalho", dados.requerido_endereco_profissional)}
-                        {renderDataField("Dados Adicionais", dados.dados_adicionais_requerido)}
+                      {/* Seção do Representante (Condicional) */}
+                      {isRepresentacao && (
+                        <div className="space-y-4 pt-4 border-t border-soft">
+                          <h3 className="heading-3 text-primary">
+                            Dados do Representante Legal
+                          </h3>
+                          <div className="grid gap-4 md:grid-cols-2">
+                            {renderDataField(
+                              "Nome Completo",
+                              dados.representante_nome
+                            )}
+                            {renderDataField("CPF", dados.representante_cpf)}
+                            {renderDataField(
+                              "Nacionalidade",
+                              dados.representante_nacionalidade
+                            )}
+                            {renderDataField(
+                              "Estado Civil",
+                              dados.representante_estado_civil
+                            )}
+                            {renderDataField(
+                              "Profissão",
+                              dados.representante_ocupacao
+                            )}
+                            {renderDataField(
+                              "Endereço Residencial",
+                              dados.representante_endereco_residencial
+                            )}
+                            {renderDataField(
+                              "Endereço Profissional",
+                              dados.representante_endereco_profissional
+                            )}
+                            {renderDataField(
+                              "Email",
+                              dados.representante_email
+                            )}
+                            {renderDataField(
+                              "Telefone",
+                              dados.representante_telefone
+                            )}
+                            {renderDataField(
+                              "RG",
+                              `${dados.representante_rg_numero || ""} ${
+                                dados.representante_rg_orgao || ""
+                              }`.trim()
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Seção do Requerido */}
+                      <div className="space-y-4 pt-4 border-t border-soft">
+                        <h3 className="heading-3 text-primary">
+                          Dados da Parte Contrária (Requerido)
+                        </h3>
+                        <div className="grid gap-4 md:grid-cols-2">
+                          {renderDataField(
+                            "Nome Completo",
+                            dados.nome_requerido
+                          )}
+                          {renderDataField("CPF", dados.cpf_requerido)}
+                          {renderDataField(
+                            "Endereço conhecido",
+                            dados.endereco_requerido
+                          )}
+                          {renderDataField(
+                            "Telefone",
+                            dados.requerido_telefone
+                          )}
+                          {renderDataField("Email", dados.requerido_email)}
+                          {renderDataField(
+                            "Profissão",
+                            dados.requerido_ocupacao
+                          )}
+                          {renderDataField(
+                            "Endereço de Trabalho",
+                            dados.requerido_endereco_profissional
+                          )}
+                          {renderDataField(
+                            "Dados Adicionais",
+                            dados.dados_adicionais_requerido
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Seção de Detalhes do Caso */}
+                      <div className="space-y-4 pt-4 border-t border-soft">
+                        <h3 className="heading-3 text-primary">
+                          Detalhes do Pedido e do Caso
+                        </h3>
+                        <div className="grid gap-4 md:grid-cols-2">
+                          {renderDataField(
+                            "Valor da Pensão Solicitado",
+                            dados.valor_mensal_pensao
+                          )}
+                          {renderDataField(
+                            "Dados Bancários para Depósito",
+                            dados.dados_bancarios_deposito
+                          )}
+                          {renderDataField(
+                            "Descrição da Guarda",
+                            dados.descricao_guarda
+                          )}
+                          {renderDataField(
+                            "Situação Financeira de quem cuida",
+                            dados.situacao_financeira_genitora
+                          )}
+                          {renderDataField(
+                            "Requerido tem emprego formal?",
+                            dados.requerido_tem_emprego_formal
+                          )}
+                          {renderDataField(
+                            "Nome da Empresa",
+                            dados.empregador_requerido_nome
+                          )}
+                          {renderDataField(
+                            "Endereço da Empresa",
+                            dados.empregador_requerido_endereco
+                          )}
+                          {/* Adicionar outros campos específicos da ação, se houver */}
+                          {dados.numero_processo_originario &&
+                            renderDataField(
+                              "Processo Original",
+                              dados.numero_processo_originario
+                            )}
+                          {dados.periodo_debito_execucao &&
+                            renderDataField(
+                              "Período do Débito",
+                              dados.periodo_debito_execucao
+                            )}
+                          {dados.valor_total_debito_execucao &&
+                            renderDataField(
+                              "Valor Total do Débito",
+                              dados.valor_total_debito_execucao
+                            )}
+                        </div>
                       </div>
                     </div>
-                    
-                    {/* Seção de Detalhes do Caso */}
-                    <div className="space-y-4 pt-4 border-t border-soft">
-                      <h3 className="heading-3 text-primary">Detalhes do Pedido e do Caso</h3>
-                       <div className="grid gap-4 md:grid-cols-2">
-                        {renderDataField("Valor da Pensão Solicitado", dados.valor_mensal_pensao)}
-                        {renderDataField("Dados Bancários para Depósito", dados.dados_bancarios_deposito)}
-                        {renderDataField("Descrição da Guarda", dados.descricao_guarda)}
-                        {renderDataField("Situação Financeira de quem cuida", dados.situacao_financeira_genitora)}
-                        {renderDataField("Requerido tem emprego formal?", dados.requerido_tem_emprego_formal)}
-                        {renderDataField("Nome da Empresa", dados.empregador_requerido_nome)}
-                        {renderDataField("Endereço da Empresa", dados.empregador_requerido_endereco)}
-                        {/* Adicionar outros campos específicos da ação, se houver */}
-                        {dados.numero_processo_originario && renderDataField("Processo Original", dados.numero_processo_originario)}
-                        {dados.periodo_debito_execucao && renderDataField("Período do Débito", dados.periodo_debito_execucao)}
-                        {dados.valor_total_debito_execucao && renderDataField("Valor Total do Débito", dados.valor_total_debito_execucao)}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
+                  );
+                })()}
             </div>
           </div>
 
@@ -444,9 +580,17 @@ export const DetalhesCaso = () => {
             </div>
             <button
               onClick={handleGenerateFatos}
-              className="btn btn-primary w-full mt-4"
+              disabled={isGenerating || caso.status === "processando"}
+              className="btn btn-primary w-full mt-4 flex items-center justify-center gap-2"
             >
-              Gerar sessão dos fatos
+              {isGenerating || caso.status === "processando" ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  Processando IA...
+                </>
+              ) : (
+                "Gerar sessão dos fatos"
+              )}
             </button>
           </section>
 
@@ -456,15 +600,17 @@ export const DetalhesCaso = () => {
               className="btn btn-secondary w-full justify-start"
             >
               <Eye size={18} />
-              {showFullPetition ? "Ocultar petição completa" : "Visualizar petição completa (Backup)"}
+              {showFullPetition
+                ? "Ocultar minuta completa"
+                : "Visualizar minuta completa (Backup)"}
             </button>
-            
+
             {showFullPetition && (
               <div className="mt-4">
                 <CollapsibleText
                   text={
                     caso.peticao_completa_texto ||
-                    "Petição completa não disponível ou ainda não gerada."
+                    "Minuta completa não disponível ou ainda não gerada."
                   }
                   isPre={true}
                   maxLength={2000}
@@ -480,7 +626,9 @@ export const DetalhesCaso = () => {
           {user?.cargo === "admin" && (
             <div className="card space-y-4">
               <div className="flex items-center justify-between">
-                <h2 className="heading-2 text-red-500">Ações Administrativas</h2>
+                <h2 className="heading-2 text-red-500">
+                  Ações Administrativas
+                </h2>
                 <button
                   onClick={handleDeleteCaso}
                   disabled={isDeleting}
@@ -491,7 +639,8 @@ export const DetalhesCaso = () => {
                 </button>
               </div>
               <p className="text-sm text-muted">
-                Esta ação não pode ser desfeita. Todos os dados do caso serão removidos permanentemente.
+                Esta ação não pode ser desfeita. Todos os dados do caso serão
+                removidos permanentemente.
               </p>
             </div>
           )}
@@ -507,7 +656,7 @@ export const DetalhesCaso = () => {
                   className="btn btn-primary w-full justify-start"
                 >
                   <Download size={18} />
-                  Baixar petição gerada
+                  Baixar minuta gerada
                 </a>
               )}
               {caso.url_audio && (
@@ -544,7 +693,19 @@ export const DetalhesCaso = () => {
           <div className="card space-y-2">
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted">Status atual</p>
-              <div className="relative flex items-center gap-2 group">
+              <div className="relative flex items-center gap-2 group z-10">
+                <button
+                  onClick={() => fetchDetalhes(true)}
+                  className="text-muted hover:text-primary transition-colors p-1"
+                  title="Atualizar status"
+                >
+                  <RefreshCw
+                    size={16}
+                    className={
+                      caso.status === "processando" ? "animate-spin" : ""
+                    }
+                  />
+                </button>
                 <span className={`badge capitalize ${badgeClass}`}>
                   {statusKey.replace(/_/g, " ")}
                 </span>

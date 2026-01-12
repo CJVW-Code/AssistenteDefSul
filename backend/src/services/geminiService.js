@@ -174,7 +174,15 @@ export const analyzeCase = async (fullText) => {
 
   try {
     // Resumo para painel interno tem menor risco, mas passa pelo orquestrador para velocidade (Groq)
-    return await generateLegalText(systemPrompt, userPrompt, 0.3);
+    logger.info("🤖 [IA] Iniciando análise de caso (Resumo)...");
+    const start = Date.now();
+    const result = await generateLegalText(systemPrompt, userPrompt, 0.3);
+    logger.info(
+      `✅ [IA] Análise concluída em ${((Date.now() - start) / 1000).toFixed(
+        2
+      )}s`
+    );
+    return result;
   } catch (error) {
     logger.error(`❌ Erro na análise do caso (IA): ${error.message}`);
     // Melhor tratamento de erros com mensagens mais específicas
@@ -316,11 +324,22 @@ ${contextoExtra}
 Adapte o texto se o relato informal contradizer o modelo padrão (ex: pai já paga algo), mas mantenha o tom formal.`;
 
     // Chamada Segura: Envia o mapa PII para sanitização automática no aiService
+    logger.info(
+      `🤖 [IA] Gerando seção 'Dos Fatos' para ${
+        normalized.requerente?.nome || "Desconhecido"
+      }...`
+    );
+    const start = Date.now();
     const textoGerado = await generateLegalText(
       systemPrompt,
       userPrompt,
       0.3,
       piiMap
+    );
+    logger.info(
+      `✅ [IA] 'Dos Fatos' gerado em ${((Date.now() - start) / 1000).toFixed(
+        2
+      )}s`
     );
     return sanitizeLegalAbbreviations(textoGerado.trim());
   } catch (error) {
