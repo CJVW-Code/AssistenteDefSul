@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import {
   ChevronLeft,
@@ -10,9 +10,12 @@ import {
   CheckCircle,
   FileText,
   Scale,
+  Trash2,
 } from "lucide-react";
 import { API_BASE } from "../../../utils/apiBase";
 import { useToast } from "../../../contexts/ToastContext";
+import { jwtDecode } from "jwt-decode";
+import { useConfirm } from "../../../contexts/ConfirmContext";
 
 const statusOptions = [
   { value: "recebido", label: "Recebido" },
@@ -95,9 +98,12 @@ const CollapsibleText = ({
 
 export const DetalhesCaso = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { token } = useAuth();
   const { toast } = useToast();
+  const { confirm } = useConfirm();
   const [caso, setCaso] = useState(null);
+  const [defensor, setDefensor] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
   const [showReview, setShowReview] = useState(false);
@@ -105,6 +111,40 @@ export const DetalhesCaso = () => {
   const [numProcesso, setNumProcesso] = useState("");
   const [arquivoCapa, setArquivoCapa] = useState(null);
   const [enviandoFinalizacao, setEnviandoFinalizacao] = useState(false);
+
+  useEffect(() => {
+    if (token) {
+      try {
+        const decoded = jwtDecode(token);
+        setDefensor(decoded);
+      } catch (e) {
+        console.error("Erro ao decodificar token", e);
+      }
+    }
+  }, [token]);
+
+  const handleDelete = async () => {
+    if (
+      await confirm(
+        "Tem certeza que deseja excluir este caso permanentemente? Todos os dados serão perdidos.",
+        "Excluir Caso"
+      )
+    ) {
+      try {
+        const response = await fetch(`${API_BASE}/casos/${id}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!response.ok) throw new Error("Falha ao excluir o caso.");
+
+        toast.success("Caso excluído com sucesso.");
+        navigate("/painel/casos");
+      } catch (err) {
+        toast.error(err.message);
+      }
+    }
+  };
 
   useEffect(() => {
     const fetchDetalhes = async () => {
@@ -192,7 +232,9 @@ export const DetalhesCaso = () => {
 
       const updatedCaso = await response.json();
       setCaso(updatedCaso);
-      toast.success("Sessão dos fatos gerada com sucesso! Recarregue a página.");
+      toast.success(
+        "Sessão dos fatos gerada com sucesso! Recarregue a página."
+      );
     } catch (error) {
       console.error(error);
       toast.error(error.message);
@@ -249,6 +291,15 @@ export const DetalhesCaso = () => {
             Protocolo {caso.protocolo} • {caso.tipo_acao}
           </p>
         </div>
+        {defensor?.cargo === "admin" && (
+          <button
+            onClick={handleDelete}
+            className="btn btn-ghost text-red-400 hover:bg-red-500/10 border border-red-500/20"
+          >
+            <Trash2 size={18} className="mr-2" />
+            Excluir Caso
+          </button>
+        )}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -323,11 +374,11 @@ export const DetalhesCaso = () => {
           </section>
 
           <section className="card space-y-4">
-            <h2 className="heading-2">Visualizar petição completa</h2>
+            <h2 className="heading-2">Visualizar minuta completa</h2>
             <CollapsibleText
               text={
                 caso.peticao_completa_texto ||
-                "Petição completa não disponível ou ainda não gerada."
+                "Minuta completa não disponível ou ainda não gerada."
               }
               isPre={true}
               maxLength={700}
@@ -348,7 +399,7 @@ export const DetalhesCaso = () => {
                   className="btn btn-primary w-full justify-start"
                 >
                   <Download size={18} />
-                  Baixar petição gerada
+                  Baixar minuta gerada
                 </a>
               )}
               {caso.url_audio && (

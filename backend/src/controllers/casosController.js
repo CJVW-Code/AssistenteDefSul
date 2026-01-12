@@ -4,7 +4,7 @@ import {
   hashKeyWithSalt,
 } from "../services/securityService.js";
 import fs from "fs/promises";
-import { extractTextFromImage } from "../services/documentService.js";
+import { visionOCR } from "../services/aiService.js";
 import { generateDocx } from "../services/documentGenerationService.js";
 import { analyzeCase, generateDosFatos } from "../services/geminiService.js";
 import { getVaraByTipoAcao } from "../config/varasMapping.js";
@@ -531,19 +531,17 @@ const buildDocxTemplatePayload = (
 };
 
 // --- WORKER EM BACKGROUND ---
-async function processarCasoEmBackground(
-  protocolo,
-  dados_formulario,
-  urls_documentos,
-  url_audio,
-  url_peticao
-) {
+// Agora exportamos para usar no queueService
+// E removemos os argumentos extras, pois vamos buscar tudo do banco para garantir consistência
+export async function processarCasoEmBackground(protocolo) {
   try {
+    // 1. Marca como processando para ninguém mais pegar
     await supabase
       .from("casos")
       .update({ status: "processando", processing_started_at: new Date() })
       .eq("protocolo", protocolo);
 
+    // 2. Busca os dados completos do caso no banco
     const { data: caso, error: fetchError } = await supabase
       .from("casos")
       .select("*")
@@ -551,14 +549,37 @@ async function processarCasoEmBackground(
       .single();
     if (fetchError || !caso) throw new Error("Caso não encontrado");
 
+    // Recupera as variáveis que antes vinham por argumento
+    const dados_formulario = caso.dados_formulario || {};
+    const urls_documentos = caso.urls_documentos || [];
+    // const url_audio = caso.url_audio; // Se precisar no futuro
+    // const url_peticao = caso.url_peticao; // Se precisar no futuro
+
     // OCR
     let textoCompleto = caso.relato_texto || "";
     for (const docPath of urls_documentos) {
       if (docPath.match(/\.(jpg|jpeg|png)$/i)) {
         try {
-          const buffer = await fs.readFile(`./uploads/${docPath}`);
-          const textoDaImagem = await extractTextFromImage(buffer);
+          // CORREÇÃO: Baixa do Supabase, pois o arquivo local já foi deletado
+          const { data: blob, error: downErr } = await supabase.storage
+            .from(storageBuckets.documentos)
+            .download(docPath);
+
+          if (downErr) throw new Error(`Erro download Supabase: ${downErr.message}`);
+
+          const arrayBuffer = await blob.arrayBuffer();
+          const buffer = Buffer.from(arrayBuffer);
+
+          // Usa a IA (Gemini Vision) para ler o documento em vez do Tesseract
+          const mimeType = docPath.toLowerCase().endsWith(".png") ? "image/png" : "image/jpeg";
+          // Adicionamos um prompt explícito para garantir que a IA transcreva o texto
+          const textoDaImagem = await visionOCR(buffer, mimeType, "Transcreva integralmente todo o texto legível presente nesta imagem.");
           textoCompleto += `\n\n--- TEXTO EXTRAÍDO: ${docPath} ---\n${textoDaImagem}`;
+          
+          // LIMPEZA DE MEMÓRIA (RENDER): Libera buffer da imagem imediatamente
+          if (global.gc) {
+            global.gc();
+          }
         } catch (ocrError) {
           logger.warn(`Falha no OCR para ${docPath}: ${ocrError.message}`);
         }
@@ -713,7 +734,7 @@ async function processarCasoEmBackground(
         caseDataForPetition
       );
       const docxBuffer = await generateDocx(docxData);
-      const docxPath = `${protocolo}/peticao_inicial_${protocolo}.docx`;
+      const docxPath = `${protocolo}/minuta_inicial_${protocolo}.docx`;
       const { error: uploadDocxErr } = await supabase.storage
         .from("peticoes")
         .upload(docxPath, docxBuffer, {
@@ -740,6 +761,12 @@ async function processarCasoEmBackground(
       })
       .eq("protocolo", protocolo);
     logger.info(`✅ Caso ${protocolo} processado com sucesso em background.`);
+
+    // LIMPEZA DE MEMÓRIA (RENDER): Coleta final após processamento pesado
+    if (global.gc) {
+      logger.debug("🧹 Executando Garbage Collector manual (Fim do processamento)...");
+      global.gc();
+    }
   } catch (error) {
     logger.error(`❌ Erro no background para ${protocolo}: ${error.message}`, {
       stack: error.stack,
@@ -776,58 +803,76 @@ export const criarNovoCaso = async (req, res) => {
       `Iniciando criação de caso. Protocolo: ${protocolo}, Tipo: ${tipoAcao}`
     );
 
-    // Upload de arquivos
+    // Upload de arquivos com tratamento de erros robusto
     let url_audio = null;
     let urls_documentos = [];
-    let url_peticao = null; // [CORREÇÃO] Inicializado para evitar ReferenceError
+    let url_peticao = null;
 
     if (req.files) {
-      if (req.files.audio) {
-        const audioFile = req.files.audio[0];
-        const filePath = `${protocolo}/${audioFile.filename}`;
-        const { error: audioErr } = await supabase.storage
-          .from("audios")
-          .upload(filePath, await fs.readFile(audioFile.path), {
-            contentType: audioFile.mimetype,
-          });
-        if (audioErr) {
-          logger.error("Erro upload áudio:", { error: audioErr });
-          avisos.push("Falha ao salvar áudio.");
-        } else {
-          url_audio = filePath;
+      // Processar áudio com try-catch
+      if (req.files.audio && req.files.audio[0]) {
+        try {
+          const audioFile = req.files.audio[0];
+          const filePath = `${protocolo}/${audioFile.filename}`;
+          const { error: audioErr } = await supabase.storage
+            .from("audios")
+            .upload(filePath, await fs.readFile(audioFile.path), {
+              contentType: audioFile.mimetype,
+            });
+          if (audioErr) {
+            logger.error("Erro upload áudio:", { error: audioErr });
+            avisos.push("Falha ao salvar áudio.");
+          } else {
+            url_audio = filePath;
+          }
+        } catch (audioError) {
+          logger.error("Erro ao processar áudio:", audioError.message);
+          avisos.push("Erro ao processar arquivo de áudio.");
         }
       }
-      if (req.files.documentos) {
+
+      // Processar documentos com try-catch individual
+      if (req.files.documentos && req.files.documentos.length > 0) {
         for (const docFile of req.files.documentos) {
-          const filePath = `${protocolo}/${docFile.filename}`;
-          const fileData = await fs.readFile(docFile.path);
-          if (docFile.originalname.toLowerCase().includes("peticao")) {
-            const { error: petErr } = await supabase.storage
-              .from("peticoes")
-              .upload(filePath, fileData, { contentType: docFile.mimetype });
-            if (petErr) {
-              logger.error(`Erro upload petição (${docFile.originalname}):`, {
-                error: petErr,
-              });
-              avisos.push(`Erro ao salvar petição: ${docFile.originalname}`);
+          try {
+            const filePath = `${protocolo}/${docFile.filename}`;
+            const fileData = await fs.readFile(docFile.path);
+
+            if (docFile.originalname.toLowerCase().includes("peticao")) {
+              const { error: petErr } = await supabase.storage
+                .from("peticoes")
+                .upload(filePath, fileData, { contentType: docFile.mimetype });
+              if (petErr) {
+                logger.error(`Erro upload petição (${docFile.originalname}):`, {
+                  error: petErr,
+                });
+                avisos.push(`Erro ao salvar petição: ${docFile.originalname}`);
+              } else {
+                url_peticao = filePath;
+              }
             } else {
-              url_peticao = filePath; // Agora seguro
+              const { error: docErr } = await supabase.storage
+                .from("documentos")
+                .upload(filePath, fileData, { contentType: docFile.mimetype });
+              if (docErr) {
+                logger.error(`Erro upload documento (${docFile.originalname}):`, {
+                  error: docErr,
+                });
+                avisos.push(`Erro ao salvar: ${docFile.originalname}`);
+              } else {
+                urls_documentos.push(filePath);
+              }
             }
-          } else {
-            const { error: docErr } = await supabase.storage
-              .from("documentos")
-              .upload(filePath, fileData, { contentType: docFile.mimetype });
-            if (docErr) {
-              logger.error(`Erro upload documento (${docFile.originalname}):`, {
-                error: docErr,
-              });
-              avisos.push(`Erro ao salvar: ${docFile.originalname}`);
-            } else {
-              urls_documentos.push(filePath);
-            }
+          } catch (docError) {
+            logger.error(`Erro ao processar documento ${docFile.originalname}:`, docError.message);
+            avisos.push(`Erro ao processar: ${docFile.originalname}`);
           }
         }
       }
+    } else if (dados_formulario.documentFiles && dados_formulario.documentFiles.length > 0) {
+      // Aviso se arquivos foram selecionados mas não chegaram
+      logger.warn(`Upload falhou: ${dados_formulario.documentFiles.length} arquivos não recebidos pelo servidor`);
+      avisos.push("Aviso: Arquivos selecionados não foram recebidos pelo servidor.");
     }
 
     // Salvar no Banco (Resposta Rápida)
@@ -845,7 +890,7 @@ export const criarNovoCaso = async (req, res) => {
       urls_documentos,
       documentos_informados: documentosInformadosArray,
       dados_formulario: dados_formulario,
-      status: "recebido",
+      status: "pendente", // <--- Mudado para 'pendente' para a fila pegar
       created_at: new Date(),
     });
 
@@ -857,24 +902,12 @@ export const criarNovoCaso = async (req, res) => {
     if (avisos.length) responsePayload.avisos = avisos;
     res.status(201).json({
       ...responsePayload,
-      message: "Caso registrado! Processando...",
-      status: "recebido",
+      message: "Caso registrado! Aguardando processamento na fila.",
+      status: "pendente",
     });
-
-    // Background Worker
-    setImmediate(async () => {
-      try {
-        await processarCasoEmBackground(
-          protocolo,
-          dados_formulario,
-          urls_documentos,
-          url_audio,
-          url_peticao
-        );
-      } catch (error) {
-        logger.error(`Erro fatal no worker (setImmediate): ${error.message}`);
-      }
-    });
+    
+    // REMOVIDO: setImmediate(...) 
+    // Agora o queueService vai pegar este caso automaticamente.
 
     // Limpeza
     if (req.files) {
@@ -909,10 +942,18 @@ export const criarNovoCaso = async (req, res) => {
 
 export const listarCasos = async (req, res) => {
   try {
-    const { data, error } = await supabase
+    const { cpf } = req.query;
+
+    let query = supabase
       .from("casos")
       .select("*")
       .order("created_at", { ascending: false });
+
+    if (cpf) {
+      query = query.eq("cpf_assistido", cpf);
+    }
+
+    const { data, error } = await query;
     if (error) throw error;
     res.status(200).json(data);
   } catch (error) {
@@ -974,6 +1015,11 @@ export const regenerarDosFatos = async (req, res) => {
       .update({ peticao_inicial_rascunho: `DOS FATOS\n\n${dosFatosTexto}` })
       .eq("id", id);
     if (updateError) throw updateError;
+
+    // LIMPEZA DE MEMÓRIA (RENDER)
+    if (global.gc) {
+      global.gc();
+    }
     res.json({ message: "Texto regenerado", texto: dosFatosTexto });
   } catch (error) {
     res.status(500).json({ error: "Falha ao regenerar texto." });
@@ -1048,5 +1094,27 @@ export const resetarChaveAcesso = async (req, res) => {
     res.status(200).json({ novaChave: chaveAcesso });
   } catch (error) {
     res.status(500).json({ error: "Erro ao resetar chave." });
+  }
+};
+export const deletarCaso = async (req, res) => {
+  try {
+    // Verificação de segurança: Apenas admin pode excluir
+    if (!req.user || req.user.cargo !== "admin") {
+      return res.status(403).json({
+        error: "Acesso negado. Apenas administradores podem excluir casos.",
+      });
+    }
+
+    const { id } = req.params;
+
+    // Deleta o registro do banco
+    const { error } = await supabase.from("casos").delete().eq("id", id);
+
+    if (error) throw error;
+
+    res.status(200).json({ message: "Caso excluído com sucesso." });
+  } catch (err) {
+    logger.error(`Erro ao excluir caso ${req.params.id}: ${err.message}`);
+    res.status(500).json({ error: "Erro ao excluir o caso." });
   }
 };

@@ -24,7 +24,7 @@ export const PainelRecepcao = () => {
       const cpfLimpo = cpfBusca.replace(/\D/g, "");
       const response = await fetch(
         // Alterado para evitar conflito com rota /casos/:id no backend
-        `${API_BASE}/casos?cpf=${cpfLimpo}&exact=true`,
+        `${API_BASE}/casos?cpf=${cpfLimpo}&exact=true&status=neq.erro&status=neq.erro_permanente`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -127,7 +127,17 @@ export const PainelRecepcao = () => {
                     {caso.protocolo}
                   </span>
                 </p>
-                <p className="text-sm text-muted mt-1">Status: {caso.status}</p>
+                <p className="text-sm text-muted mt-1 flex items-center gap-2">
+                  Status:
+                  <span className={`font-mono px-2 py-1 rounded text-xs ${
+                    caso.status === 'pendente' ? 'bg-yellow-500/20 text-yellow-400' :
+                    caso.status === 'processado' ? 'bg-green-500/20 text-green-400' :
+                    caso.status === 'processando' ? 'bg-blue-500/20 text-blue-400' :
+                    'bg-red-500/20 text-red-400'
+                  }`}>
+                    {caso.status}
+                  </span>
+                </p>
               </div>
 
               <button

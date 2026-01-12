@@ -3,8 +3,11 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { Link } from "react-router-dom";
-import { Eye, Search } from "lucide-react";
+import { Eye, Search, Trash2 } from "lucide-react";
 import { API_BASE } from "../../../utils/apiBase";
+import { jwtDecode } from "jwt-decode";
+import { useToast } from "../../../contexts/ToastContext";
+import { useConfirm } from "../../../contexts/ConfirmContext";
 
 const statusStyles = {
   recebido: "bg-amber-100 text-amber-800 border-amber-200",
@@ -21,7 +24,44 @@ export const Casos = () => {
   const [busca, setBusca] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [defensor, setDefensor] = useState(null);
   const { token } = useAuth();
+  const { toast } = useToast();
+  const { confirm } = useConfirm();
+
+  useEffect(() => {
+    if (token) {
+      try {
+        const decoded = jwtDecode(token);
+        setDefensor(decoded);
+      } catch (e) {
+        console.error("Erro ao decodificar token", e);
+      }
+    }
+  }, [token]);
+
+  const handleDelete = async (id) => {
+    if (
+      await confirm(
+        "Tem certeza que deseja excluir este caso permanentemente?",
+        "Excluir Caso"
+      )
+    ) {
+      try {
+        const response = await fetch(`${API_BASE}/casos/${id}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!response.ok) throw new Error("Falha ao excluir o caso.");
+
+        setCasos((prev) => prev.filter((c) => c.id !== id));
+        toast.success("Caso excluído com sucesso.");
+      } catch (err) {
+        toast.error(err.message);
+      }
+    }
+  };
 
   useEffect(() => {
     const fetchCasos = async () => {
@@ -154,7 +194,7 @@ export const Casos = () => {
                           {statusKey.replace("_", " ")}
                         </span>
                       </td>
-                      <td className="p-4 text-right">
+                      <td className="p-4 text-right flex items-center justify-end gap-3">
                         <Link
                           to={`/painel/casos/${caso.id}`}
                           className="inline-flex items-center gap-2 text-primary hover:text-primary-600 font-medium"
@@ -163,6 +203,15 @@ export const Casos = () => {
                           <Eye size={18} />
                           Ver detalhes
                         </Link>
+                        {defensor?.cargo === "admin" && (
+                          <button
+                            onClick={() => handleDelete(caso.id)}
+                            className="text-red-400 hover:text-red-600 transition"
+                            title="Excluir caso"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );

@@ -21,17 +21,16 @@ export const consultarStatus = async (req, res) => {
   logger.debug(`Consultando status para CPF: ${cpfLimpo}`);
 
   try {
-    // 2. Busca no Supabase pelo caso com o CPF informado
-    const { data: caso, error } = await supabase
+    // 2. Busca no Supabase pelos casos com o CPF informado (pode haver mais de um)
+    const { data: casos, error } = await supabase
       .from("casos")
       .select(
         "status, chave_acesso_hash, nome_assistido, numero_processo, numero_solar, url_capa_processual, url_documento_gerado"
       )
-      .eq("cpf_assistido", cpfLimpo)
-      .single(); // .single() garante que apenas um resultado seja retornado
+      .eq("cpf_assistido", cpfLimpo);
 
     // Se o caso não for encontrado, retorna um erro genérico
-    if (error || !caso) {
+    if (error || !casos || casos.length === 0) {
       logger.warn(
         `Consulta falhou: CPF ${cpfLimpo} não encontrado ou erro no banco.`
       );
@@ -40,11 +39,10 @@ export const consultarStatus = async (req, res) => {
         .json({ error: "CPF ou chave de acesso inválidos." });
     }
 
-    // 3. Verifica se a chave de acesso fornecida é válida
-    // Compara a chave em texto puro (chave) com a versão hash salva no banco
-    const isChaveValida = verifyKey(chave, caso.chave_acesso_hash);
+    // 3. Procura na lista de casos qual deles possui a chave válida
+    const caso = casos.find((c) => verifyKey(chave, c.chave_acesso_hash));
 
-    if (!isChaveValida) {
+    if (!caso) {
       logger.warn(`Consulta falhou: Chave inválida para CPF ${cpfLimpo}.`);
       return res
         .status(401)

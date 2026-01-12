@@ -1,10 +1,11 @@
-
-
 import Tesseract from "tesseract.js";
 
 export const extractTextFromImage = async (imagePath) => {
   try {
-    console.log(`Iniciando OCR para a imagem: ${imagePath}`);
+    const sourceLog = Buffer.isBuffer(imagePath)
+      ? "Buffer de Memória"
+      : imagePath;
+    console.log(`Iniciando OCR para a imagem: ${sourceLog}`);
 
     const {
       data: { text },
@@ -25,3 +26,4 @@ export const extractTextFromImage = async (imagePath) => {
     throw new Error("Falha ao extrair texto do documento de imagem.");
   }
 };
+

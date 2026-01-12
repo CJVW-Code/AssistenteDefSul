@@ -6,6 +6,7 @@ import casosRoutes from "./src/routes/casos.js";
 import defensoresRoutes from "./src/routes/defensores.js";
 import debugRoutes from "./src/routes/debug.js";
 import logger from "./src/utils/logger.js";
+import { iniciarFilaProcessamento } from "./src/services/queueService.js";
 
 dotenv.config();
 
@@ -53,4 +54,5 @@ app.use((err, req, res, next) => {
 // Inicia o servidor
 app.listen(PORT, "0.0.0.0", () => {
   logger.info(`🚀 Servidor rodando na porta ${PORT}`);
+  iniciarFilaProcessamento(); // <--- Inicia o loop da fila
 });
