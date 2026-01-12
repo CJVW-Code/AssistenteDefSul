@@ -29,21 +29,14 @@ app.use((req, res, next) => {
   next();
 });
 
-// A rota do QStash precisa do corpo bruto (raw body), então aplicamos o middleware raw antes do middleware JSON.
+// A rota do QStash precisa do corpo bruto (raw body)
 app.use("/api/jobs", express.raw({ type: "application/json" }), jobsRoutes);
 
-// Para todas as outras rotas, use o parser JSON.
-app.use(express.json());
-
-// Rota Defensores
-app.use("/api/defensores", defensoresRoutes);
-
-// Rota principal de casos
-app.use("/api/casos", casosRoutes);
-
-// Rota para consultar status
-app.use("/api/status", statusRoutes);
-app.use("/api/debug", debugRoutes);
+// Para todas as outras rotas, use o parser JSON explicitamente
+app.use("/api/defensores", express.json(), defensoresRoutes);
+app.use("/api/casos", express.json(), casosRoutes);
+app.use("/api/status", express.json(), statusRoutes);
+app.use("/api/debug", express.json(), debugRoutes);
 
 // Rota de "saúde" do sistema
 app.get("/health", (req, res) => {
