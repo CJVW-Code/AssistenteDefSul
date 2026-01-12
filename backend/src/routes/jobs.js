@@ -31,8 +31,14 @@ const qstashVerifyMiddleware = async (req, res, next) => {
       return res.status(401).send("Invalid signature");
     }
 
-    // If valid, parse the body as JSON and continue
-    req.body = JSON.parse(req.body.toString('utf-8'));
+    // If valid, parse the body as JSON if it exists, then continue
+    if (req.body && req.body.length > 0) {
+      req.body = JSON.parse(req.body.toString('utf-8'));
+    } else {
+      // Body is empty, which is valid. Set it to null or an empty object.
+      req.body = null;
+    }
+    
     next();
   } catch (error) {
     logger.error("Error during QStash signature verification:", error);
