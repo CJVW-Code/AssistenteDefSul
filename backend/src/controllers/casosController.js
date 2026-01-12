@@ -9,6 +9,7 @@ import { generateDocx } from "../services/documentGenerationService.js";
 import { analyzeCase, generateDosFatos } from "../services/geminiService.js";
 import { getVaraByTipoAcao } from "../config/varasMapping.js";
 import logger from "../utils/logger.js";
+import { Client } from "@upstash/qstash";
 
 // Tempo de expiração (em segundos) para URLs assinadas do Supabase
 const signedExpires = Number.parseInt(
@@ -439,6 +440,11 @@ const buildDocxTemplatePayload = (
     requerente_dataNascimento: ensureText(dataNascimentoAssistidoBr),
     requerente_data_nascimento: ensureText(dataNascimentoAssistidoBr),
     requerente_cpf: ensureText(assistidoCpf),
+    requerente_rg: ensureText(
+      baseData.assistido_rg_numero
+        ? `${baseData.assistido_rg_numero} ${baseData.assistido_rg_orgao}`
+        : ""
+    ),
     requerente_nacionalidade: ensureText(baseData.assistido_nacionalidade),
     requerente_estado_civil: ensureText(baseData.assistido_estado_civil),
     requerente_ocupacao: ensureText(baseData.assistido_ocupacao),
@@ -530,8 +536,72 @@ const buildDocxTemplatePayload = (
   return payload;
 };
 
+const gerarTextoCompletoPeticao = (payload) => {
+  const {
+    vara,
+    comarca,
+    requerente_nome,
+    requerente_nacionalidade,
+    requerente_estado_civil,
+    requerente_ocupacao,
+    requerente_cpf,
+    requerente_rg,
+    requerente_endereco_residencial,
+    representante_nome,
+    representante_nacionalidade,
+    representante_estado_civil,
+    representante_ocupacao,
+    representante_cpf,
+    representante_rg,
+    representante_endereco_residencial,
+    requerido_nome,
+    requerido_nacionalidade,
+    requerido_estado_civil,
+    requerido_ocupacao,
+    requerido_cpf,
+    requerido_endereco_residencial,
+    dos_fatos,
+    tipo_acao,
+    valor_causa,
+  } = payload;
+
+  let texto = `EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DE DIREITO DA ${vara?.toUpperCase() || "[VARA]"} DA COMARCA DE ${comarca?.toUpperCase() || "[COMARCA]"}\n\n`;
+
+  texto += `REQUERENTE: ${requerente_nome?.toUpperCase() || "[NOME REQUERENTE]"}`;
+  if (representante_nome) {
+    texto += `, representado(a) por ${representante_nome?.toUpperCase() || "[NOME REPRESENTANTE]"}`;
+  }
+  texto += `\nREQUERIDO: ${requerido_nome?.toUpperCase() || "[NOME REQUERIDO]"}\n\n`;
+
+  texto += `AÇÃO: ${tipo_acao?.toUpperCase() || "[TIPO DA AÇÃO]"}\n\n`;
+
+  texto += `QUALIFICAÇÃO DAS PARTES:\n`;
+  texto += `${requerente_nome}, ${requerente_nacionalidade || "[nacionalidade]"}, ${requerente_estado_civil || "[estado civil]"}, ${requerente_ocupacao || "[profissão]"}, inscrito(a) no CPF sob o nº ${requerente_cpf || "[CPF]"}, portador(a) do RG nº ${requerente_rg || "[RG]"}, residente e domiciliado(a) em ${requerente_endereco_residencial || "[endereço]"}.\n`;
+
+  if (representante_nome) {
+    texto += `REPRESENTANTE LEGAL: ${representante_nome}, ${representante_nacionalidade || "[nacionalidade]"}, ${representante_estado_civil || "[estado civil]"}, ${representante_ocupacao || "[profissão]"}, inscrito(a) no CPF sob o nº ${representante_cpf || "[CPF]"}, portador(a) do RG nº ${representante_rg || "[RG]"}, residente e domiciliado(a) em ${representante_endereco_residencial || "[endereço]"}.\n`;
+  }
+
+  texto += `\nEM FACE DE: ${requerido_nome}, ${requerido_nacionalidade || "[nacionalidade]"}, ${requerido_estado_civil || "[estado civil]"}, ${requerido_ocupacao || "[profissão]"}, inscrito(a) no CPF sob o nº ${requerido_cpf || "[CPF]"}, residente e domiciliado(a) em ${requerido_endereco_residencial || "[endereço]"}.\n\n`;
+
+  texto += `DOS FATOS\n\n${dos_fatos || "[Descrever os fatos]"}\n\n`;
+
+  texto += `DOS PEDIDOS\n\n`;
+  texto += `Diante do exposto, requer:\n`;
+  texto += `1. A concessão da gratuidade da justiça;\n`;
+  texto += `2. A citação da parte requerida;\n`;
+  texto += `3. A procedência total da ação.\n\n`;
+
+  texto += `Dá-se à causa o valor de ${valor_causa || "R$ 0,00"}.\n\n`;
+  texto += `Nestes termos,\n`;
+  texto += `Pede Deferimento.\n\n`;
+  texto += `${comarca || "[Cidade]"}, ${new Date().toLocaleDateString("pt-BR")}.`;
+
+  return texto;
+};
+
 // --- WORKER EM BACKGROUND ---
-async function processarCasoEmBackground(
+export async function processarCasoEmBackground(
   protocolo,
   dados_formulario,
   urls_documentos,
@@ -554,9 +624,24 @@ async function processarCasoEmBackground(
     // OCR
     let textoCompleto = caso.relato_texto || "";
     for (const docPath of urls_documentos) {
+      // Apenas processa imagens
       if (docPath.match(/\.(jpg|jpeg|png)$/i)) {
         try {
-          const buffer = await fs.readFile(`./uploads/${docPath}`);
+          // 1. Baixar o arquivo do Supabase Storage
+          const { data: blob, error: downloadError } = await supabase.storage
+            .from(storageBuckets.documentos)
+            .download(docPath);
+
+          if (downloadError) {
+            throw new Error(
+              `Erro no download do arquivo ${docPath}: ${downloadError.message}`
+            );
+          }
+
+          // 2. Converter o Blob para Buffer
+          const buffer = Buffer.from(await blob.arrayBuffer());
+
+          // 3. Extrair texto da imagem
           const textoDaImagem = await extractTextFromImage(buffer);
           textoCompleto += `\n\n--- TEXTO EXTRAÍDO: ${docPath} ---\n${textoDaImagem}`;
         } catch (ocrError) {
@@ -631,6 +716,8 @@ async function processarCasoEmBackground(
       assistido_estado_civil: dados_formulario.assistido_estado_civil,
       assistido_ocupacao: dados_formulario.assistido_ocupacao,
       assistido_data_nascimento: formattedAssistidoNascimento,
+      assistido_rg_numero: dados_formulario.assistido_rg_numero,
+      assistido_rg_orgao: dados_formulario.assistido_rg_orgao,
       representante_nome: dados_formulario.representante_nome,
       representante_nacionalidade: dados_formulario.representante_nacionalidade,
       representante_estado_civil: dados_formulario.representante_estado_civil,
@@ -728,6 +815,11 @@ async function processarCasoEmBackground(
       });
     }
 
+    // Gerar texto completo para backup/visualização
+    const peticao_completa_texto = gerarTextoCompletoPeticao(
+      buildDocxTemplatePayload({}, dosFatosTexto, caseDataForPetition)
+    );
+
     // Finalizar processamento
     await supabase
       .from("casos")
@@ -736,6 +828,7 @@ async function processarCasoEmBackground(
         resumo_ia,
         url_documento_gerado,
         peticao_inicial_rascunho: `DOS FATOS\n\n${dosFatosTexto || ""}`,
+        peticao_completa_texto,
         processed_at: new Date(),
       })
       .eq("protocolo", protocolo);
@@ -861,20 +954,41 @@ export const criarNovoCaso = async (req, res) => {
       status: "recebido",
     });
 
-    // Background Worker
-    setImmediate(async () => {
-      try {
-        await processarCasoEmBackground(
+    // Configurar cliente QStash
+    const qstashClient = new Client({
+      token: process.env.QSTASH_TOKEN,
+    });
+
+    // Enviar para QStash em vez de setImmediate
+    try {
+      await qstashClient.publishJSON({
+        url: `${process.env.API_BASE_URL}/api/jobs/process`,
+        body: {
           protocolo,
           dados_formulario,
           urls_documentos,
           url_audio,
-          url_peticao
-        );
-      } catch (error) {
-        logger.error(`Erro fatal no worker (setImmediate): ${error.message}`);
-      }
-    });
+          url_peticao,
+        },
+      });
+      logger.info(`📤 Job enviado para QStash: ${protocolo}`);
+    } catch (qstashError) {
+      logger.error(`❌ Falha ao enviar para QStash: ${qstashError.message}`);
+      // Fallback para processamento local se QStash falhar
+      setImmediate(async () => {
+        try {
+          await processarCasoEmBackground(
+            protocolo,
+            dados_formulario,
+            urls_documentos,
+            url_audio,
+            url_peticao
+          );
+        } catch (error) {
+          logger.error(`Erro fatal no worker fallback: ${error.message}`);
+        }
+      });
+    }
 
     // Limpeza
     if (req.files) {
@@ -924,13 +1038,14 @@ export const listarCasos = async (req, res) => {
 export const obterDetalhesCaso = async (req, res) => {
   const { id } = req.params;
   try {
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from("casos")
       .select("*")
       .eq("id", id)
       .single();
     if (error) throw error;
     if (!data) return res.status(404).json({ error: "Caso não encontrado." });
+
     const casoComUrls = await attachSignedUrls(data);
     res.status(200).json(casoComUrls);
   } catch (error) {
@@ -943,7 +1058,7 @@ export const atualizarStatusCaso = async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
   try {
-    const { data, error } = await supabase
+    const { data, error = null } = await supabase
       .from("casos")
       .update({ status })
       .eq("id", id)
@@ -1048,5 +1163,45 @@ export const resetarChaveAcesso = async (req, res) => {
     res.status(200).json({ novaChave: chaveAcesso });
   } catch (error) {
     res.status(500).json({ error: "Erro ao resetar chave." });
+  }
+};
+
+// --- DELETAR CASO (Apenas Admin) ---
+export const deletarCaso = async (req, res) => {
+  try {
+    // Verificação de permissão de admin
+    if (!req.user || req.user.cargo !== "admin") {
+      return res.status(403).json({
+        error: "Acesso negado. Apenas administradores podem excluir casos.",
+      });
+    }
+
+    const { id } = req.params;
+
+    // Primeiro, obtenha os dados do caso para verificar se existe
+    const { data: caso, error: fetchError } = await supabase
+      .from("casos")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (fetchError || !caso) {
+      return res.status(404).json({ error: "Caso não encontrado." });
+    }
+
+    // Excluir o caso do banco de dados
+    const { error: deleteError } = await supabase
+      .from("casos")
+      .delete()
+      .eq("id", id);
+
+    if (deleteError) {
+      throw deleteError;
+    }
+
+    res.json({ message: "Caso excluído com sucesso." });
+  } catch (err) {
+    logger.error(`Erro ao deletar caso ${req.params.id}: ${err.message}`);
+    res.status(500).json({ error: "Erro ao excluir caso." });
   }
 };

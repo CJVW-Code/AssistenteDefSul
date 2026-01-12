@@ -8,6 +8,7 @@ import {
   buscarPorCpf,
   resetarChaveAcesso,
   atualizarStatusCaso,
+  deletarCaso,
 } from "../controllers/casosController.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { upload } from "../middleware/upload.js"; // Usa sua configuração personalizada
@@ -36,5 +37,6 @@ router.post(
 );
 router.post("/:id/resetar-chave", authMiddleware, resetarChaveAcesso);
 router.patch("/:id/status", authMiddleware, atualizarStatusCaso);
+router.delete("/:id", authMiddleware, deletarCaso);
 
 export default router;

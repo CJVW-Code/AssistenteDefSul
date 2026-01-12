@@ -590,6 +590,8 @@ export const FormularioSubmissao = () => {
       requeridoEstadoCivil: "requerido_estado_civil",
       requeridoOcupacao: "requerido_ocupacao",
       requeridoEnderecoProfissional: "requerido_endereco_profissional",
+      requeridoRgNumero: "requerido_rg_numero",
+      requeridoRgOrgao: "requerido_rg_orgao",
 
       // Família Geral
       dataSeparacao: "data_separacao",

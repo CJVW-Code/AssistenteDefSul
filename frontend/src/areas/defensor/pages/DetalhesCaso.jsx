@@ -10,9 +10,12 @@ import {
   CheckCircle,
   FileText,
   Scale,
+  Trash2,
+  HelpCircle,
 } from "lucide-react";
 import { API_BASE } from "../../../utils/apiBase";
 import { useToast } from "../../../contexts/ToastContext";
+import { useConfirm } from "../../../contexts/ConfirmContext";
 
 const statusOptions = [
   { value: "recebido", label: "Recebido" },
@@ -24,6 +27,22 @@ const statusBadges = {
   recebido: "bg-amber-100 text-amber-800 border-amber-200",
   em_analise: "bg-sky-100 text-sky-800 border-sky-200",
   aguardando_docs: "bg-purple-100 text-purple-800 border-purple-200",
+  processando: "bg-blue-100 text-blue-800 border-blue-200",
+  processado: "bg-green-100 text-green-800 border-green-200",
+  encaminhado_solar: "bg-teal-100 text-teal-800 border-teal-200",
+  finalizado: "bg-gray-100 text-gray-800 border-gray-200",
+  erro: "bg-red-100 text-red-800 border-red-200",
+};
+
+const statusDescriptions = {
+  recebido: "O caso foi submetido e está na fila para processamento automático.",
+  processando: "O sistema está extraindo informações dos documentos e gerando a petição inicial.",
+  processado: "O processamento automático foi concluído. A petição está pronta para revisão.",
+  em_analise: "O caso está sendo analisado manualmente por um defensor ou estagiário.",
+  aguardando_docs: "O processo está pausado, aguardando o envio de documentos adicionais pelo cidadão.",
+  encaminhado_solar: "O caso foi finalizado e encaminhado para o sistema Solar da defensoria.",
+  finalizado: "O caso foi concluído.",
+  erro: "Ocorreu um erro crítico durante o processamento automático. Verifique os logs do sistema.",
 };
 
 const formatValue = (value) => {
@@ -95,16 +114,19 @@ const CollapsibleText = ({
 
 export const DetalhesCaso = () => {
   const { id } = useParams();
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const { toast } = useToast();
+  const { confirm } = useConfirm();
   const [caso, setCaso] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
   const [showReview, setShowReview] = useState(false);
+  const [showFullPetition, setShowFullPetition] = useState(false);
   const [numSolar, setNumSolar] = useState("");
   const [numProcesso, setNumProcesso] = useState("");
   const [arquivoCapa, setArquivoCapa] = useState(null);
   const [enviandoFinalizacao, setEnviandoFinalizacao] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     const fetchDetalhes = async () => {
@@ -233,6 +255,48 @@ export const DetalhesCaso = () => {
       setEnviandoFinalizacao(false);
     }
   };
+
+  const handleDeleteCaso = async () => {
+    if (
+      await confirm(
+        `Tem certeza que deseja excluir permanentemente o caso ${caso.protocolo}?`,
+        "Excluir Caso"
+      )
+    ) {
+      setIsDeleting(true);
+      try {
+        const response = await fetch(`${API_BASE}/casos/${id}`, {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          let errorMessage = "Falha ao excluir o caso.";
+          try {
+            const errorData = await response.json();
+            // Prioriza a mensagem de erro específica da API, se houver
+            errorMessage =
+              errorData.message || errorData.error || response.statusText;
+          } catch (e) {
+            // Fallback se a resposta não for um JSON válido
+            errorMessage = response.statusText || errorMessage;
+          }
+          throw new Error(errorMessage);
+        }
+
+        toast.success("Caso excluído com sucesso.");
+        window.location.href = "/painel";
+      } catch (error) {
+        console.error("Erro ao excluir caso:", error);
+        // Garante que uma mensagem de erro útil seja sempre exibida
+        toast.error(error.message || "Não foi possível processar a exclusão.");
+      } finally {
+        setIsDeleting(false);
+      }
+    }
+  };
   return (
     <div className="space-y-8 pb-24">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -272,20 +336,84 @@ export const DetalhesCaso = () => {
                 <Eye size={18} />
                 Revisar dados preenchidos
               </button>
-              {showReview && (
-                <div className="mt-4 space-y-4 border-t border-soft pt-4">
-                  <h3 className="heading-3">Formulário do Assistido</h3>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    {Object.entries(caso.dados_formulario || {}).map(
-                      ([key, value]) =>
-                        renderDataField(
-                          key.replace(/_/g, " "),
-                          value // CORREÇÃO LÓGICA: Usa a função que trata booleanos
-                        )
+              {showReview && (() => {
+                const dados = caso.dados_formulario || {};
+                const isRepresentacao = dados.assistido_eh_incapaz === "sim";
+
+                return (
+                  <div className="mt-4 space-y-6 border-t border-soft pt-6">
+                    {/* Seção do Beneficiário */}
+                    <div className="space-y-4">
+                      <h3 className="heading-3 text-primary">
+                        {isRepresentacao ? "Dados do Beneficiário (Criança/Adolescente)" : "Dados do Autor da Ação"}
+                      </h3>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        {renderDataField("Nome Completo", dados.nome)}
+                        {renderDataField("CPF", dados.cpf)}
+                        {renderDataField("Data de Nascimento", dados.assistido_data_nascimento)}
+                        {renderDataField("Nacionalidade", dados.assistido_nacionalidade)}
+                        {renderDataField("Estado Civil", dados.assistido_estado_civil)}
+                        {renderDataField("Endereço Residencial", dados.endereco_assistido)}
+                        {renderDataField("Email", dados.email_assistido)}
+                        {renderDataField("Telefone de Contato", dados.telefone)}
+                        {renderDataField("RG", `${dados.assistido_rg_numero || ''} ${dados.assistido_rg_orgao || ''}`.trim())}
+                      </div>
+                    </div>
+
+                    {/* Seção do Representante (Condicional) */}
+                    {isRepresentacao && (
+                      <div className="space-y-4 pt-4 border-t border-soft">
+                        <h3 className="heading-3 text-primary">Dados do Representante Legal</h3>
+                        <div className="grid gap-4 md:grid-cols-2">
+                          {renderDataField("Nome Completo", dados.representante_nome)}
+                          {renderDataField("CPF", dados.representante_cpf)}
+                          {renderDataField("Nacionalidade", dados.representante_nacionalidade)}
+                          {renderDataField("Estado Civil", dados.representante_estado_civil)}
+                          {renderDataField("Profissão", dados.representante_ocupacao)}
+                          {renderDataField("Endereço Residencial", dados.representante_endereco_residencial)}
+                          {renderDataField("Endereço Profissional", dados.representante_endereco_profissional)}
+                          {renderDataField("Email", dados.representante_email)}
+                          {renderDataField("Telefone", dados.representante_telefone)}
+                          {renderDataField("RG", `${dados.representante_rg_numero || ''} ${dados.representante_rg_orgao || ''}`.trim())}
+                        </div>
+                      </div>
                     )}
+
+                    {/* Seção do Requerido */}
+                    <div className="space-y-4 pt-4 border-t border-soft">
+                      <h3 className="heading-3 text-primary">Dados da Parte Contrária (Requerido)</h3>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        {renderDataField("Nome Completo", dados.nome_requerido)}
+                        {renderDataField("CPF", dados.cpf_requerido)}
+                        {renderDataField("Endereço conhecido", dados.endereco_requerido)}
+                        {renderDataField("Telefone", dados.requerido_telefone)}
+                        {renderDataField("Email", dados.requerido_email)}
+                        {renderDataField("Profissão", dados.requerido_ocupacao)}
+                        {renderDataField("Endereço de Trabalho", dados.requerido_endereco_profissional)}
+                        {renderDataField("Dados Adicionais", dados.dados_adicionais_requerido)}
+                      </div>
+                    </div>
+                    
+                    {/* Seção de Detalhes do Caso */}
+                    <div className="space-y-4 pt-4 border-t border-soft">
+                      <h3 className="heading-3 text-primary">Detalhes do Pedido e do Caso</h3>
+                       <div className="grid gap-4 md:grid-cols-2">
+                        {renderDataField("Valor da Pensão Solicitado", dados.valor_mensal_pensao)}
+                        {renderDataField("Dados Bancários para Depósito", dados.dados_bancarios_deposito)}
+                        {renderDataField("Descrição da Guarda", dados.descricao_guarda)}
+                        {renderDataField("Situação Financeira de quem cuida", dados.situacao_financeira_genitora)}
+                        {renderDataField("Requerido tem emprego formal?", dados.requerido_tem_emprego_formal)}
+                        {renderDataField("Nome da Empresa", dados.empregador_requerido_nome)}
+                        {renderDataField("Endereço da Empresa", dados.empregador_requerido_endereco)}
+                        {/* Adicionar outros campos específicos da ação, se houver */}
+                        {dados.numero_processo_originario && renderDataField("Processo Original", dados.numero_processo_originario)}
+                        {dados.periodo_debito_execucao && renderDataField("Período do Débito", dados.periodo_debito_execucao)}
+                        {dados.valor_total_debito_execucao && renderDataField("Valor Total do Débito", dados.valor_total_debito_execucao)}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
             </div>
           </div>
 
@@ -323,20 +451,51 @@ export const DetalhesCaso = () => {
           </section>
 
           <section className="card space-y-4">
-            <h2 className="heading-2">Visualizar petição completa</h2>
-            <CollapsibleText
-              text={
-                caso.peticao_completa_texto ||
-                "Petição completa não disponível ou ainda não gerada."
-              }
-              isPre={true}
-              maxLength={700}
-              defaultCollapsed={true}
-            />
+            <button
+              onClick={() => setShowFullPetition(!showFullPetition)}
+              className="btn btn-secondary w-full justify-start"
+            >
+              <Eye size={18} />
+              {showFullPetition ? "Ocultar petição completa" : "Visualizar petição completa (Backup)"}
+            </button>
+            
+            {showFullPetition && (
+              <div className="mt-4">
+                <CollapsibleText
+                  text={
+                    caso.peticao_completa_texto ||
+                    "Petição completa não disponível ou ainda não gerada."
+                  }
+                  isPre={true}
+                  maxLength={2000}
+                  defaultCollapsed={false}
+                />
+              </div>
+            )}
           </section>
         </section>
 
         <section className="space-y-6">
+          {/* Botão de Excluir Caso - Apenas para Admin */}
+          {user?.cargo === "admin" && (
+            <div className="card space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="heading-2 text-red-500">Ações Administrativas</h2>
+                <button
+                  onClick={handleDeleteCaso}
+                  disabled={isDeleting}
+                  className="btn btn-danger w-fit flex items-center gap-2"
+                >
+                  <Trash2 size={18} />
+                  {isDeleting ? "Excluindo..." : "Excluir Caso"}
+                </button>
+              </div>
+              <p className="text-sm text-muted">
+                Esta ação não pode ser desfeita. Todos os dados do caso serão removidos permanentemente.
+              </p>
+            </div>
+          )}
+
           <div className="card space-y-4">
             <h2 className="heading-2">Documentos e anexos</h2>
             <div className="space-y-3">
@@ -385,9 +544,25 @@ export const DetalhesCaso = () => {
           <div className="card space-y-2">
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted">Status atual</p>
-              <span className={`badge capitalize ${badgeClass}`}>
-                {statusKey.replace(/_/g, " ")}
-              </span>
+              <div className="relative flex items-center gap-2 group">
+                <span className={`badge capitalize ${badgeClass}`}>
+                  {statusKey.replace(/_/g, " ")}
+                </span>
+                <HelpCircle size={16} className="text-muted cursor-help" />
+                <div
+                  className="absolute bottom-full right-0 mb-2 w-72 origin-bottom scale-95 transform-gpu opacity-0 transition-all duration-200 ease-in-out group-hover:scale-100 group-hover:opacity-100"
+                  role="tooltip"
+                >
+                  <div className="rounded-md border border-soft bg-surface p-3 text-sm shadow-lg">
+                    <p className="font-bold capitalize">
+                      {statusKey.replace(/_/g, " ")}
+                    </p>
+                    <p className="text-muted">
+                      {statusDescriptions[statusKey] || "Sem descrição."}
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <select
