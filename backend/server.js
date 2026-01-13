@@ -18,7 +18,7 @@ app.use(cors());
 
 // A rota do QStash precisa do corpo bruto (raw body) para validar a assinatura.
 // Este middleware deve ser configurado ANTES de qualquer outro middleware que possa modificar o corpo.
-app.use("/api/jobs", express.raw({ type: "application/json" }), jobsRoutes);
+app.use("/api/jobs", express.raw({ type: "*/*" }), jobsRoutes);
 
 // Middleware de Logging de Requisições HTTP
 app.use((req, res, next) => {
