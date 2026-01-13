@@ -16,25 +16,7 @@ const PORT = process.env.PORT || 8001;
 // Middlewares
 app.use(cors());
 
-// --- 🕵️ DEBUG ESPIÃO (Adicione isto para descobrirmos o erro) ---
-app.use("/api/jobs", (req, res, next) => {
-  console.log("\n--- 🕵️ DEBUG QSTASH ---");
-  console.log("1. URL:", req.originalUrl);
-  console.log("2. Tipo:", req.headers["content-type"]);
-  console.log("3. Tamanho (Length):", req.headers["content-length"]);
-  
-  // Vamos tentar ler o buffer se ele existir
-  const chunks = [];
-  req.on("data", (chunk) => chunks.push(chunk));
-  req.on("end", () => {
-    const bodyString = Buffer.concat(chunks).toString();
-    console.log("4. Corpo Recebido (Raw):", bodyString ? `"${bodyString}"` : "[VAZIO!]");
-    // Emitir o evento de novo para o próximo middleware não travar
-    req.emit("data", chunks); 
-  });
-  
-  next();
-});
+
 app.use("/api/jobs", express.raw({ type: "*/*" }), jobsRoutes);
 
 // Middleware de Logging de Requisições HTTP
