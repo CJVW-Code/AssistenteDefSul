@@ -20,10 +20,13 @@ const qstashVerifyMiddleware = async (req, res, next) => {
       return res.status(401).send("`Upstash-Signature` header is missing");
     }
 
-    // The 'req.body' MUST be the raw, unparsed buffer.
+    // Get the raw body from the request
+    const rawBody = req.body;
+
+    // The 'rawBody' MUST be the raw, unparsed buffer.
     const isValid = await qstashReceiver.verify({
       signature,
-      body: req.body,
+      body: rawBody,
     });
 
     if (!isValid) {
@@ -32,13 +35,18 @@ const qstashVerifyMiddleware = async (req, res, next) => {
     }
 
     // If valid, parse the body as JSON if it exists, then continue
-    if (req.body && req.body.length > 0) {
-      req.body = JSON.parse(req.body.toString('utf-8'));
+    if (rawBody && rawBody.length > 0) {
+      try {
+        req.body = JSON.parse(rawBody.toString('utf-8'));
+      } catch (parseError) {
+        logger.error("Error parsing request body:", parseError);
+        return res.status(400).send("Invalid JSON body");
+      }
     } else {
       // Body is empty, which is valid. Set it to null or an empty object.
       req.body = null;
     }
-    
+
     next();
   } catch (error) {
     logger.error("Error during QStash signature verification:", error);

@@ -1075,13 +1075,23 @@ export const salvarFeedback = async (req, res) => {
   const { id } = req.params;
   const { feedback } = req.body;
   try {
-    const { data, error } = await supabase
+    // Primeiro faz o update
+    const { error: updateError } = await supabase
       .from("casos")
       .update({ feedback })
+      .eq("id", id);
+
+    if (updateError) throw updateError;
+
+    // Depois busca os dados atualizados para retornar
+    const { data, error: fetchError } = await supabase
+      .from("casos")
+      .select("*")
       .eq("id", id)
-      .select()
       .single();
-    if (error) throw error;
+
+    if (fetchError) throw fetchError;
+
     res.status(200).json(data);
   } catch (error) {
     logger.error(`Erro ao salvar feedback ${id}: ${error.message}`);
