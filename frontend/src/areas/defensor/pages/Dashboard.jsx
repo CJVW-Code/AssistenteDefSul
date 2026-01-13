@@ -107,7 +107,7 @@ export const Dashboard = () => {
     casos.forEach((c) => {
       // Lógica baseada em campos do formulário (se disponível no objeto caso)
       // Assumindo que o backend retorna 'dados_formulario' ou similar
-      if (c.dados_formulario?.assistidoEhIncapaz === "sim")
+      if (c.dados_formulario?.assistido_eh_incapaz === "sim")
         representacao.representacao++;
       else representacao.proprio++;
     });

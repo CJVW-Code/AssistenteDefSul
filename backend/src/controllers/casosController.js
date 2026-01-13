@@ -436,7 +436,7 @@ const buildDocxTemplatePayload = (
     triagemNumero: ensureText(normalizedData.triagemNumero),
     processoOrigemNumero: ensureText(baseData.numero_processo_originario),
     processoTituloNumero: ensureText(baseData.processo_titulo_numero),
-    requerente_nome: ensureText(assistidoNome),
+    requerente_nome: ensureText(assistidoNome).toUpperCase(),
     requerente_incapaz_sim_nao: ensureText(
       baseData.assistido_eh_incapaz || "nao"
     ),
@@ -455,7 +455,7 @@ const buildDocxTemplatePayload = (
     requerente_telefone: ensureText(baseData.telefone_assistido),
     requerente_endereco_residencial: ensureText(baseData.endereco_assistido),
     requerente_representante: ensureText(requerente.representante),
-    representante_nome: ensureText(baseData.representante_nome),
+    representante_nome: ensureText(baseData.representante_nome).toUpperCase(),
     representante_nacionalidade: ensureInlineValue(
       baseData.representante_nacionalidade
     ),
@@ -484,9 +484,9 @@ const buildDocxTemplatePayload = (
     exequente_data_nascimento: ensureText(dataNascimentoAssistidoBr),
     exequente_cpf: ensureText(assistidoCpf),
     exequente_representante: ensureText(requerente.representante),
-    executado_nome: ensureText(baseData.nome_requerido || requerido.nome),
+    executado_nome: ensureText(baseData.nome_requerido || requerido.nome).toUpperCase(),
     executado_cpf: ensureText(baseData.cpf_requerido || requerido.cpf),
-    requerido_nome: ensureText(baseData.nome_requerido || requerido.nome),
+    requerido_nome: ensureText(baseData.nome_requerido || requerido.nome).toUpperCase(),
     requerido_cpf: ensureText(baseData.cpf_requerido || requerido.cpf),
     executado_nacionalidade: ensureText(baseData.requerido_nacionalidade),
     executado_estado_civil: ensureText(baseData.requerido_estado_civil),
@@ -1150,9 +1150,11 @@ export const gerarTermoDeclaracao = async (req, res) => {
     // Build term declaration data payload
     const termoData = {
       ...dados,
-      nome_assistido: dados.nome || caso.nome_assistido,
+      nome_assistido: (dados.nome || caso.nome_assistido || "").toUpperCase(),
+      representante_nome: (dados.representante_nome || "").toUpperCase(),
       cpf_assistido: dados.cpf || caso.cpf_assistido,
-      relato_texto: dados.relato_texto || caso.relato_texto,
+      relato_texto: (caso.relato_texto || "").replace(/\n/g, "\r\n"),
+      filhos_info: (dados.filhos_info || dados.nome || caso.nome_assistido || "").toUpperCase(),
       data_atual: new Date().toLocaleDateString("pt-BR"),
       protocolo: caso.protocolo,
       tipo_acao: caso.tipo_acao,
@@ -1169,6 +1171,10 @@ export const gerarTermoDeclaracao = async (req, res) => {
 
     // Upload to Supabase storage
     const termoPath = `${caso.protocolo}/termo_declaracao_${caso.protocolo}.docx`;
+
+    // Exclui o arquivo antigo se existir para garantir uma geração limpa (conforme solicitado)
+    await supabase.storage.from("peticoes").remove([termoPath]);
+
     const { error: uploadError } = await supabase.storage
       .from("peticoes")
       .upload(termoPath, docxBuffer, {

@@ -831,18 +831,27 @@ export const DetalhesCaso = () => {
                   Baixar minuta gerada
                 </a>
               )}
-              {caso.url_termo_declaracao && (
-                <a
-                  href={caso.url_termo_declaracao}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn btn-primary w-full justify-start"
-                >
-                  <Download size={18} />
-                  Baixar Termo de Declaração
-                </a>
-              )}
-              {!caso.url_termo_declaracao && (
+              {caso.url_termo_declaracao ? (
+                <div className="space-y-2">
+                  <a
+                    href={caso.url_termo_declaracao}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn btn-primary w-full justify-start"
+                  >
+                    <Download size={18} />
+                    Baixar Termo de Declaração
+                  </a>
+                  <button
+                    onClick={handleGenerateTermo}
+                    disabled={isGeneratingTermo}
+                    className="btn btn-ghost border border-soft w-full justify-start text-xs"
+                  >
+                    <RefreshCw size={14} className={isGeneratingTermo ? "animate-spin" : ""} />
+                    {isGeneratingTermo ? "Regerando..." : "Regerar Termo"}
+                  </button>
+                </div>
+              ) : (
                 <button
                   onClick={handleGenerateTermo}
                   disabled={isGeneratingTermo}
