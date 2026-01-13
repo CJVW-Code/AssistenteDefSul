@@ -13,50 +13,33 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 8001;
 
-app.use("/api/jobs", express.raw({ type: "*/*" }), jobsRoutes);
-// Middlewares
 app.use(cors());
 
+// --- A SOLUÇÃO DEFINITIVA ---
+// Configuramos o JSON parser globalmente, mas com um "gancho" (verify)
+// para salvar o corpo bruto SOMENTE quando a rota for de jobs.
+app.use(express.json({
+  verify: (req, res, buf) => {
+    // Se a rota for do QStash, salvamos o buffer bruto numa variável personalizada
+    if (req.originalUrl.includes("/api/jobs")) {
+      req.rawBody = buf.toString(); 
+    }
+  }
+}));
 
+app.use(express.urlencoded({ extended: true }));
 
-// Middleware de Logging de Requisições HTTP
-app.use((req, res, next) => {
-  const start = Date.now();
-  res.on("finish", () => {
-    const duration = Date.now() - start;
-    logger.http(
-      `${req.method} ${req.originalUrl} [${res.statusCode}] - ${duration}ms`
-    );
-  });
-  next();
-});
-
-// Para as outras rotas, usamos o parser de JSON.
-// Este middleware irá processar o corpo de todas as rotas que não foram capturadas antes.
-app.use(express.json());
-
-// Rotas da API
+// Rotas
+app.use("/api/jobs", jobsRoutes); // Agora esta rota já receberá o req.rawBody preenchido
 app.use("/api/defensores", defensoresRoutes);
 app.use("/api/casos", casosRoutes);
 app.use("/api/status", statusRoutes);
 app.use("/api/debug", debugRoutes);
 
-// Rota de "saúde" do sistema
-app.get("/", (req, res) => {
-  res.json({ status: "OK", message: "Def. Sul Bahia API is running" });
-});
-
 app.get("/health", (req, res) => {
   res.json({ status: "OK", message: "Def. Sul Bahia API is running" });
 });
 
-// Tratamento de erros
-app.use((err, req, res, next) => {
-  logger.error(`Erro não tratado: ${err.message}`, { stack: err.stack });
-  res.status(500).json({ error: "Algo deu errado no servidor!" });
-});
-
-// Inicia o servidor
-app.listen(PORT, "0.0.0.0", () => {
-  logger.info(`🚀 Servidor rodando na porta ${PORT}`);
+app.listen(PORT, () => {
+  console.log(`🚀 Servidor rodando na porta ${PORT}`);
 });

@@ -5,60 +5,39 @@ import logger from "../utils/logger.js";
 
 const router = express.Router();
 
-// Initialize QStash Receiver for signature verification
 const qstashReceiver = new Receiver({
   currentSigningKey: process.env.QSTASH_CURRENT_SIGNING_KEY,
   nextSigningKey: process.env.QSTASH_NEXT_SIGNING_KEY,
 });
 
-// Middleware to verify QStash signature
 const qstashVerifyMiddleware = async (req, res, next) => {
   try {
     const signature = req.headers["upstash-signature"];
-    if (!signature) {
-      logger.warn("QStash signature missing.");
-      return res.status(401).send("`Upstash-Signature` header is missing");
+
+    // 1. Verificamos se o server.js capturou o corpo bruto
+    // Se isso for undefined, algo deu errado no server.js ou o corpo veio vazio
+    if (!req.rawBody) {
+      logger.warn("QStash: Corpo bruto (rawBody) não capturado.");
+      return res.status(400).send("Empty or unparsed body");
     }
 
-    // --- CAPTURA MANUAL DO CORPO (CORREÇÃO) ---
-    // 1. Lê os chunks (pedaços) da requisição para montar o buffer original
-    const chunks = [];
-    for await (const chunk of req) {
-      chunks.push(chunk);
-    }
-    const rawBodyBuffer = Buffer.concat(chunks);
-    const rawBodyString = rawBodyBuffer.toString(); // Corpo exato como string
-
-    // ✅ CRUCIAL: Usar a string que acabamos de capturar, NÃO o req.body
-    // Se usasse req.body aqui, daria erro porque o stream já foi consumido acima.
-
-    // Verify the signature with the exact raw body string
+    // 2. Validamos a assinatura usando o rawBody EXATO que salvamos
     const isValid = await qstashReceiver.verify({
       signature,
-      body: rawBodyString, // ✅ Usando a captura manual correta
+      body: req.rawBody,
     });
 
     if (!isValid) {
-      logger.warn("Invalid QStash signature received.");
+      logger.warn("QStash: Assinatura inválida.");
       return res.status(401).send("Invalid signature");
     }
 
-    // ✅ Converter manualmente para JSON para o Controller usar depois
-    if (rawBodyString) {
-      try {
-        req.body = JSON.parse(rawBodyString);
-      } catch (parseError) {
-        logger.error("Error parsing request body:", parseError);
-        return res.status(400).send("Invalid JSON body");
-      }
-    } else {
-      req.body = {};
-    }
-
+    // O req.body JÁ ESTÁ populado pelo express.json() do server.js
+    // Não precisamos fazer JSON.parse aqui.
     next();
   } catch (error) {
-    logger.error("Error during QStash signature verification:", error);
-    res.status(500).send("Error processing request.");
+    logger.error("Erro na verificação do QStash:", error);
+    res.status(500).send("Internal Server Error");
   }
 };
 
