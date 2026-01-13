@@ -13,11 +13,11 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 8001;
 
+app.use("/api/jobs", express.raw({ type: "*/*" }), jobsRoutes);
 // Middlewares
 app.use(cors());
 
 
-app.use("/api/jobs", express.raw({ type: "*/*" }), jobsRoutes);
 
 // Middleware de Logging de Requisições HTTP
 app.use((req, res, next) => {

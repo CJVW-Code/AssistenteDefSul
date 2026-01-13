@@ -1,7 +1,7 @@
-import express from 'express';
-import { processJob } from '../controllers/jobController.js';
+import express from "express";
+import { processJob } from "../controllers/jobController.js";
 import { Receiver } from "@upstash/qstash";
-import logger from '../utils/logger.js';
+import logger from "../utils/logger.js";
 
 const router = express.Router();
 
@@ -20,14 +20,22 @@ const qstashVerifyMiddleware = async (req, res, next) => {
       return res.status(401).send("`Upstash-Signature` header is missing");
     }
 
-    // For QStash signature verification, we need the EXACT raw body as received
-    // We'll use req.body directly since express.raw() middleware is configured
-    const rawBody = req.body;
+    // --- CAPTURA MANUAL DO CORPO (CORREÇÃO) ---
+    // 1. Lê os chunks (pedaços) da requisição para montar o buffer original
+    const chunks = [];
+    for await (const chunk of req) {
+      chunks.push(chunk);
+    }
+    const rawBodyBuffer = Buffer.concat(chunks);
+    const rawBodyString = rawBodyBuffer.toString(); // Corpo exato como string
 
-    // Verify the signature with the exact raw body
+    // ✅ CRUCIAL: Usar a string que acabamos de capturar, NÃO o req.body
+    // Se usasse req.body aqui, daria erro porque o stream já foi consumido acima.
+
+    // Verify the signature with the exact raw body string
     const isValid = await qstashReceiver.verify({
       signature,
-      body: rawBody,
+      body: rawBodyString, // ✅ Usando a captura manual correta
     });
 
     if (!isValid) {
@@ -35,17 +43,16 @@ const qstashVerifyMiddleware = async (req, res, next) => {
       return res.status(401).send("Invalid signature");
     }
 
-    // If valid, parse the body as JSON if it exists, then continue
-    if (rawBody && rawBody.length > 0) {
+    // ✅ Converter manualmente para JSON para o Controller usar depois
+    if (rawBodyString) {
       try {
-        req.body = JSON.parse(rawBody.toString('utf-8'));
+        req.body = JSON.parse(rawBodyString);
       } catch (parseError) {
         logger.error("Error parsing request body:", parseError);
         return res.status(400).send("Invalid JSON body");
       }
     } else {
-      // Body is empty, which is valid. Set it to null or an empty object.
-      req.body = null;
+      req.body = {};
     }
 
     next();
@@ -55,8 +62,6 @@ const qstashVerifyMiddleware = async (req, res, next) => {
   }
 };
 
-// The route QStash will call
-// It's important that the express.raw() middleware is used on server.js for this route
-router.post('/process', qstashVerifyMiddleware, processJob);
+router.post("/process", qstashVerifyMiddleware, processJob);
 
 export default router;
