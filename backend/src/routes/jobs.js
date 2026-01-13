@@ -20,10 +20,11 @@ const qstashVerifyMiddleware = async (req, res, next) => {
       return res.status(401).send("`Upstash-Signature` header is missing");
     }
 
-    // Get the raw body from the request
+    // For QStash signature verification, we need the EXACT raw body as received
+    // We'll use req.body directly since express.raw() middleware is configured
     const rawBody = req.body;
 
-    // The 'rawBody' MUST be the raw, unparsed buffer.
+    // Verify the signature with the exact raw body
     const isValid = await qstashReceiver.verify({
       signature,
       body: rawBody,
