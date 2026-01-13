@@ -28,14 +28,19 @@ app.use((req, res, next) => {
   next();
 });
 
-// A rota do QStash precisa do corpo bruto (raw body)
-app.use("/api/jobs", express.raw(), jobsRoutes);
+// A rota do QStash precisa do corpo bruto (raw body) para validar a assinatura.
+// Este middleware deve ser configurado ANTES do parser de JSON global.
+app.use("/api/jobs", express.raw({ type: "application/json" }), jobsRoutes);
 
-// Para todas as outras rotas, use o parser JSON explicitamente
-app.use("/api/defensores", express.json(), defensoresRoutes);
-app.use("/api/casos", express.json(), casosRoutes);
-app.use("/api/status", express.json(), statusRoutes);
-app.use("/api/debug", express.json(), debugRoutes);
+// Para as outras rotas, usamos o parser de JSON.
+// Este middleware irá processar o corpo de todas as rotas que não foram capturadas antes.
+app.use(express.json());
+
+// Rotas da API
+app.use("/api/defensores", defensoresRoutes);
+app.use("/api/casos", casosRoutes);
+app.use("/api/status", statusRoutes);
+app.use("/api/debug", debugRoutes);
 
 // Rota de "saúde" do sistema
 app.get("/", (req, res) => {
