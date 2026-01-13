@@ -16,6 +16,10 @@ const PORT = process.env.PORT || 8001;
 // Middlewares
 app.use(cors());
 
+// A rota do QStash precisa do corpo bruto (raw body) para validar a assinatura.
+// Este middleware deve ser configurado ANTES de qualquer outro middleware que possa modificar o corpo.
+app.use("/api/jobs", express.raw({ type: "application/json" }), jobsRoutes);
+
 // Middleware de Logging de Requisições HTTP
 app.use((req, res, next) => {
   const start = Date.now();
@@ -27,10 +31,6 @@ app.use((req, res, next) => {
   });
   next();
 });
-
-// A rota do QStash precisa do corpo bruto (raw body) para validar a assinatura.
-// Este middleware deve ser configurado ANTES do parser de JSON global.
-app.use("/api/jobs", express.raw({ type: "application/json" }), jobsRoutes);
 
 // Para as outras rotas, usamos o parser de JSON.
 // Este middleware irá processar o corpo de todas as rotas que não foram capturadas antes.
