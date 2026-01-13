@@ -56,9 +56,9 @@ const logger = winston.createLogger({
 });
 
 // Adiciona o transporte do Better Stack (Logtail) se o token existir no .env
-if (process.env.LOGTAIL_SOURCE_TOKEN) {
-  const logtail = new Logtail(process.env.LOGTAIL_SOURCE_TOKEN);
-  logger.add(new LogtailTransport(logtail));
-}
+// if (process.env.LOGTAIL_SOURCE_TOKEN) {
+//   const logtail = new Logtail(process.env.LOGTAIL_SOURCE_TOKEN);
+//   logger.add(new LogtailTransport(logtail));
+// }
 
 export default logger;
