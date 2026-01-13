@@ -14,7 +14,7 @@
   --color-primary-600: #00562b; /* Hover/pressed */
   --color-secondary: #006837; /* Dourado-laranja */
   --color-secondary-600: #00562b;
-
+  --color-special: #00548b; /* azul */
   /* Surfaces & text */
   --color-bg: #dddddd;
   --color-surface: #cfcfcf;
@@ -45,7 +45,7 @@
   --color-primary-600: #178963;
   --color-secondary: #1fa97c;
   --color-secondary-600: #178963;
-
+  --color-special: #5cb8f5; /* azul */
   --color-bg: #0b1520; /* azul-petróleo escuro */
   --color-surface: #142433; /* cards/painéis */
   --color-border: #1e3a4a;
@@ -87,7 +87,7 @@
   /* Secundária */
   --color-secondary: var(--color-secondary);
   --color-secondary-600: var(--color-secondary-600);
-
+  --color-special: var(--color-special); /* azul */
   /* Estruturais */
   /* Cria bg-app, text-app, border-app */
   --color-app: var(--color-bg); 

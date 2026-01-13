@@ -9,6 +9,7 @@ const TEMPLATE_MAP = {
   fixacao: "fixacao_alimentos1.docx",
   execucao_prisao: "execucao_prisao.docx",
   execucao_penhora: "execucao_penhora.docx",
+  termo_declaracao: "termo_declaracao.docx",
 };
 
 const resolveTemplatePath = (baseDir, key) => {
@@ -50,6 +51,32 @@ export const generateDocx = async (data) => {
   });
 
   // Substitui os placeholders {nome}, {cpf}, etc., pelos dados do caso
+  doc.render(data);
+
+  // Gera o documento final como um buffer
+  const buf = doc.getZip().generate({
+    type: "nodebuffer",
+    compression: "DEFLATE",
+  });
+
+  return buf;
+};
+
+export const generateTermoDeclaracao = async (data) => {
+  // Resolve o caminho do template de termo de declaração
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  const templatePath = resolveTemplatePath(__dirname, "termo_declaracao");
+  const templateContent = await fs.readFile(templatePath, "binary");
+
+  const zip = new PizZip(templateContent);
+
+  const doc = new Docxtemplater(zip, {
+    paragraphLoop: true,
+    linebreaks: true,
+  });
+
+  // Substitui os placeholders pelos dados do caso
   doc.render(data);
 
   // Gera o documento final como um buffer

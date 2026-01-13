@@ -4,11 +4,14 @@ import {
   listarCasos,
   obterDetalhesCaso,
   finalizarCasoSolar,
+  reverterFinalizacao, // Adicionado
   regenerarDosFatos,
+  gerarTermoDeclaracao,
   buscarPorCpf,
   resetarChaveAcesso,
   atualizarStatusCaso,
   deletarCaso,
+  agendarReuniao,
 } from "../controllers/casosController.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { upload } from "../middleware/upload.js"; // Usa sua configuração personalizada
@@ -29,14 +32,17 @@ router.get("/buscar-cpf", buscarPorCpf);
 router.get("/", authMiddleware, listarCasos);
 router.get("/:id", authMiddleware, obterDetalhesCaso);
 router.post("/:id/gerar-fatos", authMiddleware, regenerarDosFatos);
+router.post("/:id/gerar-termo", authMiddleware, gerarTermoDeclaracao);
 router.post(
   "/:id/finalizar",
   authMiddleware,
   upload.single("capa"),
   finalizarCasoSolar
 );
+router.post("/:id/reverter-finalizacao", authMiddleware, reverterFinalizacao); // Adicionado
 router.post("/:id/resetar-chave", authMiddleware, resetarChaveAcesso);
 router.patch("/:id/status", authMiddleware, atualizarStatusCaso);
 router.delete("/:id", authMiddleware, deletarCaso);
 router.patch("/:id/feedback", authMiddleware, salvarFeedback);
+router.patch("/:id/agendar", authMiddleware, agendarReuniao);
 export default router;

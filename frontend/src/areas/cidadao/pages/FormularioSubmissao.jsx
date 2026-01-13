@@ -34,16 +34,20 @@ const initialState = {
   nome: "", // Nome do Autor (seja adulto ou criança)
   cpf: "",
   dataNascimentoAssistido: "",
+  assistidoOcupacao: "",
   assistidoNacionalidade: "",
+  assistidoEnderecoProfissional: "",
   assistidoEstadoCivil: "",
   enderecoAssistido: "", // Residencial
   emailAssistido: "",
   telefone: "",
+  whatsappContato: "", // Novo campo
   assistidoRgNumero: "",
   assistidoRgOrgao: "",
 
   // Representante Legal (apenas se assistidoEhIncapaz === 'sim')
   representanteNome: "",
+  representanteDataNascimento: "",
   representanteCpf: "",
   representanteNacionalidade: "",
   representanteEstadoCivil: "",
@@ -559,6 +563,8 @@ export const FormularioSubmissao = () => {
       cpf: "cpf",
       telefone: "telefone",
       enderecoAssistido: "endereco_assistido",
+      assistidoOcupacao: "assistido_ocupacao",
+      whatsappContato: "whatsapp_contato",
       emailAssistido: "email_assistido",
       assistidoEhIncapaz: "assistido_eh_incapaz",
       assistidoNacionalidade: "assistido_nacionalidade",
@@ -569,6 +575,7 @@ export const FormularioSubmissao = () => {
 
       // Representante
       representanteNome: "representante_nome",
+      representanteDataNascimento: "representante_data_nascimento",
       representanteCpf: "representante_cpf",
       representanteNacionalidade: "representante_nacionalidade",
       representanteEstadoCivil: "representante_estado_civil",
@@ -635,6 +642,7 @@ export const FormularioSubmissao = () => {
     const digitsOnlyFields = new Set([
       "cpf",
       "telefone",
+      "whatsappContato",
       "representanteCpf",
       "representanteTelefone",
       "cpfRequerido",
@@ -662,6 +670,11 @@ export const FormularioSubmissao = () => {
     // O backend espera "Area - Ação" para saber qual template DOCX usar
     const tipoAcaoFormatado = `${formState.tipoAcao} - ${formState.acaoEspecifica}`;
     formData.append("tipoAcao", tipoAcaoFormatado);
+
+    // Se for representação, preenche filhos_info com o nome da criança para o Termo de Declaração
+    if (formState.assistidoEhIncapaz === 'sim' && formState.nome) {
+      formData.append("filhos_info", formState.nome);
+    }
 
     // 3. Construção de Campos Compostos para a IA (Gemini)
     // A IA usa 'dados_adicionais_requerente' para criar o resumo, então montamos uma string rica
@@ -786,17 +799,17 @@ export const FormularioSubmissao = () => {
         <div className="bg-surface border border-soft p-4 rounded-xl mb-4 text-left space-y-3">
           <div>
             <p className="text-xs text-muted uppercase font-bold">CPF (Seu Login)</p>
-            <p className="text-xl font-mono text-white">{formState.cpf}</p>
+            <p className="text-xl font-mono text-surface">{formState.cpf}</p>
           </div>
           <div>
             <p className="text-xs text-muted uppercase font-bold">Sua Senha (Chave de Acesso)</p>
-            <p className="text-xl font-mono text-amber-400">{generatedCredentials.chaveAcesso}</p>
+            <p className="text-xl font-mono text-primary-600">{generatedCredentials.chaveAcesso}</p>
           </div>
           <div className="pt-2 border-t border-soft/50">
             <p className="text-xs text-muted">Protocolo do sistema: <span className="font-mono text-white">{generatedCredentials.protocolo}</span></p>
           </div>
         </div>
-        <div className="bg-amber-500/10 p-3 rounded border border-amber-500/30 text-amber-200 text-sm text-left flex gap-2">
+        <div className="bg-border/10 p-3 rounded border border-border/30 text-primary text-sm text-left flex gap-2">
           <AlertTriangle className="w-5 h-5 shrink-0" />
           <p>Tire um print! Você precisará do seu CPF e desta Chave de Acesso para consultar o andamento.</p>
         </div>
@@ -921,10 +934,15 @@ export const FormularioSubmissao = () => {
                   <select name="assistidoEstadoCivil" value={formState.assistidoEstadoCivil} onChange={handleFieldChange} className="input">
                      {estadoCivilOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
+                  {!isRepresentacao && (
+                    <input type="text" placeholder="Sua Profissão" name="assistidoOcupacao" value={formState.assistidoOcupacao} onChange={handleFieldChange} className="input" />
+                  )}
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                   
+                   {!isRepresentacao && (
+                     <input type="text" placeholder="Seu Endereço Profissional (se houver)" name="assistidoEnderecoProfissional" value={formState.assistidoEnderecoProfissional} onChange={handleFieldChange} className="input" />
+                   )}
                    <input
                      type="text"
                      inputMode="numeric"
@@ -963,6 +981,18 @@ export const FormularioSubmissao = () => {
                         className="input pl-10"
                       />
                     </div>
+                   <div className="relative">
+                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-green-500" size={18} />
+                      <input
+                        type="text"
+                        inputMode="tel"
+                        placeholder="WhatsApp para receber o link da reunião"
+                        name="whatsappContato"
+                        value={formState.whatsappContato}
+                        onChange={handlePhoneChange('whatsappContato')}
+                        className="input pl-10 border-green-500/30 focus:ring-green-500"
+                      />
+                    </div>
                 </div>
               </div>
 
@@ -986,6 +1016,7 @@ export const FormularioSubmissao = () => {
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                     <input type="date" placeholder="Sua Data de Nascimento" name="representanteDataNascimento" value={formState.representanteDataNascimento} onChange={handleFieldChange} className="input" />
                      <select name="representanteNacionalidade" value={formState.representanteNacionalidade} onChange={handleFieldChange} className="input">
                        {nacionalidadeOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                      </select>
@@ -1514,9 +1545,9 @@ export const FormularioSubmissao = () => {
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 px-4">
           <div className="bg-surface max-w-md w-full rounded-2xl p-6 border border-soft shadow-xl space-y-4">
             <div className="flex items-center gap-3">
-              <AlertTriangle className="text-amber-500" />
+              <AlertTriangle className="text-secondary" />
               <h3 className="text-lg font-semibold">Documentos obrigatórios</h3>
-            </div>
+            </div>7
             <p className="text-sm text-muted">
               Você está enviando o caso sem marcar nenhum documento obrigatório para esta ação.
               Confirme que está ciente para continuar ou volte para revisar a lista.

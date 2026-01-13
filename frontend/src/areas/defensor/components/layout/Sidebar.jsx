@@ -111,8 +111,8 @@ export const Sidebar = () => {
           >
             <LogOut size={20} /> Sair
           </button>
-          <p>Precisa de ajuda?</p>
-          <p className="font-semibold ">suporte@defsul.app</p>
+          {/*<p>Precisa de ajuda?</p>
+          <p className="font-semibold "></p>*/}
         </div>
       </aside>
 

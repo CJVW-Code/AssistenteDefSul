@@ -16,6 +16,8 @@ import {
   RefreshCw,
   MessageSquare,
   Save,
+  Video,
+  Calendar,
 } from "lucide-react";
 import { API_BASE } from "../../../utils/apiBase";
 import { useToast } from "../../../contexts/ToastContext";
@@ -141,6 +143,11 @@ export const DetalhesCaso = () => {
   const [enviandoFinalizacao, setEnviandoFinalizacao] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [feedbackInitialized, setFeedbackInitialized] = useState(false);
+  const [isGeneratingTermo, setIsGeneratingTermo] = useState(false);
+  const [isReverting, setIsReverting] = useState(false);
+  const [dataAgendamento, setDataAgendamento] = useState("");
+  const [linkAgendamento, setLinkAgendamento] = useState("");
+  const [isAgendando, setIsAgendando] = useState(false);
 
   const fetchDetalhes = useCallback(
     async (silent = false) => {
@@ -150,6 +157,14 @@ export const DetalhesCaso = () => {
         });
         if (!response.ok) throw new Error("Falha ao carregar o caso.");
         const data = await response.json();
+        if (data.agendamento_data) {
+          // Converte a data UTC do banco para o formato local esperado pelo input datetime-local
+          const date = new Date(data.agendamento_data);
+          const offset = date.getTimezoneOffset() * 60000;
+          const localISOTime = new Date(date.getTime() - offset).toISOString().slice(0, 16);
+          setDataAgendamento(localISOTime);
+        }
+        setLinkAgendamento(data.agendamento_link || "");
         setCaso(data);
       } catch (error) {
         console.error(error);
@@ -261,6 +276,32 @@ export const DetalhesCaso = () => {
     }
   };
 
+  const handleGenerateTermo = async () => {
+    setIsGeneratingTermo(true);
+    try {
+      const response = await fetch(`${API_BASE}/casos/${id}/gerar-termo`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Falha ao gerar o termo de declaração.");
+      }
+
+      const updatedCaso = await response.json();
+      setCaso(updatedCaso);
+      toast.success("Termo de declaração gerado com sucesso!");
+    } catch (error) {
+      console.error(error);
+      toast.error(error.message);
+    } finally {
+      setIsGeneratingTermo(false);
+    }
+  };
+
   const handleSaveFeedback = async () => {
     setSavingFeedback(true);
     try {
@@ -301,7 +342,7 @@ export const DetalhesCaso = () => {
       const response = await fetch(`${API_BASE}/casos/${id}/finalizar`, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("defensorToken")}`,
+          Authorization: `Bearer ${token}`,
         },
         body: formData,
       });
@@ -360,6 +401,74 @@ export const DetalhesCaso = () => {
       }
     }
   };
+
+  const handleAgendarReuniao = async () => {
+    if (!dataAgendamento || !linkAgendamento) {
+      toast.warning("Preencha a data e o link da reunião.");
+      return;
+    }
+
+    setIsAgendando(true);
+    try {
+      const response = await fetch(`${API_BASE}/casos/${id}/agendar`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          // Converte a string do input (local) para um objeto Date e envia como ISO (UTC)
+          agendamento_data: new Date(dataAgendamento).toISOString(),
+          agendamento_link: linkAgendamento,
+        }),
+      });
+      if (!response.ok) throw new Error("Erro ao salvar agendamento.");
+      toast.success("Atendimento online agendado com sucesso!");
+      fetchDetalhes(true);
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setIsAgendando(false);
+    }
+  };
+
+  const handleReverterFinalizacao = async () => {
+    if (
+      !(await confirm(
+        "Esta ação irá reabrir o caso, remover os números de Solar/Processo e excluir a capa processual anexada. Deseja continuar?",
+        "Reverter Finalização?"
+      ))
+    ) {
+      return;
+    }
+
+    setIsReverting(true);
+    try {
+      const response = await fetch(
+        `${API_BASE}/casos/${id}/reverter-finalizacao`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Falha ao reverter a finalização.");
+      }
+
+      toast.success("Finalização revertida! O caso foi reaberto para edição.");
+      fetchDetalhes();
+    } catch (error) {
+      console.error("Erro ao reverter finalização:", error);
+      toast.error(error.message);
+    } finally {
+      setIsReverting(false);
+    }
+  };
+
   return (
     <div className="space-y-8 pb-24">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -722,6 +831,36 @@ export const DetalhesCaso = () => {
                   Baixar minuta gerada
                 </a>
               )}
+              {caso.url_termo_declaracao && (
+                <a
+                  href={caso.url_termo_declaracao}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-primary w-full justify-start"
+                >
+                  <Download size={18} />
+                  Baixar Termo de Declaração
+                </a>
+              )}
+              {!caso.url_termo_declaracao && (
+                <button
+                  onClick={handleGenerateTermo}
+                  disabled={isGeneratingTermo}
+                  className="btn btn-secondary w-full justify-start"
+                >
+                  {isGeneratingTermo ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      Gerando Termo...
+                    </>
+                  ) : (
+                    <>
+                      <FileText size={18} />
+                      Gerar Termo de Declaração
+                    </>
+                  )}
+                </button>
+              )}
               {caso.url_audio && (
                 <a
                   href={caso.url_audio}
@@ -789,6 +928,60 @@ export const DetalhesCaso = () => {
               </div>
             </div>
 
+            {/* SEÇÃO DE AGENDAMENTO ONLINE */}
+            <div className="card space-y-4 border-t-4 border-t-blue-500">
+              <h2 className="heading-2 flex items-center gap-2">
+                <Video size={20} className="text-blue-500" />
+                Agendamento Online
+              </h2>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs text-muted uppercase font-bold">Data e Hora</label>
+                  <input
+                    type="datetime-local"
+                    className="input mt-1"
+                    value={dataAgendamento}
+                    onChange={(e) => setDataAgendamento(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted uppercase font-bold">Link da Reunião</label>
+                  <input
+                    type="text"
+                    placeholder="Google Meet, Teams, etc."
+                    className="input mt-1"
+                    value={linkAgendamento}
+                    onChange={(e) => setLinkAgendamento(e.target.value)}
+                  />
+                </div>
+                <button
+                  onClick={handleAgendarReuniao}
+                  disabled={isAgendando}
+                  className="btn btn-primary w-full"
+                >
+                  {isAgendando ? "Salvando..." : "Salvar Agendamento"}
+                </button>
+
+                {caso.agendamento_link && (
+                  <div className="pt-2">
+                    <a
+                      href={`https://wa.me/55${(caso.whatsapp_contato || caso.telefone_assistido)?.replace(/\D/g, "")}?text=${encodeURIComponent(
+                        `Olá, Sr(a). ${caso.nome_assistido}. A Defensoria Pública agendou seu atendimento online para ${new Date(
+                          caso.agendamento_data
+                        ).toLocaleString("pt-BR")}. Acesse pelo link: ${caso.agendamento_link}. Favor confirmar.`
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn btn-secondary w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white border-none"
+                    >
+                      <MessageSquare size={18} />
+                      Notificar via WhatsApp
+                    </a>
+                  </div>
+                )}
+              </div>
+            </div>
+
             <select
               className="input disabled:opacity-70 disabled:cursor-not-allowed"
               onChange={(e) => handleStatusChange(e.target.value)}
@@ -833,10 +1026,23 @@ export const DetalhesCaso = () => {
 
             {caso.status === "encaminhado_solar" ? (
               // SE JÁ ESTIVER FINALIZADO, MOSTRA OS DADOS
-              <div className="bg-green-500/10 border border-green-500/30 p-6 rounded-xl">
-                <div className="flex items-center gap-2 text-green-400 font-bold mb-4">
-                  <CheckCircle size={20} /> CASO CONCLUÍDO E ENCAMINHADO
+              <div className="bg-green-500/10 border border-green-500/30 p-6 rounded-xl space-y-6">
+                <div className="flex items-center justify-between gap-2 text-muted font-bold">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle size={20} /> CASO CONCLUÍDO E ENCAMINHADO
+                  </div>
+                  {user?.cargo === "admin" && (
+                    <button
+                      onClick={handleReverterFinalizacao}
+                      disabled={isReverting}
+                      className="btn btn-danger btn-sm flex items-center gap-2"
+                    >
+                      <RefreshCw size={14} />
+                      {isReverting ? "Revertendo..." : "Reverter"}
+                    </button>
+                  )}
                 </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="text-xs text-muted uppercase font-bold">
@@ -856,7 +1062,7 @@ export const DetalhesCaso = () => {
                   </div>
                 </div>
                 {caso.url_capa_processual && (
-                  <div className="mt-4">
+                  <div>
                     <a
                       href={caso.url_capa_processual}
                       target="_blank"

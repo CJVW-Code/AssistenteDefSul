@@ -17,24 +17,25 @@ const statusStyles = {
   recebido: "bg-amber-100 text-amber-800 border-amber-200",
   em_analise: "bg-sky-100 text-sky-800 border-sky-200",
   aguardando_docs: "bg-purple-100 text-purple-800 border-purple-200",
-  finalizado: "bg-emerald-100 text-emerald-800 border-emerald-200",
+  encaminhado_solar: "bg-emerald-100 text-emerald-800 border-emerald-200",
   default: "bg-slate-100 text-slate-700 border-slate-200",
 };
 
 const normalizeStatus = (status) => (status || "recebido").toLowerCase().trim();
 
 const summaryFilters = {
-  ativos: (caso) => normalizeStatus(caso.status) !== "finalizado",
+  ativos: (caso) => normalizeStatus(caso.status) !== "encaminhado_solar",
   em_analise: (caso) => normalizeStatus(caso.status) === "em_analise",
   aguardando_docs: (caso) => normalizeStatus(caso.status) === "aguardando_docs",
-  finalizado: (caso) => normalizeStatus(caso.status) === "finalizado",
+  encaminhado_solar: (caso) =>
+    normalizeStatus(caso.status) === "encaminhado_solar",
 };
 
 const summaryFilterLabels = {
   ativos: "casos ativos",
   em_analise: "casos em análise",
   aguardando_docs: "casos aguardando documentos",
-  finalizado: "casos finalizados",
+  encaminhado_solar: "casos encaminhados ao Solar",
 };
 
 export const Dashboard = () => {
@@ -74,8 +75,8 @@ export const Dashboard = () => {
 
   const resumo = useMemo(() => {
     const total = casos.length;
-    const finalizados = casos.filter(
-      (caso) => normalizeStatus(caso.status) === "finalizado"
+    const encaminhadosSolar = casos.filter(
+      (caso) => normalizeStatus(caso.status) === "encaminhado_solar"
     ).length;
     const aguardandoDocs = casos.filter(
       (caso) => normalizeStatus(caso.status) === "aguardando_docs"
@@ -83,8 +84,8 @@ export const Dashboard = () => {
     const emAnalise = casos.filter(
       (caso) => normalizeStatus(caso.status) === "em_analise"
     ).length;
-    const ativos = total - finalizados;
-    return { total, finalizados, aguardandoDocs, emAnalise, ativos };
+    const ativos = total - encaminhadosSolar;
+    return { total, encaminhadosSolar, aguardandoDocs, emAnalise, ativos };
   }, [casos]);
 
   // --- ESTATÍSTICAS DO SISTEMA (Novo) ---
@@ -218,10 +219,10 @@ export const Dashboard = () => {
             accent: "text-purple-500",
           },
           {
-            key: "finalizado",
-            label: "Finalizados",
-            value: resumo.finalizados,
-            helper: "Casos concluídos.",
+            key: "encaminhado_solar",
+            label: "Encaminhados Solar",
+            value: resumo.encaminhadosSolar,
+            helper: "Casos concluídos e enviados.",
             icon: CheckCircle2,
             accent: "text-emerald-500",
           },

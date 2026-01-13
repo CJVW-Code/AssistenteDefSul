@@ -28,7 +28,7 @@ const imagens = [
 export const CarrosselAvisos = () => {
   return (
     <section className="bg-app p-4 sm:p-6 rounded-2xl border border-soft max-w-3xl mx-auto">
-      <h2 className="text-2xl font-semibold mb-4 text-center text-green-400">
+      <h2 className="text-2xl font-semibold mb-4 text-center text-error">
         Fique Atento aos Golpes!
       </h2>
       <Swiper
