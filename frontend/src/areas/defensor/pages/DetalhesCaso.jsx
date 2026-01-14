@@ -772,7 +772,8 @@ export const DetalhesCaso = () => {
               <h2 className="heading-2">Anotações / Feedback</h2>
             </div>
             <p className="text-sm text-muted">
-              Espaço para observações internas sobre o caso ou ajustes necessários na minuta.
+              Espaço para observações internas sobre o caso ou ajustes
+              necessários na minuta.
             </p>
             <textarea
               className="input min-h-[120px] resize-y font-sans"
@@ -782,6 +783,7 @@ export const DetalhesCaso = () => {
             />
             <div className="flex justify-end">
               <button
+                type="button"
                 onClick={handleSaveFeedback}
                 disabled={savingFeedback}
                 className="btn btn-primary flex items-center gap-2"
@@ -847,12 +849,16 @@ export const DetalhesCaso = () => {
                     disabled={isGeneratingTermo}
                     className="btn btn-ghost border border-soft w-full justify-start text-xs"
                   >
-                    <RefreshCw size={14} className={isGeneratingTermo ? "animate-spin" : ""} />
+                    <RefreshCw
+                      size={14}
+                      className={isGeneratingTermo ? "animate-spin" : ""}
+                    />
                     {isGeneratingTermo ? "Regerando..." : "Regerar Termo"}
                   </button>
                 </div>
               ) : (
                 <button
+                  type="button"
                   onClick={handleGenerateTermo}
                   disabled={isGeneratingTermo}
                   className="btn btn-secondary w-full justify-start"
@@ -945,7 +951,9 @@ export const DetalhesCaso = () => {
               </h2>
               <div className="space-y-3">
                 <div>
-                  <label className="text-xs text-muted uppercase font-bold">Data e Hora</label>
+                  <label className="text-xs text-muted uppercase font-bold">
+                    Data e Hora
+                  </label>
                   <input
                     type="datetime-local"
                     className="input mt-1"
@@ -954,7 +962,9 @@ export const DetalhesCaso = () => {
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-muted uppercase font-bold">Link da Reunião</label>
+                  <label className="text-xs text-muted uppercase font-bold">
+                    Link da Reunião
+                  </label>
                   <input
                     type="text"
                     placeholder="Google Meet, Teams, etc."
@@ -964,6 +974,7 @@ export const DetalhesCaso = () => {
                   />
                 </div>
                 <button
+                  type="button"
                   onClick={handleAgendarReuniao}
                   disabled={isAgendando}
                   className="btn btn-primary w-full"
@@ -974,10 +985,16 @@ export const DetalhesCaso = () => {
                 {caso.agendamento_link && (
                   <div className="pt-2">
                     <a
-                      href={`https://wa.me/55${(caso.whatsapp_contato || caso.telefone_assistido)?.replace(/\D/g, "")}?text=${encodeURIComponent(
-                        `Olá, Sr(a). ${caso.nome_assistido}. A Defensoria Pública agendou seu atendimento online para ${new Date(
+                      href={`https://wa.me/55${(
+                        caso.whatsapp_contato || caso.telefone_assistido
+                      )?.replace(/\D/g, "")}?text=${encodeURIComponent(
+                        `Olá, Sr(a). ${
+                          caso.nome_assistido
+                        }. A Defensoria Pública agendou seu atendimento online para ${new Date(
                           caso.agendamento_data
-                        ).toLocaleString("pt-BR")}. Acesse pelo link: ${caso.agendamento_link}. Favor confirmar.`
+                        ).toLocaleString("pt-BR")}. Acesse pelo link: ${
+                          caso.agendamento_link
+                        }. Favor confirmar.`
                       )}`}
                       target="_blank"
                       rel="noopener noreferrer"
@@ -1042,6 +1059,7 @@ export const DetalhesCaso = () => {
                   </div>
                   {user?.cargo === "admin" && (
                     <button
+                      type="button"
                       onClick={handleReverterFinalizacao}
                       disabled={isReverting}
                       className="btn btn-danger btn-sm flex items-center gap-2"
