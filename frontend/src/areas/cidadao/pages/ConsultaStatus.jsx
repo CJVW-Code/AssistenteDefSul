@@ -7,6 +7,7 @@ import {
   CheckCircle,
   FileText,
   Clock,
+  Video,
   HelpCircle,
 } from "lucide-react";
 import { API_BASE } from "../../../utils/apiBase";
@@ -61,12 +62,12 @@ export const ConsultaStatus = () => {
             value={cpf}
             onChange={(e) => setCpf(e.target.value)}
             required
-            className="w-full pl-10 pr-4 py-3 bg-app rounded-lg border border-soft focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all text-white"
+            className="w-full pl-10 pr-4 py-3 bg-app rounded-lg border border-soft focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all text-muted"
           />
         </div>
         <div className="relative">
           <KeyRound
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted"
             size={20}
           />
           <input
@@ -75,13 +76,13 @@ export const ConsultaStatus = () => {
             value={chave}
             onChange={(e) => setChave(e.target.value)}
             required
-            className="w-full pl-10 pr-4 py-3 bg-app rounded-lg border border-soft focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all text-white"
+            className="w-full pl-10 pr-4 py-3 bg-app rounded-lg border border-soft focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all text-muted"
           />
         </div>
 
         {/* MENSAGEM DE AJUDA DA CHAVE */}
         <div className="flex items-start gap-2 text-xs text-muted bg-surface p-3 rounded border border-soft">
-          <HelpCircle size={16} className="shrink-0 mt-0.5 text-primary" />
+          <HelpCircle size={16} className="shrink-0 mt-0.5 text-muted" />
           <p>
             Esqueceu a chave? Compareça a uma unidade da defensoria para resetar
             apresentando documentos para comprovação da identidade.
@@ -106,14 +107,40 @@ export const ConsultaStatus = () => {
 
       {caso && (
         <>
-          {caso.status === "encaminhado_solar" ? (
+          {/* CARD DE AGENDAMENTO ONLINE - PRIORIDADE MÁXIMA */}
+          {caso.agendamento_link && (
+            <div className="bg-surface/20 border border-border/50 rounded-xl p-6 mt-6 mb-4 ">
+              <h3 className="text-xl font-bold text-primary flex items-center gap-2">
+                <Video size={20} /> Atendimento Online Agendado
+              </h3>
+              {caso.agendamento_data && (
+                <p className="text-muted mt-2">
+                  Data:{" "}
+                  <strong className="text-lg">
+                    {new Date(caso.agendamento_data).toLocaleString("pt-BR")}
+                  </strong>
+                </p>
+              )}
+              <a
+                href={caso.agendamento_link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-primary w-full mt-4 flex justify-center items-center gap-2"
+              >
+                ENTRAR NA REUNIÃO AGORA
+              </a>
+            </div>
+          )}
+
+          {caso.status === "encaminhamento solar" ||
+          caso.status === "encaminhado_solar" ? (
             // --- TELA DE CASO CONCLUÍDO ---
-            <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-6 mt-6 animate-fade-in">
+            <div className="bg-border/10 border border-border/30 rounded-xl p-6 mt-6 animate-fade-in">
               <div className="flex items-center gap-3 mb-4">
-                <div className="bg-green-500 text-white p-2 rounded-full">
+                <div className="bg-primary/50 text-muted p-2 rounded-full">
                   <CheckCircle size={24} />
                 </div>
-                <h3 className="text-xl font-bold text-green-400">
+                <h3 className="text-xl font-bold text-muted">
                   Atendimento Concluído!
                 </h3>
               </div>
@@ -130,7 +157,7 @@ export const ConsultaStatus = () => {
                     Número do Processo
                   </label>
                   <div className="flex items-center justify-between mt-1">
-                    <span className="text-2xl font-mono text-white select-all">
+                    <span className="text-2xl font-mono text-primary select-all">
                       {caso.numero_processo || "Número indisponível"}
                     </span>
                     <button
@@ -138,7 +165,7 @@ export const ConsultaStatus = () => {
                       onClick={() =>
                         navigator.clipboard.writeText(caso.numero_processo)
                       }
-                      className="text-primary hover:text-white text-sm"
+                      className="text-primary hover:text-primary text-sm"
                     >
                       Copiar
                     </button>
@@ -150,7 +177,7 @@ export const ConsultaStatus = () => {
                     Atendimento Solar
                   </label>
                   <div className="mt-1">
-                    <span className="text-xl font-mono text-white select-all">
+                    <span className="text-xl font-mono text-primary select-all">
                       {caso.numero_solar || "N/A"}
                     </span>
                   </div>
@@ -175,17 +202,13 @@ export const ConsultaStatus = () => {
           ) : (
             // --- TELA DE STATUS NORMAL (EM ANÁLISE) ---
             <div className="bg-surface border border-soft rounded-xl p-6 mt-6">
-              <h3 className="text-lg font-semibold text-white mb-2">
+              <h3 className="text-lg font-semibold text-primary mb-2">
                 Status Atual
               </h3>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-yellow-500/20 text border border-yellow-500/30">
                 <Clock size={16} />
                 <span className="font-medium capitalize">
-                  {caso.status === "recebido"
-                    ? "Recebido - Em Triagem"
-                    : caso.status === "em_analise"
-                    ? "Em Análise Jurídica"
-                    : caso.status.replace("_", " ")}
+                  {caso.status?.replace("_", " ")}
                 </span>
               </div>
               <p className="text-sm text-muted mt-4">

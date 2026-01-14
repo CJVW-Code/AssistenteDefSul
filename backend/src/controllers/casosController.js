@@ -1,11 +1,12 @@
 ﻿﻿import { supabase } from "../config/supabase.js";
+import path from "path";
 import {
   generateCredentials,
   hashKeyWithSalt,
 } from "../services/securityService.js";
 import fs from "fs/promises";
 import { extractTextFromImage } from "../services/documentService.js";
-import { generateDocx } from "../services/documentGenerationService.js";
+import { generateDocx, generateTermoDeclaracao } from "../services/documentGenerationService.js";
 import { analyzeCase, generateDosFatos } from "../services/geminiService.js";
 import { getVaraByTipoAcao } from "../config/varasMapping.js";
 import logger from "../utils/logger.js";
@@ -24,7 +25,7 @@ const storageBuckets = {
 };
 
 const salarioMinimoAtual = Number.parseFloat(
-  process.env.SALARIO_MINIMO_ATUAL || "1412"
+  process.env.SALARIO_MINIMO_ATUAL || "1621"
 );
 
 // --- UTILS DE FORMATAÇÃO E PARSE ---
@@ -217,14 +218,16 @@ const buildSignedUrl = async (bucket, storedValue) => {
 const attachSignedUrls = async (caso) => {
   if (!caso) return caso;
   const enriched = { ...caso };
-  const [docGerado, audio, peticao] = await Promise.all([
+  const [docGerado, audio, peticao, termoDeclaracao] = await Promise.all([
     buildSignedUrl(storageBuckets.peticoes, caso.url_documento_gerado),
     buildSignedUrl(storageBuckets.audios, caso.url_audio),
     buildSignedUrl(storageBuckets.peticoes, caso.url_peticao),
+    buildSignedUrl(storageBuckets.peticoes, caso.url_termo_declaracao),
   ]);
   enriched.url_documento_gerado = docGerado;
   enriched.url_audio = audio;
   enriched.url_peticao = peticao;
+  enriched.url_termo_declaracao = termoDeclaracao;
   if (Array.isArray(caso.urls_documentos) && caso.urls_documentos.length) {
     const signedDocs = await Promise.all(
       caso.urls_documentos.map((value) =>
@@ -433,7 +436,7 @@ const buildDocxTemplatePayload = (
     triagemNumero: ensureText(normalizedData.triagemNumero),
     processoOrigemNumero: ensureText(baseData.numero_processo_originario),
     processoTituloNumero: ensureText(baseData.processo_titulo_numero),
-    requerente_nome: ensureText(assistidoNome),
+    requerente_nome: ensureText(assistidoNome).toUpperCase(),
     requerente_incapaz_sim_nao: ensureText(
       baseData.assistido_eh_incapaz || "nao"
     ),
@@ -452,7 +455,7 @@ const buildDocxTemplatePayload = (
     requerente_telefone: ensureText(baseData.telefone_assistido),
     requerente_endereco_residencial: ensureText(baseData.endereco_assistido),
     requerente_representante: ensureText(requerente.representante),
-    representante_nome: ensureText(baseData.representante_nome),
+    representante_nome: ensureText(baseData.representante_nome).toUpperCase(),
     representante_nacionalidade: ensureInlineValue(
       baseData.representante_nacionalidade
     ),
@@ -481,9 +484,9 @@ const buildDocxTemplatePayload = (
     exequente_data_nascimento: ensureText(dataNascimentoAssistidoBr),
     exequente_cpf: ensureText(assistidoCpf),
     exequente_representante: ensureText(requerente.representante),
-    executado_nome: ensureText(baseData.nome_requerido || requerido.nome),
+    executado_nome: ensureText(baseData.nome_requerido || requerido.nome).toUpperCase(),
     executado_cpf: ensureText(baseData.cpf_requerido || requerido.cpf),
-    requerido_nome: ensureText(baseData.nome_requerido || requerido.nome),
+    requerido_nome: ensureText(baseData.nome_requerido || requerido.nome).toUpperCase(),
     requerido_cpf: ensureText(baseData.cpf_requerido || requerido.cpf),
     executado_nacionalidade: ensureText(baseData.requerido_nacionalidade),
     executado_estado_civil: ensureText(baseData.requerido_estado_civil),
@@ -931,6 +934,7 @@ export const criarNovoCaso = async (req, res) => {
       nome_assistido: nome,
       cpf_assistido: cpf,
       telefone_assistido: telefone,
+      whatsapp_contato: dados_formulario.whatsapp_contato,
       tipo_acao: tipoAcao,
       relato_texto: relato,
       url_audio,
@@ -1023,10 +1027,18 @@ export const criarNovoCaso = async (req, res) => {
 
 export const listarCasos = async (req, res) => {
   try {
-    const { data, error } = await supabase
-      .from("casos")
-      .select("*")
-      .order("created_at", { ascending: false });
+    const { cpf } = req.query;
+    let query = supabase.from("casos").select("*");
+
+    // Se o CPF for fornecido na query, filtra por ele
+    if (cpf) {
+      query = query.eq("cpf_assistido", cpf);
+    }
+
+    // Ordena os resultados
+    const { data, error } = await query.order("created_at", {
+      ascending: false,
+    });
     if (error) throw error;
     res.status(200).json(data);
   } catch (error) {
@@ -1123,6 +1135,75 @@ export const regenerarDosFatos = async (req, res) => {
   }
 };
 
+export const gerarTermoDeclaracao = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const { data: caso, error } = await supabase
+      .from("casos")
+      .select("*")
+      .eq("id", id)
+      .single();
+    if (error || !caso) throw new Error("Caso não encontrado");
+
+    const dados = caso.dados_formulario || caso;
+
+    // Build term declaration data payload
+    const termoData = {
+      ...dados,
+      nome_assistido: (dados.nome || caso.nome_assistido || "").toUpperCase(),
+      representante_nome: (dados.representante_nome || "").toUpperCase(),
+      cpf_assistido: dados.cpf || caso.cpf_assistido,
+      relato_texto: (caso.relato_texto || "").replace(/\n/g, "\r\n"),
+      filhos_info: (dados.filhos_info || dados.nome || caso.nome_assistido || "").toUpperCase(),
+      data_atual: new Date().toLocaleDateString("pt-BR"),
+      protocolo: caso.protocolo,
+      tipo_acao: caso.tipo_acao,
+      // Helpers para o template .docx
+      eh_representacao: dados.assistido_eh_incapaz === 'sim',
+      endereco_assistido: dados.endereco_assistido || dados.representante_endereco_residencial,
+      telefone_assistido: dados.telefone || caso.telefone_assistido,
+      profissao: dados.assistido_ocupacao || dados.representante_ocupacao || "Não informada",
+      estado_civil: dados.assistido_estado_civil || "Não informado"
+    };
+
+    // Generate the term declaration document
+    const docxBuffer = await generateTermoDeclaracao(termoData);
+
+    // Upload to Supabase storage
+    const termoPath = `${caso.protocolo}/termo_declaracao_${caso.protocolo}.docx`;
+
+    // Exclui o arquivo antigo se existir para garantir uma geração limpa (conforme solicitado)
+    await supabase.storage.from("peticoes").remove([termoPath]);
+
+    const { error: uploadError } = await supabase.storage
+      .from("peticoes")
+      .upload(termoPath, docxBuffer, {
+        contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        upsert: true,
+      });
+
+    if (uploadError) {
+      logger.error(`Erro ao fazer upload do termo de declaração: ${uploadError.message}`);
+      throw new Error("Falha ao salvar o termo de declaração");
+    }
+
+    // Update case record with term URL
+    const { error: updateError } = await supabase
+      .from("casos")
+      .update({ url_termo_declaracao: termoPath })
+      .eq("id", id);
+
+    if (updateError) throw updateError;
+
+    // Return the updated case with signed URL
+    const casoAtualizado = await attachSignedUrls({ ...caso, url_termo_declaracao: termoPath });
+    res.status(200).json(casoAtualizado);
+  } catch (error) {
+    logger.error(`Erro ao gerar termo de declaração: ${error.message}`);
+    res.status(500).json({ error: "Falha ao gerar termo de declaração." });
+  }
+};
+
 export const buscarPorCpf = async (req, res) => {
   const cpf = req.params.cpf || req.query.cpf;
   try {
@@ -1139,12 +1220,14 @@ export const buscarPorCpf = async (req, res) => {
 
 export const finalizarCasoSolar = async (req, res) => {
   const { id } = req.params;
-  const { numero_solar } = req.body;
+  const { numero_solar, numero_processo } = req.body;
   let url_capa_processual = null;
   try {
     if (req.file) {
       const file = req.file;
-      const filePath = `capas/${id}_${Date.now()}_${file.originalname}`;
+      // Sanitize filename to prevent path traversal and other issues
+      const safeOriginalName = path.basename(file.originalname);
+      const filePath = `capas/${id}_${Date.now()}_${safeOriginalName}`;
       const { error: uploadError } = await supabase.storage
         .from(storageBuckets.documentos)
         .upload(filePath, await fs.readFile(file.path), {
@@ -1154,21 +1237,103 @@ export const finalizarCasoSolar = async (req, res) => {
       url_capa_processual = filePath;
       await fs.unlink(file.path);
     }
+    const { error } = await supabase
+      .from("casos")
+      .update({
+        status: "encaminhado_solar",
+        numero_solar,
+        numero_processo,
+        url_capa_processual,
+        finished_at: new Date(),
+      })
+      .eq("id", id);
+    if (error) throw error;
+    res.status(200).json({ message: "Caso finalizado com sucesso." });
+  } catch (error) {
+    res.status(500).json({ error: "Erro ao finalizar caso." });
+  }
+};
+
+export const agendarReuniao = async (req, res) => {
+  const { id } = req.params;
+  const { agendamento_data, agendamento_link } = req.body;
+
+  // Define o status como 'agendado' se houver dados, ou 'pendente' se estiverem vazios
+  const status = (agendamento_data && agendamento_link) ? "agendado" : "pendente";
+
+  try {
     const { data, error } = await supabase
       .from("casos")
       .update({
-        status: "finalizado",
-        numero_solar,
-        url_capa_processual,
-        finished_at: new Date(),
+        agendamento_data,
+        agendamento_link,
+        agendamento_status: status,
       })
       .eq("id", id)
       .select()
       .single();
+
     if (error) throw error;
     res.status(200).json(data);
   } catch (error) {
-    res.status(500).json({ error: "Erro ao finalizar caso." });
+    logger.error(`Erro ao agendar reunião para o caso ${id}: ${error.message}`);
+    res.status(500).json({ error: "Erro ao agendar reunião." });
+  }
+};
+
+export const reverterFinalizacao = async (req, res) => {
+  if (!req.user || req.user.cargo !== "admin") {
+    return res.status(403).json({
+      error: "Acesso negado. Apenas administradores podem reverter a finalização.",
+    });
+  }
+
+  const { id } = req.params;
+
+  try {
+    const { data: caso, error: fetchError } = await supabase
+      .from("casos")
+      .select("url_capa_processual, protocolo")
+      .eq("id", id)
+      .single();
+
+    if (fetchError || !caso) {
+      return res.status(404).json({ error: "Caso não encontrado." });
+    }
+
+    if (caso.url_capa_processual) {
+      const filePath = extractObjectPath(caso.url_capa_processual);
+      if (filePath) {
+        logger.info(`Revertendo finalização: Excluindo capa processual '${filePath}' do caso ${id}`);
+        const { error: deleteError } = await supabase.storage
+          .from(storageBuckets.documentos)
+          .remove([filePath]);
+        
+        if (deleteError) {
+            logger.warn(`Falha ao excluir capa do storage durante a reversão: ${deleteError.message}`);
+        }
+      }
+    }
+
+    const { error: updateError } = await supabase
+      .from("casos")
+      .update({
+        status: "processado",
+        numero_solar: null,
+        numero_processo: null,
+        url_capa_processual: null,
+        finished_at: null,
+      })
+      .eq("id", id);
+
+    if (updateError) throw updateError;
+
+    logger.info(`Finalização do caso ${caso.protocolo} (ID: ${id}) revertida por ${req.user.email}.`);
+    // Apenas retorna uma mensagem de sucesso, pois o frontend já recarrega os dados.
+    res.status(200).json({ message: "Finalização revertida com sucesso." });
+  } catch (error) {
+    logger.error(`Erro ao reverter finalização do caso ${id}: ${error.message}`);
+    res.status(500).json({ error: "Erro ao reverter finalização do caso." });
   }
 };
 
@@ -1216,6 +1381,37 @@ export const deletarCaso = async (req, res) => {
     if (fetchError || !caso) {
       return res.status(404).json({ error: "Caso não encontrado." });
     }
+
+    // --- REMOVER ARQUIVOS DO STORAGE ---
+    const filesToDelete = {
+      [storageBuckets.audios]: [],
+      [storageBuckets.peticoes]: [],
+      [storageBuckets.documentos]: [],
+    };
+
+    const addFile = (bucket, path) => {
+      const cleanPath = extractObjectPath(path);
+      if (cleanPath) filesToDelete[bucket].push(cleanPath);
+    };
+
+    addFile(storageBuckets.audios, caso.url_audio);
+    addFile(storageBuckets.peticoes, caso.url_peticao);
+    addFile(storageBuckets.peticoes, caso.url_documento_gerado);
+    addFile(storageBuckets.peticoes, caso.url_termo_declaracao);
+    addFile(storageBuckets.documentos, caso.url_capa_processual);
+
+    if (Array.isArray(caso.urls_documentos)) {
+      caso.urls_documentos.forEach((doc) => addFile(storageBuckets.documentos, doc));
+    }
+
+    await Promise.all(
+      Object.entries(filesToDelete).map(async ([bucket, files]) => {
+        if (files.length > 0) {
+          logger.info(`🗑️ Excluindo ${files.length} arquivos do bucket '${bucket}' vinculados ao caso ${id}`);
+          await supabase.storage.from(bucket).remove(files);
+        }
+      })
+    );
 
     // Excluir o caso do banco de dados
     const { error: deleteError } = await supabase

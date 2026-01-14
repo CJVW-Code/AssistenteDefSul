@@ -25,7 +25,7 @@ export const consultarStatus = async (req, res) => {
     const { data: caso, error } = await supabase
       .from("casos")
       .select(
-        "status, chave_acesso_hash, nome_assistido, numero_processo, numero_solar, url_capa_processual, url_documento_gerado"
+        "status, chave_acesso_hash, nome_assistido, numero_processo, numero_solar, url_capa_processual, url_documento_gerado, agendamento_data, agendamento_link, agendamento_status"
       )
       .eq("cpf_assistido", cpfLimpo)
       .single(); // .single() garante que apenas um resultado seja retornado
@@ -54,14 +54,30 @@ export const consultarStatus = async (req, res) => {
     logger.info(
       `Status consultado com sucesso para CPF ${cpfLimpo}. Status: ${caso.status}`
     );
+
+    // Mapeamento de status internos para os 4 status públicos solicitados
+    const statusPublicoMap = {
+      recebido: "enviado",
+      processando: "em triagem",
+      processado: "em triagem",
+      em_analise: "em triagem",
+      aguardando_docs: "documentos pendente",
+      encaminhado_solar: "encaminhamento solar",
+      finalizado: "encaminhamento solar",
+      erro: "enviado",
+    };
+
     // 4. Se tudo estiver correto, retorna o status do caso
     res.status(200).json({
-      status: caso.status,
+      status: statusPublicoMap[caso.status] || "enviado",
       nome_assistido: caso.nome_assistido,
       numero_processo: caso.numero_processo,
       numero_solar: caso.numero_solar,
       url_capa_processual: caso.url_capa_processual,
       url_documento_gerado: caso.url_documento_gerado,
+      agendamento_data: caso.agendamento_data,
+      agendamento_link: caso.agendamento_link,
+      agendamento_status: caso.agendamento_status,
     });
   } catch (err) {
     logger.error(`Erro crítico ao consultar status: ${err.message}`, {
