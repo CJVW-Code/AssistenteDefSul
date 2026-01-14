@@ -36,7 +36,7 @@ app.use("/api/casos", casosRoutes);
 app.use("/api/status", statusRoutes);
 app.use("/api/debug", debugRoutes);
 
-app.get("/health", (req, res) => {
+app.get("/api/health", (req, res) => {
   res.json({ status: "OK", message: "Def. Sul Bahia API is running" });
 });
 

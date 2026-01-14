@@ -25,7 +25,7 @@ const storageBuckets = {
 };
 
 const salarioMinimoAtual = Number.parseFloat(
-  process.env.SALARIO_MINIMO_ATUAL || "1.621"
+  process.env.SALARIO_MINIMO_ATUAL || "1621"
 );
 
 // --- UTILS DE FORMATAÇÃO E PARSE ---
