@@ -6,12 +6,13 @@ import {
   finalizarCasoSolar,
   reverterFinalizacao, // Adicionado
   regenerarDosFatos,
-  gerarTermoDeclaracao,
   buscarPorCpf,
   resetarChaveAcesso,
   atualizarStatusCaso,
   deletarCaso,
   agendarReuniao,
+  gerarTermoDeclaracao,
+  regerarMinuta,
 } from "../controllers/casosController.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { upload } from "../middleware/upload.js"; // Usa sua configuração personalizada
@@ -45,4 +46,5 @@ router.patch("/:id/status", authMiddleware, atualizarStatusCaso);
 router.delete("/:id", authMiddleware, deletarCaso);
 router.patch("/:id/feedback", authMiddleware, salvarFeedback);
 router.patch("/:id/agendar", authMiddleware, agendarReuniao);
+router.post("/:id/regerar-minuta", authMiddleware, regerarMinuta);
 export default router;

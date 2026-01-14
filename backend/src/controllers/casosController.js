@@ -1,4 +1,4 @@
-﻿﻿import { supabase } from "../config/supabase.js";
+﻿﻿﻿﻿import { supabase } from "../config/supabase.js";
 import path from "path";
 import {
   generateCredentials,
@@ -258,8 +258,7 @@ const sanitizeInlineText = (value) => {
 
 const ensureInlineValue = (value) => {
   const ensured = ensureText(value);
-  if (!ensured || ensured === "[PREENCHER]") return ensured;
-  return ensured.startsWith("[") ? ensured : ` ${ensured}`;
+  return ensured;
 };
 
 const sanitizeCaseDataInlineFields = (data = {}) => {
@@ -398,6 +397,107 @@ const buildDocxTemplatePayload = (
   dosFatosTexto,
   baseData = {}
 ) => {
+  const normalizeGenderTerm = (val) => {
+    if (!val || typeof val !== 'string') return val;
+    const lower = val.toLowerCase().trim();
+    if (lower.includes('brasileir')) return 'brasileiro(a)';
+    if (lower.includes('solteir')) return 'solteiro(a)';
+    if (lower.includes('casad')) return 'casado(a)';
+    if (lower.includes('divorciad')) return 'divorciado(a)';
+    if (lower.includes('viúv') || lower.includes('viuv')) return 'viúvo(a)';
+    if (lower.includes('união estável') || lower.includes('uniao estavel')) return 'união estável';
+    return val;
+  };
+
+  // --- LÓGICA INTELIGENTE PARA MÚLTIPLOS FILHOS E REPRESENTAÇÃO LEGAL V2.0 ---
+
+  // 1. Função auxiliar para calcular idade a partir de data "DD/MM/YYYY"
+  const calcularIdade = (dataNascString) => {
+    if (!dataNascString) return null;
+    let nascimento;
+    if (dataNascString.includes('/')) {
+      const [dia, mes, ano] = dataNascString.split('/');
+      nascimento = new Date(`${ano}-${mes}-${dia}T00:00:00`);
+    } else if (dataNascString.includes('-')) {
+      nascimento = new Date(`${dataNascString}T00:00:00`);
+    } else {
+      return null;
+    }
+
+    if (isNaN(nascimento.getTime())) return null;
+
+    const hoje = new Date();
+    let idade = hoje.getFullYear() - nascimento.getFullYear();
+    const m = hoje.getMonth() - nascimento.getMonth();
+    if (m < 0 || (m === 0 && hoje.getDate() < nascimento.getDate())) {
+      idade--;
+    }
+    return idade;
+  };
+
+  // 2. Unifica todos os filhos (principal + outros) em uma única lista
+  const rawDetails = baseData.outros_filhos_detalhes || baseData.dados_formulario?.outros_filhos_detalhes;
+  const outrosFilhosRaw = rawDetails
+    ? (typeof rawDetails === 'string' ? JSON.parse(rawDetails) : rawDetails)
+    : [];
+
+  const filhoPrincipal = {
+    nome: ensureText(baseData.nome || baseData.nome_assistido || normalizedData.requerente_nome),
+    cpf: ensureText(baseData.cpf || baseData.cpf_assistido || normalizedData.requerente_cpf),
+    nascimento: ensureText(formatDateBr(baseData.assistido_data_nascimento || baseData.dataNascimentoAssistido || baseData.dados_formulario?.assistido_data_nascimento)),
+    rg: ensureText(baseData.assistido_rg_numero ? `${baseData.assistido_rg_numero} ${baseData.assistido_rg_orgao}` : ""),
+    nacionalidade: ensureText(normalizeGenderTerm(baseData.assistido_nacionalidade)),
+  };
+
+  const irmaos = outrosFilhosRaw.map(f => ({
+    nome: ensureText(f.nome),
+    cpf: ensureText(f.cpf),
+    nascimento: ensureText(formatDateBr(f.dataNascimento)),
+    rg: ensureText(f.rgNumero ? `${f.rgNumero} ${f.rgOrgao}` : ""),
+    nacionalidade: ensureText(normalizeGenderTerm(f.nacionalidade)),
+  }));
+
+  // Filtra para garantir que não há entradas vazias e converte nomes para maiúsculo
+  const lista_filhos = [filhoPrincipal, ...irmaos]
+    .filter(f => f.nome && f.nome !== "[PREENCHER]")
+    .map(f => ({ ...f, nome: f.nome.toUpperCase() }));
+
+  // 3. Monta o texto corrido para qualificação dos filhos
+  const texto_qualificacao_filhos = lista_filhos
+    .map(f => {
+      const rgPart = f.rg !== "[PREENCHER]" ? `, portador(a) do RG nº ${f.rg}` : "";
+      const nacPart = f.nacionalidade !== "[PREENCHER]" ? `, ${f.nacionalidade}` : "";
+      return `${f.nome}${nacPart}, nascido(a) em ${f.nascimento}, inscrito(a) no CPF nº ${f.cpf}${rgPart}`;
+    })
+    .join("; e ");
+
+  // 4. Lógica de Concordância (ECA + Código Civil + Pedido do Usuário)
+  const idades = lista_filhos.map(f => calcularIdade(f.nascimento)).filter(age => age !== null);
+  const isPlural = lista_filhos.length > 1;
+  const temMenorDe16 = idades.some(idade => idade < 16);
+  const temEntre16e18 = idades.some(idade => idade >= 16 && idade < 18);
+
+  // Termo "incapaz" ou "incapazes"
+  const termo_incapaz = isPlural ? "incapazes" : "incapaz";
+  
+  // Termo de representação/assistência
+  let termo_representacao = "";
+  if (isPlural) {
+      if (temMenorDe16 && temEntre16e18) {
+          termo_representacao = "neste ato representados e assistidos";
+      } else if (temEntre16e18) {
+          termo_representacao = "neste ato assistidos";
+      } else { // Implícito que só tem menores de 16 ou a lista está vazia
+          termo_representacao = "neste ato representados";
+      }
+  } else if (idades.length === 1) { // Singular
+      termo_representacao = idades[0] < 16
+        ? "neste ato representado(a)" 
+        : "neste ato assistido(a)";
+  }
+
+  // --- FIM DA LÓGICA DE FILHOS ---
+
   const requerente = normalizedData.requerente || {};
   const requerido = normalizedData.requerido || {};
   const varaPreferida =
@@ -420,17 +520,23 @@ const buildDocxTemplatePayload = (
   const percentualExtras = baseData.percentual_definitivo_extras || "0";
   const diaPagamentoBase =
     baseData.dia_pagamento_fixado || baseData.dia_pagamento_requerido;
-  const assistidoNome = baseData.nome_assistido || requerente.nome;
+  const assistidoNome = lista_filhos.length > 0 ? lista_filhos.map(f => f.nome).join(', ') : (baseData.nome_assistido || requerente.nome);
   const assistidoCpf = baseData.cpf_assistido || requerente.cpf;
   const dadosBancarios = baseData.dados_bancarios_deposito;
   const executadoEndereco =
     baseData.endereco_requerido || requerido.endereco || "";
-  const dataNascimentoAssistidoBr = formatDateBr(
-    baseData.assistido_data_nascimento || requerente.dataNascimento
-  );
+  // Usa o primeiro filho da lista para o campo de data de nascimento principal, se aplicável
+  const dataNascimentoAssistidoBr = lista_filhos.length > 0
+    ? lista_filhos[0].nascimento
+    : formatDateBr(baseData.assistido_data_nascimento || requerente.dataNascimento);
 
   const payload = {
     ...baseData,
+    lista_filhos,
+    texto_qualificacao_filhos,
+    termo_incapaz,
+    termo_representacao,
+    
     vara: ensureText(varaPreferida),
     comarca: ensureText(normalizedData.comarca),
     triagemNumero: ensureText(normalizedData.triagemNumero),
@@ -448,8 +554,8 @@ const buildDocxTemplatePayload = (
         ? `${baseData.assistido_rg_numero} ${baseData.assistido_rg_orgao}`
         : ""
     ),
-    requerente_nacionalidade: ensureText(baseData.assistido_nacionalidade),
-    requerente_estado_civil: ensureText(baseData.assistido_estado_civil),
+    requerente_nacionalidade: ensureText(normalizeGenderTerm(baseData.assistido_nacionalidade)),
+    requerente_estado_civil: ensureText(normalizeGenderTerm(baseData.assistido_estado_civil)),
     requerente_ocupacao: ensureText(baseData.assistido_ocupacao),
     requerente_email: ensureText(baseData.email_assistido),
     requerente_telefone: ensureText(baseData.telefone_assistido),
@@ -457,10 +563,10 @@ const buildDocxTemplatePayload = (
     requerente_representante: ensureText(requerente.representante),
     representante_nome: ensureText(baseData.representante_nome).toUpperCase(),
     representante_nacionalidade: ensureInlineValue(
-      baseData.representante_nacionalidade
+      normalizeGenderTerm(baseData.representante_nacionalidade)
     ),
     representante_estado_civil: ensureInlineValue(
-      baseData.representante_estado_civil
+      normalizeGenderTerm(baseData.representante_estado_civil)
     ),
     representante_ocupacao: ensureText(baseData.representante_ocupacao),
     representante_cpf: ensureText(baseData.representante_cpf),
@@ -488,8 +594,8 @@ const buildDocxTemplatePayload = (
     executado_cpf: ensureText(baseData.cpf_requerido || requerido.cpf),
     requerido_nome: ensureText(baseData.nome_requerido || requerido.nome).toUpperCase(),
     requerido_cpf: ensureText(baseData.cpf_requerido || requerido.cpf),
-    executado_nacionalidade: ensureText(baseData.requerido_nacionalidade),
-    executado_estado_civil: ensureText(baseData.requerido_estado_civil),
+    executado_nacionalidade: ensureText(normalizeGenderTerm(baseData.requerido_nacionalidade)),
+    executado_estado_civil: ensureText(normalizeGenderTerm(baseData.requerido_estado_civil)),
     executado_ocupacao: ensureText(baseData.requerido_ocupacao),
     executado_endereco_residencial: ensureText(executadoEndereco),
     requerido_endereco_residencial: ensureText(executadoEndereco),
@@ -781,6 +887,7 @@ export async function processarCasoEmBackground(
       regime_bens: dados_formulario.regime_bens,
       retorno_nome_solteira: dados_formulario.retorno_nome_solteira,
       alimentos_para_ex_conjuge: dados_formulario.alimentos_para_ex_conjuge,
+      outros_filhos_detalhes: dados_formulario.outros_filhos_detalhes, // Adicionando o campo que faltava
     };
 
     const caseDataForPetition = sanitizeCaseDataInlineFields(
@@ -797,8 +904,13 @@ export async function processarCasoEmBackground(
     // Gerar DOCX
     let url_documento_gerado = null;
     try {
+      const normalizedData = { 
+        comarca: process.env.DEFENSORIA_DEFAULT_COMARCA || "Teixeira de Freitas/BA",
+        defensoraNome: process.env.DEFENSORIA_DEFAULT_DEFENSORA || "DEFENSOR(A) PÚBLICO(A) DO ESTADO DA BAHIA",
+        triagemNumero: protocolo
+      };
       const docxData = buildDocxTemplatePayload(
-        {},
+        normalizedData,
         dosFatosTexto,
         caseDataForPetition
       );
@@ -820,7 +932,7 @@ export async function processarCasoEmBackground(
 
     // Gerar texto completo para backup/visualização
     const peticao_completa_texto = gerarTextoCompletoPeticao(
-      buildDocxTemplatePayload({}, dosFatosTexto, caseDataForPetition)
+      buildDocxTemplatePayload(normalizedData, dosFatosTexto, caseDataForPetition)
     );
 
     // Finalizar processamento
@@ -1138,6 +1250,13 @@ export const regenerarDosFatos = async (req, res) => {
 export const gerarTermoDeclaracao = async (req, res) => {
   const { id } = req.params;
   try {
+    // Restrição: Apenas administradores podem gerar ou regerar o termo
+    if (!req.user || req.user.cargo !== "admin") {
+      return res.status(403).json({
+        error: "Acesso negado. Apenas administradores podem realizar esta operação.",
+      });
+    }
+
     const { data: caso, error } = await supabase
       .from("casos")
       .select("*")
@@ -1201,6 +1320,65 @@ export const gerarTermoDeclaracao = async (req, res) => {
   } catch (error) {
     logger.error(`Erro ao gerar termo de declaração: ${error.message}`);
     res.status(500).json({ error: "Falha ao gerar termo de declaração." });
+  }
+};
+
+export const regerarMinuta = async (req, res) => {
+  const { id } = req.params;
+  try {
+    // Restrição: Apenas administradores
+    if (!req.user || req.user.cargo !== "admin") {
+      return res.status(403).json({
+        error: "Acesso negado. Apenas administradores podem regerar a minuta.",
+      });
+    }
+
+    const { data: caso, error } = await supabase
+      .from("casos")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (error || !caso) throw new Error("Caso não encontrado");
+
+    // 1. Prepara os dados baseados no estado atual do caso no banco
+    const dosFatosTexto = (caso.peticao_inicial_rascunho || "").replace("DOS FATOS\n\n", "");
+    
+    const normalizedData = { 
+      comarca: process.env.DEFENSORIA_DEFAULT_COMARCA || "Teixeira de Freitas/BA",
+      defensoraNome: process.env.DEFENSORIA_DEFAULT_DEFENSORA || "DEFENSOR(A) PÚBLICO(A) DO ESTADO DA BAHIA",
+      triagemNumero: caso.protocolo
+    };
+
+    // 2. Gera o novo payload e o buffer do Word
+    const payload = buildDocxTemplatePayload(normalizedData, dosFatosTexto, caso.dados_formulario || caso);
+    const docxBuffer = await generateDocx(payload);
+
+    // 3. Define o caminho e faz o upload (substituindo o anterior)
+    const docxPath = `${caso.protocolo}/peticao_inicial_${caso.protocolo}.docx`;
+    
+    const { error: uploadError } = await supabase.storage
+      .from("peticoes")
+      .upload(docxPath, docxBuffer, {
+        contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        upsert: true,
+      });
+
+    if (uploadError) throw uploadError;
+
+    // 4. Garante que a URL no banco está correta
+    await supabase
+      .from("casos")
+      .update({ url_documento_gerado: docxPath })
+      .eq("id", id);
+
+    // 5. Retorna o caso atualizado com as novas URLs assinadas
+    const casoAtualizado = await attachSignedUrls({ ...caso, url_documento_gerado: docxPath });
+    
+    res.status(200).json(casoAtualizado);
+  } catch (error) {
+    logger.error(`Erro ao regerar minuta: ${error.message}`);
+    res.status(500).json({ error: "Falha ao regerar a minuta em Word." });
   }
 };
 

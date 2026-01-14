@@ -144,6 +144,7 @@ export const DetalhesCaso = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [feedbackInitialized, setFeedbackInitialized] = useState(false);
   const [isGeneratingTermo, setIsGeneratingTermo] = useState(false);
+  const [isRegeneratingMinuta, setIsRegeneratingMinuta] = useState(false);
   const [isReverting, setIsReverting] = useState(false);
   const [dataAgendamento, setDataAgendamento] = useState("");
   const [linkAgendamento, setLinkAgendamento] = useState("");
@@ -299,6 +300,31 @@ export const DetalhesCaso = () => {
       toast.error(error.message);
     } finally {
       setIsGeneratingTermo(false);
+    }
+  };
+
+  const handleRegenerateMinuta = async () => {
+    if (!(await confirm("Isso irá gerar um novo arquivo Word com os dados atuais. O arquivo anterior será substituído. Continuar?", "Regerar Minuta"))) return;
+    
+    setIsRegeneratingMinuta(true);
+    try {
+      const response = await fetch(`${API_BASE}/casos/${id}/regerar-minuta`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) throw new Error("Falha ao regerar minuta.");
+
+      const updatedCaso = await response.json();
+      setCaso(updatedCaso);
+      toast.success("Minuta regerada com sucesso!");
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setIsRegeneratingMinuta(false);
     }
   };
 
@@ -512,6 +538,16 @@ export const DetalhesCaso = () => {
                 (() => {
                   const dados = caso.dados_formulario || {};
                   const isRepresentacao = dados.assistido_eh_incapaz === "sim";
+                  let outrosFilhos = [];
+                  try {
+                    if (dados.outros_filhos_detalhes) {
+                      outrosFilhos = typeof dados.outros_filhos_detalhes === 'string'
+                        ? JSON.parse(dados.outros_filhos_detalhes)
+                        : dados.outros_filhos_detalhes;
+                    }
+                  } catch (e) {
+                    console.error("Erro ao processar dados de outros filhos:", e);
+                  }
 
                   return (
                     <div className="mt-4 space-y-6 border-t border-soft pt-6">
@@ -519,7 +555,7 @@ export const DetalhesCaso = () => {
                       <div className="space-y-4">
                         <h3 className="heading-3 text-primary">
                           {isRepresentacao
-                            ? "Dados do Beneficiário (Criança/Adolescente)"
+                            ? "Dados do Assistido (Criança/Adolescente)"
                             : "Dados do Autor da Ação"}
                         </h3>
                         <div className="grid gap-4 md:grid-cols-2">
@@ -547,6 +583,10 @@ export const DetalhesCaso = () => {
                             dados.telefone
                           )}
                           {renderDataField(
+                            "WhatsApp para Reunião",
+                            dados.whatsapp_contato
+                          )}
+                          {renderDataField(
                             "RG",
                             `${dados.assistido_rg_numero || ""} ${
                               dados.assistido_rg_orgao || ""
@@ -554,6 +594,38 @@ export const DetalhesCaso = () => {
                           )}
                         </div>
                       </div>
+
+                      {/* Seção de Filhos Adicionais */}
+                      {outrosFilhos.length > 0 &&
+                        outrosFilhos.map((filho, index) => (
+                          <div
+                            key={index}
+                            className="space-y-4 pt-4 border-t border-soft"
+                          >
+                            <h3 className="heading-3 text-primary">
+                              Dados do Assistido {index + 2}{" "}
+                              (Criança/Adolescente)
+                            </h3>
+                            <div className="grid gap-4 md:grid-cols-2">
+                              {renderDataField("Nome Completo", filho.nome)}
+                              {renderDataField("CPF", filho.cpf)}
+                              {renderDataField(
+                                "Data de Nascimento",
+                                filho.dataNascimento
+                              )}
+                              {renderDataField(
+                                "Nacionalidade",
+                                filho.nacionalidade
+                              )}
+                              {renderDataField(
+                                "RG",
+                                `${filho.rgNumero || ""} ${
+                                  filho.rgOrgao || ""
+                                }`.trim()
+                              )}
+                            </div>
+                          </div>
+                        ))}
 
                       {/* Seção do Representante (Condicional) */}
                       {isRepresentacao && (
@@ -821,15 +893,27 @@ export const DetalhesCaso = () => {
             <h2 className="heading-2">Documentos e anexos</h2>
             <div className="space-y-3">
               {caso.url_documento_gerado && (
-                <a
-                  href={caso.url_documento_gerado}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn btn-primary w-full justify-start"
-                >
-                  <Download size={18} />
-                  Baixar minuta gerada
-                </a>
+                <div className="space-y-2">
+                  <a
+                    href={caso.url_documento_gerado}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn btn-primary w-full justify-start"
+                  >
+                    <Download size={18} />
+                    Baixar minuta gerada
+                  </a>
+                  {user?.cargo === "admin" && (
+                    <button
+                      onClick={handleRegenerateMinuta}
+                      disabled={isRegeneratingMinuta}
+                      className="btn btn-ghost border border-soft w-full justify-start text-xs"
+                    >
+                      <RefreshCw size={14} className={isRegeneratingMinuta ? "animate-spin" : ""} />
+                      {isRegeneratingMinuta ? "Regerando..." : "Regerar Minuta Word"}
+                    </button>
+                  )}
+                </div>
               )}
               {caso.url_termo_declaracao ? (
                 <div className="space-y-2">
@@ -842,17 +926,20 @@ export const DetalhesCaso = () => {
                     <Download size={18} />
                     Baixar Termo de Declaração
                   </a>
-                  <button
-                    onClick={handleGenerateTermo}
-                    disabled={isGeneratingTermo}
-                    className="btn btn-ghost border border-soft w-full justify-start text-xs"
-                  >
-                    <RefreshCw size={14} className={isGeneratingTermo ? "animate-spin" : ""} />
-                    {isGeneratingTermo ? "Regerando..." : "Regerar Termo"}
-                  </button>
+                  {user?.cargo === "admin" && (
+                    <button
+                      onClick={handleGenerateTermo}
+                      disabled={isGeneratingTermo}
+                      className="btn btn-ghost border border-soft w-full justify-start text-xs"
+                    >
+                      <RefreshCw size={14} className={isGeneratingTermo ? "animate-spin" : ""} />
+                      {isGeneratingTermo ? "Regerando..." : "Regerar Termo"}
+                    </button>
+                  )}
                 </div>
               ) : (
-                <button
+                user?.cargo === "admin" && (
+                  <button
                   onClick={handleGenerateTermo}
                   disabled={isGeneratingTermo}
                   className="btn btn-secondary w-full justify-start"
@@ -869,6 +956,7 @@ export const DetalhesCaso = () => {
                     </>
                   )}
                 </button>
+                )
               )}
               {caso.url_audio && (
                 <a

@@ -160,6 +160,7 @@ function sanitizeLegalAbbreviations(text) {
 export const analyzeCase = async (fullText) => {
   const systemPrompt = `Você é um assistente jurídico sênior e objetivo da Defensoria Pública.
   Sua tarefa é analisar o relato de um caso e criar um resumo executivo claro para o defensor.
+  REGRA CRÍTICA: NUNCA use o termo "menor" para se referir a uma criança ou adolescente. Utilize sempre os termos "criança", "adolescente" ou "filho(a)".
   Não adicione saudações, frases introdutórias ou conclusões genéricas.`;
 
   const userPrompt = `Analise o texto abaixo e retorne APENAS os seguintes tópicos:
@@ -290,6 +291,7 @@ export const generateDosFatos = async (caseData = {}) => {
     const systemPrompt = `Você é um Defensor Público experiente na Bahia.
 Seu estilo de escrita é extremamente formal, culto e padronizado (juridiquês clássico).
 Você DEVE utilizar os conectivos: "Insta salientar", "Ocorre que, no caso em tela", "Como é sabido", "aduzir".
+REGRA CRÍTICA: NUNCA use o termo "menor" para se referir a uma criança ou adolescente. Em vez disso, use "criança", "adolescente" ou "filho(a)".
 Não use listas ou tópicos na resposta final. Escreva apenas parágrafos coesos.`;
 
     // No userPrompt, instruímos a IA a usar os placeholders que ela vai receber
