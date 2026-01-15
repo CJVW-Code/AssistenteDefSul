@@ -18,6 +18,7 @@ import {
   Save,
   Video,
   Calendar,
+  Bell,
 } from "lucide-react";
 import { API_BASE } from "../../../utils/apiBase";
 import { useToast } from "../../../contexts/ToastContext";
@@ -27,11 +28,13 @@ const statusOptions = [
   { value: "recebido", label: "Recebido" },
   { value: "em_analise", label: "Em análise" },
   { value: "aguardando_docs", label: "Pendentes de documentos" },
+  { value: "documentos_entregues", label: "Documentos Entregues (Novo)" },
 ];
 
 const statusBadges = {
   recebido: "bg-amber-100 text-amber-800 border-amber-200",
   em_analise: "bg-sky-100 text-sky-800 border-sky-200",
+  documentos_entregues: "bg-indigo-100 text-indigo-800 border-indigo-200",
   aguardando_docs: "bg-purple-100 text-purple-800 border-purple-200",
   processando: "bg-blue-100 text-blue-800 border-blue-200",
   processado: "bg-green-100 text-green-800 border-green-200",
@@ -51,6 +54,8 @@ const statusDescriptions = {
     "O caso está sendo analisado manualmente por um defensor ou estagiário.",
   aguardando_docs:
     "O processo está pausado, aguardando o envio de documentos adicionais pelo cidadão.",
+  documentos_entregues:
+    "O cidadão enviou novos documentos. Verifique os anexos.",
   encaminhado_solar:
     "O caso foi finalizado e encaminhado para o sistema Solar da defensoria.",
   finalizado: "O caso foi concluído.",
@@ -148,6 +153,7 @@ export const DetalhesCaso = () => {
   const [dataAgendamento, setDataAgendamento] = useState("");
   const [linkAgendamento, setLinkAgendamento] = useState("");
   const [isAgendando, setIsAgendando] = useState(false);
+  const [pendenciaTexto, setPendenciaTexto] = useState("");
 
   const fetchDetalhes = useCallback(
     async (silent = false) => {
@@ -166,6 +172,7 @@ export const DetalhesCaso = () => {
         }
         setLinkAgendamento(data.agendamento_link || "");
         setCaso(data);
+        setPendenciaTexto(data.descricao_pendencia || "");
       } catch (error) {
         console.error(error);
       } finally {
@@ -201,6 +208,9 @@ export const DetalhesCaso = () => {
   const handleStatusChange = async (novoStatus) => {
     if (!caso || !novoStatus || novoStatus === caso.status) return;
 
+    // Se for mudar para aguardando_docs, garante que o texto foi preenchido se necessário
+    // (A lógica de UI está abaixo, aqui apenas enviamos)
+    
     setIsUpdating(true);
     try {
       const response = await fetch(`${API_BASE}/casos/${id}/status`, {
@@ -209,7 +219,10 @@ export const DetalhesCaso = () => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ status: novoStatus }),
+        body: JSON.stringify({ 
+          status: novoStatus,
+          descricao_pendencia: novoStatus === 'aguardando_docs' ? pendenciaTexto : caso.descricao_pendencia 
+        }),
       });
 
       if (!response.ok) {
@@ -486,6 +499,17 @@ export const DetalhesCaso = () => {
           </p>
         </div>
       </div>
+
+      {/* NOTIFICAÇÃO DE DOCUMENTOS ENTREGUES */}
+      {caso.status === "documentos_entregues" && (
+        <div className="bg-indigo-50 border-l-4 border-indigo-500 p-4 rounded-r shadow-sm flex items-start gap-3 animate-fade-in mb-6">
+          <Bell className="text-indigo-600 shrink-0 mt-1" size={24} />
+          <div>
+            <h3 className="font-bold text-indigo-800">Novos Documentos Recebidos!</h3>
+            <p className="text-indigo-700 text-sm">O cidadão enviou os documentos complementares solicitados. Verifique os itens destacados abaixo na seção de anexos.</p>
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <section className="space-y-6 lg:col-span-2">
@@ -888,18 +912,36 @@ export const DetalhesCaso = () => {
                 </a>
               )}
               {caso.urls_documentos?.length > 0 ? (
-                caso.urls_documentos.map((url, index) => (
-                  <a
-                    key={url}
-                    href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn btn-ghost border border-soft w-full justify-start"
-                  >
-                    <FileText size={18} />
-                    Documento {index + 1}
-                  </a>
-                ))
+                caso.urls_documentos.map((url, index) => {
+                  // Tenta extrair o nome original do arquivo da URL ou usa o mapa de nomes
+                  const fileName = url.split('/').pop().split('?')[0];
+                  // Procura no mapa de nomes (se existir)
+                  // A chave no mapa pode ser o nome original do arquivo antes do upload
+                  // Como o backend renomeia, a correspondência exata pode ser difícil sem um ID.
+                  // Vamos tentar exibir o nome personalizado se encontrarmos uma chave parcial ou usar o índice.
+                  
+                  // Melhor abordagem: Iterar e exibir. Se tivermos metadados, usamos.
+                  // O backend salva em dados_formulario.document_names { "nome_original": "Classificacao" }
+                  // Mas aqui temos a URL assinada. 
+                  // Vamos exibir o nome do arquivo limpo ou "Documento X"
+                  const isComplementar = url.includes("complementar_");
+                  
+                  return (
+                    <a
+                      key={url}
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`btn btn-ghost border w-full justify-start text-left break-all group ${
+                        isComplementar ? "border-indigo-300 bg-indigo-50 hover:bg-indigo-100" : "border-soft"
+                      }`}
+                    >
+                      <FileText size={18} className={`shrink-0 ${isComplementar ? "text-indigo-600" : ""}`} />
+                      <span className={isComplementar ? "font-medium text-indigo-900" : ""}>{decodeURIComponent(fileName)}</span>
+                      {isComplementar && <span className="ml-auto text-[10px] uppercase font-bold bg-indigo-200 text-indigo-700 px-2 py-0.5 rounded-full">Novo</span>}
+                    </a>
+                  );
+                })
               ) : (
                 <p className="text-sm text-muted">
                   Nenhum documento complementar enviado.
@@ -1007,6 +1049,20 @@ export const DetalhesCaso = () => {
                 )}
               </div>
             </div>
+
+            {/* ÁREA DE PENDÊNCIA (Só aparece se selecionar aguardando_docs) */}
+            {statusKey === 'aguardando_docs' && (
+               <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg space-y-2 animate-fade-in">
+                 <label className="text-sm font-bold text-purple-800">Descreva os documentos pendentes:</label>
+                 <textarea 
+                    className="input w-full min-h-[100px] text-sm"
+                    placeholder="Ex: - RG do cônjuge&#10;- Comprovante de residência atualizado"
+                    value={pendenciaTexto}
+                    onChange={(e) => setPendenciaTexto(e.target.value)}
+                 />
+                 <p className="text-xs text-purple-600">Este texto aparecerá para o assistido na consulta.</p>
+               </div>
+            )}
 
             <select
               className="input disabled:opacity-70 disabled:cursor-not-allowed"
@@ -1182,3 +1238,9 @@ export const DetalhesCaso = () => {
     </div>
   );
 };
+{/*-- Adiciona a coluna para armazenar o texto da pendência (se ainda não existir)
+ALTER TABLE casos ADD COLUMN IF NOT EXISTS descricao_pendencia TEXT;
+
+-- OBS: Como o status é um campo de texto simples no seu banco, 
+-- não é necessário criar novos tipos ENUM para 'documentos_entregues'.
+*/}

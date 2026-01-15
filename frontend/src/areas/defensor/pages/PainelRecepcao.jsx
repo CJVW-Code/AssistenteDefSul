@@ -1,5 +1,12 @@
 import React, { useState } from "react";
-import { Search, RotateCcw, CheckCircle } from "lucide-react";
+import {
+  Search,
+  RotateCcw,
+  CheckCircle,
+  Video,
+  FileText,
+  Clock,
+} from "lucide-react";
 import { API_BASE } from "../../../utils/apiBase";
 import { useAuth } from "../contexts/AuthContext";
 import { useToast } from "../../../contexts/ToastContext";
@@ -32,7 +39,8 @@ export const PainelRecepcao = () => {
 
       const data = await response.json();
       setCasosEncontrados(data);
-      if (data.length === 0) toast.info("Nenhum caso encontrado para este CPF.");
+      if (data.length === 0)
+        toast.info("Nenhum caso encontrado para este CPF.");
     } catch (error) {
       console.error(error);
       toast.error("Erro ao buscar.");
@@ -74,8 +82,8 @@ export const PainelRecepcao = () => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
-      <h1 className="heading-1">Recepção: Recuperação de Acesso</h1>
+    <div className="max-w-4xl mx-auto space-y-8 pb-24">
+      <h1 className="heading-1">Recepção: Consulta e Acesso</h1>
 
       {/* ÁREA DE BUSCA */}
       <div className="card p-8">
@@ -108,35 +116,114 @@ export const PainelRecepcao = () => {
 
       {/* RESULTADOS DA BUSCA */}
       {casosEncontrados.length > 0 && (
-        <div className="space-y-4">
-          <h2 className="heading-2 text-white">
+        <div className="space-y-6">
+          <h2 className="heading-2 font-semibold text-primary">
             Casos Encontrados ({casosEncontrados.length})
           </h2>
           {casosEncontrados.map((caso) => (
             <div
               key={caso.id}
-              className="bg-surface border border-soft p-6 rounded-xl flex items-center justify-between"
+              className="bg-surface border border-soft p-6 rounded-xl space-y-6"
             >
-              <div>
-                <h3 className="text-xl font-bold text-white">
-                  {caso.nome_assistido}
-                </h3>
-                <p className="text-muted">
-                  Protocolo:{" "}
-                  <span className="text-primary font-mono">
-                    {caso.protocolo}
-                  </span>
-                </p>
-                <p className="text-sm text-muted mt-1">Status: {caso.status}</p>
+              {/* CABEÇALHO DO CARD */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-soft pb-4">
+                <div>
+                  <h3 className="text-xl font-bold ">{caso.nome_assistido}</h3>
+                  <p className="text-muted">
+                    Protocolo:{" "}
+                    <span className="text-primary font-mono">
+                      {caso.protocolo}
+                    </span>
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleResetarChave(caso.id)}
+                  className="btn btn-secondary border-error hover:bg-red-500/40 text-error gap-2 w-full md:w-auto"
+                >
+                  <RotateCcw size={18} />
+                  Resetar Chave
+                </button>
               </div>
 
-              <button
-                onClick={() => handleResetarChave(caso.id)}
-                className="btn btn-secondary border-red-500/30 hover:bg-red-500/10 text-red-400 gap-2"
-              >
-                <RotateCcw size={18} />
-                Resetar Chave
-              </button>
+              {/* CONTEÚDO DE STATUS (Lógica do ConsultaStatus.jsx) */}
+              <div className="space-y-4">
+                {/* 1. AGENDAMENTO ONLINE */}
+                {caso.agendamento_link && (
+                  <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
+                    <h3 className="text-lg font-bold text-blue-400 flex items-center gap-2">
+                      <Video size={20} /> Atendimento Online Agendado
+                    </h3>
+                    {caso.agendamento_data && (
+                      <p className="text-muted mt-1 text-sm">
+                        Data:{" "}
+                        <strong className="text-white">
+                          {new Date(caso.agendamento_data).toLocaleString(
+                            "pt-BR"
+                          )}
+                        </strong>
+                      </p>
+                    )}
+                    <div className="mt-3 p-2 bg-surface rounded border border-soft text-sm break-all font-mono text-muted">
+                      {caso.agendamento_link}
+                    </div>
+                  </div>
+                )}
+
+                {/* 2. CASO CONCLUÍDO / SOLAR */}
+                {caso.status === "encaminhamento solar" ||
+                caso.status === "encaminhado_solar" ? (
+                  <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-3 text-green-400 font-bold">
+                      <CheckCircle size={20} />
+                      <h3>Atendimento Concluído!</h3>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="bg-surface border border-soft p-3 rounded-lg">
+                        <label className="text-xs text-muted uppercase font-bold">
+                          Número do Processo
+                        </label>
+                        <p className="text-lg font-mono text-white select-all">
+                          {caso.numero_processo || "Indisponível"}
+                        </p>
+                      </div>
+                      <div className="bg-surface border border-soft p-3 rounded-lg">
+                        <label className="text-xs text-muted uppercase font-bold">
+                          Atendimento Solar
+                        </label>
+                        <p className="text-lg font-mono text-white select-all">
+                          {caso.numero_solar || "N/A"}
+                        </p>
+                      </div>
+                    </div>
+                    {caso.url_capa_processual && (
+                      <div className="mt-3">
+                        <a
+                          href={caso.url_capa_processual}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-primary hover:underline flex items-center gap-2"
+                        >
+                          <FileText size={16} />
+                          Visualizar Capa do Processo
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  // 3. STATUS NORMAL
+                  <div className="bg-surface-alt border border-soft rounded-xl p-4">
+                    <h3 className="text-sm font-semibold text-muted mb-2 uppercase tracking-wider">
+                      Status Atual
+                    </h3>
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-surface text border border-border ">
+                      <Clock size={16} />
+                      <span className="font-medium capitalize">
+                        {caso.status?.replace("_", " ")}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           ))}
         </div>
@@ -161,7 +248,7 @@ export const PainelRecepcao = () => {
             </p>
 
             <div className="bg-app p-6 rounded-xl border border-soft">
-              <p className="text-xs text-muted uppercase font-bold mb-2">
+              <p className="text-base text-muted uppercase font-bold mb-2">
                 NOVA CHAVE DE ACESSO
               </p>
               <div className="text-4xl font-mono font-bold text-primary tracking-widest select-all">

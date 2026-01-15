@@ -71,6 +71,20 @@ const RecepcaoRoute = ({ children }) => {
   return children;
 };
 
+// 4. Protege rotas de DEFENSOR/ESTAGIÁRIO (Bloqueia Recepção) 🚫
+const DefensorRoute = ({ children }) => {
+  const { user, loading } = useAuth();
+
+  if (loading) return null;
+
+  // Se for recepção, redireciona para o painel específico deles
+  if (user?.cargo === "recepcao") {
+    return <Navigate to="/painel/recepcao" />;
+  }
+
+  return children;
+};
+
 function App() {
   return (
     <BrowserRouter>
@@ -100,12 +114,33 @@ function App() {
                   </ProtectedRoute>
                 }
               >
-                {/* Rota Padrão (Dashboard) */}
-                <Route index element={<Dashboard />} />
+                {/* Rota Padrão (Dashboard) - AGORA PROTEGIDA CONTRA RECEPÇÃO */}
+                <Route
+                  index
+                  element={
+                    <DefensorRoute>
+                      <Dashboard />
+                    </DefensorRoute>
+                  }
+                />
 
-                {/* Rotas Comuns */}
-                <Route path="casos" element={<Casos />} />
-                <Route path="casos/:id" element={<DetalhesCaso />} />
+                {/* Rotas Comuns - AGORA PROTEGIDAS CONTRA RECEPÇÃO */}
+                <Route
+                  path="casos"
+                  element={
+                    <DefensorRoute>
+                      <Casos />
+                    </DefensorRoute>
+                  }
+                />
+                <Route
+                  path="casos/:id"
+                  element={
+                    <DefensorRoute>
+                      <DetalhesCaso />
+                    </DefensorRoute>
+                  }
+                />
 
                 {/* Rota Protegida da Recepção */}
                 <Route

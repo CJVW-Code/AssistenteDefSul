@@ -1,4 +1,4 @@
-﻿﻿import { supabase } from "../config/supabase.js";
+﻿﻿﻿﻿﻿﻿import { supabase } from "../config/supabase.js";
 import path from "path";
 import {
   generateCredentials,
@@ -861,6 +861,7 @@ export const criarNovoCaso = async (req, res) => {
       relato,
       documentos_informados,
       // ... todos os outros campos mantidos ...
+      documentos_nomes, // Recebe o JSON com os nomes personalizados
     } = dados_formulario;
 
     const { valor_mensal_pensao } = dados_formulario;
@@ -926,6 +927,12 @@ export const criarNovoCaso = async (req, res) => {
       }
     }
 
+    // Mescla os nomes dos documentos nos dados do formulário
+    const dadosFormularioFinal = {
+      ...dados_formulario,
+      document_names: JSON.parse(documentos_nomes || "{}")
+    };
+
     // Salvar no Banco (Resposta Rápida)
     logger.debug("Salvando dados básicos no Supabase...");
     const { error: dbError } = await supabase.from("casos").insert({
@@ -941,7 +948,7 @@ export const criarNovoCaso = async (req, res) => {
       url_peticao,
       urls_documentos,
       documentos_informados: documentosInformadosArray,
-      dados_formulario: dados_formulario,
+      dados_formulario: dadosFormularioFinal,
       status: "recebido",
       created_at: new Date(),
     });
@@ -1068,11 +1075,14 @@ export const obterDetalhesCaso = async (req, res) => {
 
 export const atualizarStatusCaso = async (req, res) => {
   const { id } = req.params;
-  const { status } = req.body;
+  const { status, descricao_pendencia } = req.body;
   try {
+    const updateData = { status };
+    if (descricao_pendencia !== undefined) updateData.descricao_pendencia = descricao_pendencia;
+
     const { data, error = null } = await supabase
       .from("casos")
-      .update({ status })
+      .update(updateData)
       .eq("id", id)
       .select()
       .single();
@@ -1356,6 +1366,81 @@ export const resetarChaveAcesso = async (req, res) => {
     res.status(200).json({ novaChave: chaveAcesso });
   } catch (error) {
     res.status(500).json({ error: "Erro ao resetar chave." });
+  }
+};
+
+export const receberDocumentosComplementares = async (req, res) => {
+  const { id } = req.params;
+  const { nomes_arquivos } = req.body; // JSON string com os nomes personalizados
+
+  try {
+    // 1. Busca o caso atual
+    const { data: caso, error: fetchError } = await supabase
+      .from("casos")
+      .select("urls_documentos, dados_formulario, protocolo")
+      .eq("id", id)
+      .single();
+
+    if (fetchError || !caso) throw new Error("Caso não encontrado.");
+
+    const novosUrls = [];
+    
+    // 2. Processa os arquivos enviados
+    if (req.files && req.files.documentos) {
+      for (const docFile of req.files.documentos) {
+        // Sanitiza nome
+        const safeName = docFile.originalname.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        const filePath = `${caso.protocolo}/complementar_${Date.now()}_${safeName}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from(storageBuckets.documentos)
+          .upload(filePath, await fs.readFile(docFile.path), {
+            contentType: docFile.mimetype,
+          });
+
+        if (uploadError) {
+          logger.error(`Erro upload complementar: ${uploadError.message}`);
+        } else {
+          novosUrls.push(filePath);
+        }
+        
+        // Limpa arquivo temporário
+        try { await fs.unlink(docFile.path); } catch (e) {}
+      }
+    }
+
+    if (novosUrls.length === 0) {
+      return res.status(400).json({ error: "Nenhum arquivo foi enviado." });
+    }
+
+    // 3. Atualiza metadados de nomes (dados_formulario.document_names)
+    const nomesMap = JSON.parse(nomes_arquivos || "{}");
+    const currentNames = caso.dados_formulario?.document_names || {};
+    
+    const updatedNames = { ...currentNames, ...nomesMap };
+    const updatedDadosFormulario = {
+      ...caso.dados_formulario,
+      document_names: updatedNames
+    };
+
+    // 4. Atualiza o banco
+    const { error: updateError } = await supabase
+      .from("casos")
+      .update({
+        urls_documentos: [...(caso.urls_documentos || []), ...novosUrls],
+        dados_formulario: updatedDadosFormulario,
+        status: "documentos_entregues", // Novo status
+        updated_at: new Date()
+      })
+      .eq("id", id);
+
+    if (updateError) throw updateError;
+
+    res.status(200).json({ message: "Documentos enviados com sucesso!" });
+
+  } catch (error) {
+    logger.error(`Erro upload complementar: ${error.message}`);
+    res.status(500).json({ error: "Falha ao enviar documentos." });
   }
 };
 

@@ -12,6 +12,7 @@ import {
   atualizarStatusCaso,
   deletarCaso,
   agendarReuniao,
+  receberDocumentosComplementares,
 } from "../controllers/casosController.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { upload } from "../middleware/upload.js"; // Usa sua configuração personalizada
@@ -27,6 +28,11 @@ const uploadCriacao = upload.fields([
 // Rotas Públicas
 router.post("/novo", uploadCriacao, criarNovoCaso);
 router.get("/buscar-cpf", buscarPorCpf);
+router.post(
+  "/:id/upload-complementar",
+  upload.fields([{ name: "documentos" }]),
+  receberDocumentosComplementares
+);
 
 // Rotas Protegidas
 router.get("/", authMiddleware, listarCasos);

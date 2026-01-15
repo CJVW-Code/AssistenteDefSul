@@ -120,6 +120,7 @@ const initialState = {
   // Narrativa e Arquivos
   relato: "",
   documentFiles: [],
+  documentNames: {}, // Novo estado para nomes personalizados
   documentosMarcados: [],
   audioBlob: null,
 };
@@ -133,6 +134,7 @@ function formReducer(state, action) {
       return {
         ...initialState,
         documentFiles: [],
+        documentNames: {},
         documentosMarcados: [],
         requeridoOutrosSelecionados: [],
       };
@@ -541,6 +543,15 @@ export const FormularioSubmissao = () => {
     });
   };
 
+  const handleDocumentNameChange = (fileName, newName) => {
+    const newNames = { ...formState.documentNames, [fileName]: newName };
+    dispatch({
+      type: "UPDATE_FIELD",
+      field: "documentNames",
+      value: newNames,
+    });
+  };
+
   const removeDocument = (fileName) => {
     const updatedFiles = formState.documentFiles.filter(
       (file) => file.name !== fileName
@@ -550,6 +561,10 @@ export const FormularioSubmissao = () => {
       field: "documentFiles",
       value: updatedFiles,
     });
+    // Limpa o nome também
+    const newNames = { ...formState.documentNames };
+    delete newNames[fileName];
+    dispatch({ type: "UPDATE_FIELD", field: "documentNames", value: newNames });
   };
 
   const handleCheckboxChange = (e) => {
@@ -863,6 +878,9 @@ export const FormularioSubmissao = () => {
       "documentos_informados",
       JSON.stringify(formState.documentosMarcados)
     );
+    // Envia o mapa de nomes personalizados
+    formData.append("documentos_nomes", JSON.stringify(formState.documentNames));
+
     if (formState.audioBlob)
       formData.append("audio", formState.audioBlob, "gravacao.webm");
     formState.documentFiles.forEach((file) => {
@@ -2125,9 +2143,16 @@ export const FormularioSubmissao = () => {
                     {formState.documentFiles.map((file, idx) => (
                       <div
                         key={`${file.name}-${idx}`}
-                        className="flex items-center justify-between bg-slate-100 dark:bg-slate-700 p-2 rounded text-sm"
+                        className="flex flex-col sm:flex-row sm:items-center gap-2 bg-slate-100 dark:bg-slate-700 p-2 rounded text-sm"
                       >
-                        <span className="truncate max-w-xs">{file.name}</span>
+                        <span className="truncate max-w-xs text-xs text-muted">{file.name}</span>
+                        <input 
+                          type="text" 
+                          placeholder="Nomeie este documento (ex: RG, Comprovante)" 
+                          className="input py-1 px-2 text-sm flex-1 h-8"
+                          value={formState.documentNames[file.name] || ""}
+                          onChange={(e) => handleDocumentNameChange(file.name, e.target.value)}
+                        />
                         <button
                           type="button"
                           onClick={() => removeDocument(file.name)}
