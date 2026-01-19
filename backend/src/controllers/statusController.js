@@ -62,6 +62,7 @@ export const consultarStatus = async (req, res) => {
       processado: "em triagem",
       em_analise: "em triagem",
       aguardando_docs: "documentos pendente",
+      documentos_entregues: "em triagem", // Mapeia o novo status para algo genérico pro cidadão
       encaminhado_solar: "encaminhamento solar",
       finalizado: "encaminhamento solar",
       erro: "enviado",
@@ -78,6 +79,7 @@ export const consultarStatus = async (req, res) => {
       agendamento_data: caso.agendamento_data,
       agendamento_link: caso.agendamento_link,
       agendamento_status: caso.agendamento_status,
+      descricao_pendencia: caso.descricao_pendencia, // Envia a pendência para o frontend
     });
   } catch (err) {
     logger.error(`Erro crítico ao consultar status: ${err.message}`, {

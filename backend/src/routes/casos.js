@@ -13,6 +13,8 @@ import {
   agendarReuniao,
   gerarTermoDeclaracao,
   regerarMinuta,
+  receberDocumentosComplementares,
+  reprocessarCaso, // <--- Importar aqui
 } from "../controllers/casosController.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { upload } from "../middleware/upload.js"; // Usa sua configuração personalizada
@@ -28,6 +30,11 @@ const uploadCriacao = upload.fields([
 // Rotas Públicas
 router.post("/novo", uploadCriacao, criarNovoCaso);
 router.get("/buscar-cpf", buscarPorCpf);
+router.post(
+  "/:id/upload-complementar",
+  upload.fields([{ name: "documentos" }]),
+  receberDocumentosComplementares,
+);
 
 // Rotas Protegidas
 router.get("/", authMiddleware, listarCasos);
@@ -47,4 +54,5 @@ router.delete("/:id", authMiddleware, deletarCaso);
 router.patch("/:id/feedback", authMiddleware, salvarFeedback);
 router.patch("/:id/agendar", authMiddleware, agendarReuniao);
 router.post("/:id/regerar-minuta", authMiddleware, regerarMinuta);
+router.post("/:id/reprocessar", authMiddleware, reprocessarCaso); // <--- Nova rota
 export default router;

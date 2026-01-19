@@ -18,6 +18,7 @@ import {
   Calendar,
   Scale,
   Plus,
+  Info,
 } from "lucide-react";
 import { documentosPorAcao } from "../../../data/documentos.js";
 import { API_BASE } from "../../../utils/apiBase";
@@ -122,6 +123,7 @@ const initialState = {
 
   // Narrativa e Arquivos
   relato: "",
+  prefersAudio: false,
   documentFiles: [],
   documentosMarcados: [],
   audioBlob: null,
@@ -630,6 +632,30 @@ export const FormularioSubmissao = () => {
       }
     }
 
+    // --- NOVAS VALIDAÇÕES OBRIGATÓRIAS ---
+    
+    // 1. WhatsApp Obrigatório
+    if (!stripNonDigits(formState.whatsappContato)) {
+      validationErrors.whatsappContato = "O WhatsApp para reunião é obrigatório.";
+    }
+
+    // 2. Validação Relato vs Áudio
+    if (formState.prefersAudio) {
+      if (!formState.audioBlob) {
+        validationErrors.audio = "Como você optou por enviar áudio, a gravação é obrigatória.";
+      }
+    } else {
+      const relatoLimpo = (formState.relato || "").trim();
+      if (relatoLimpo.length < 250) {
+        validationErrors.relato = `O relato deve ser mais detalhado (mínimo 250 caracteres). Atual: ${relatoLimpo.length}.`;
+      }
+    }
+
+    // 3. Mínimo 4 Documentos
+    if (formState.documentFiles.length < 4) {
+      validationErrors.documentos = `É necessário anexar pelo menos 4 documentos (RG, CPF, Comprovantes, etc). Atual: ${formState.documentFiles.length}.`;
+    }
+
     if (Object.keys(validationErrors).length > 0) {
       setFormErrors(validationErrors);
       return;
@@ -1076,6 +1102,22 @@ export const FormularioSubmissao = () => {
       animate={{ opacity: 1 }}
       className="max-w-4xl mx-auto px-3 sm:px-0"
     >
+      {/* AVISO INICIAL DE REQUISITOS */}
+      <div className="card border-l-4 border-special mb-8 flex items-start gap-3">
+        <Info className="text-special shrink-0 mt-1" size={24} />
+        <div>
+          <h3 className="font-bold text-special text-lg">Antes de começar</h3>
+          <p className="text-muted mt-1">
+            Tenha em mãos seus documentos digitalizados (RG, CPF, Comprovantes). 
+            Para garantir a análise do seu caso, será necessário:
+          </p>
+          <ul className="list-disc list-inside text-muted text-sm mt-2 space-y-1 font-medium">
+            <li>Anexar pelo menos <strong>4 documentos</strong>;</li>
+            <li>Escrever um relato detalhado com no mínimo <strong>250 caracteres</strong>.</li>
+          </ul>
+        </div>
+      </div>
+
       <form onSubmit={handleSubmit} className="space-y-8">
         {/* --- ETAPA 1: DEFINIÇÃO DA AÇÃO --- */}
         <section className="card space-y-4 border-l-4 border-l-blue-500">
@@ -1190,7 +1232,9 @@ export const FormularioSubmissao = () => {
                     className="input"
                   />
                 </div>
-                <div className={`grid grid-cols-1 ${isFixacaoDeAlimentos ? 'md:grid-cols-2' : 'md:grid-cols-3'} gap-4`}>
+                <div
+                  className={`grid grid-cols-1 ${isFixacaoDeAlimentos ? "md:grid-cols-2" : "md:grid-cols-3"} gap-4`}
+                >
                   <input
                     type="date"
                     placeholder="Data de Nascimento"
@@ -1236,7 +1280,7 @@ export const FormularioSubmissao = () => {
                     />
                   )}
                 </div>
-                  
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {!isRepresentacao && (
                     <input
@@ -1309,21 +1353,24 @@ export const FormularioSubmissao = () => {
                     </div>
                   </div>
                 )}
-                    <div className="relative">
-                      <Phone
-                        className="absolute left-3 top-1/2 -translate-y-1/2 text-green-500"
-                        size={18}
-                      />
-                      <input
-                        type="text"
-                        inputMode="tel"
-                        placeholder="WhatsApp para receber o link da reunião"
-                        name="whatsappContato"
-                        value={formState.whatsappContato}
-                        onChange={handlePhoneChange("whatsappContato")}
-                        className="input pl-10 border-green-500/30 focus:ring-green-500"
-                      />
-                    </div>
+                <div className="relative">
+                  <Phone
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-green-500"
+                    size={18}
+                  />
+                  <input
+                    type="text"
+                    inputMode="tel"
+                    placeholder="WhatsApp para receber o link da reunião"
+                    name="whatsappContato"
+                    value={formState.whatsappContato}
+                    onChange={handlePhoneChange("whatsappContato")}
+                    className={`input pl-10 border-green-500/30 focus:ring-green-500 ${formErrors.whatsappContato ? "border-red-500 ring-1 ring-red-500" : ""}`}
+                  />
+                </div>
+                {formErrors.whatsappContato && (
+                  <p className="text-xs text-red-500 font-medium">{formErrors.whatsappContato}</p>
+                )}
               </div>
 
               {/* --- SEÇÃO DE MÚLTIPLOS FILHOS --- */}
@@ -1759,7 +1806,7 @@ export const FormularioSubmissao = () => {
                     {outrosDadosRequeridoConfig.map((item) => {
                       const selecionado =
                         formState.requeridoOutrosSelecionados.includes(
-                          item.key
+                          item.key,
                         );
                       return (
                         <div
@@ -1786,7 +1833,7 @@ export const FormularioSubmissao = () => {
                                     name="requeridoRgNumero"
                                     value={formState.requeridoRgNumero}
                                     onChange={handleRgChange(
-                                      "requeridoRgNumero"
+                                      "requeridoRgNumero",
                                     )}
                                     className="input"
                                   />
@@ -2084,7 +2131,7 @@ export const FormularioSubmissao = () => {
                         name="valorTotalDebitoExecucao"
                         value={formState.valorTotalDebitoExecucao}
                         onChange={handleCurrencyChange(
-                          "valorTotalDebitoExecucao"
+                          "valorTotalDebitoExecucao",
                         )}
                         className="input pl-12"
                       />
@@ -2245,23 +2292,60 @@ export const FormularioSubmissao = () => {
               </div>
 
               <div>
-                <label className="label font-bold">
-                  Relato dos Fatos (O que aconteceu?)
-                </label>
+                <div className="flex justify-between items-end mb-2">
+                  <label className="label font-bold mb-0">
+                    Relato dos Fatos (O que aconteceu?)
+                  </label>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer bg-surface p-2 rounded-lg border border-soft hover:border-primary transition select-none">
+                    <input
+                      type="checkbox"
+                      name="prefersAudio"
+                      checked={formState.prefersAudio}
+                      onChange={(e) => dispatch({ type: "UPDATE_FIELD", field: "prefersAudio", value: e.target.checked })}
+                      className="w-4 h-4 accent-primary"
+                    />
+                    <span className="text-primary font-medium flex items-center gap-1">
+                      <Mic size={14} /> Prefiro enviar áudio
+                    </span>
+                  </label>
+                </div>
                 <textarea
-                  placeholder="Conte detalhadamente o que aconteceu, por que você precisa da justiça, como está a situação atual..."
+                  placeholder={formState.prefersAudio ? "Se desejar, faça um breve resumo aqui (opcional)..." : "Conte detalhadamente o que aconteceu, por que você precisa da justiça, como está a situação atual..."}
                   value={formState.relato}
                   onChange={handleFieldChange}
                   name="relato"
-                  rows="6"
-                  className="input w-full"
+                  rows="10"
+                  className={`input w-full ${formErrors.relato ? "border-error ring-1 ring-error" : ""}`}
                 ></textarea>
+                
+                {/* Barra de Progresso */}
+                {!formState.prefersAudio && (
+                  <div className="w-full h-2 bg-app rounded-full mt-2 overflow-hidden border border-soft">
+                    <div 
+                      className={`h-full transition-all duration-500 ${
+                        (formState.relato || "").length >= 250 ? "bg-success" : "bg-error"
+                      }`}
+                      style={{ width: `${Math.min(((formState.relato || "").length / 250) * 100, 100)}%` }}
+                    />
+                  </div>
+                )}
+
+                <div className="flex justify-between mt-1 px-1">
+                  <span className="text-xs text-error font-medium">
+                    {formErrors.relato}
+                  </span>
+                  {!formState.prefersAudio && (
+                    <span className={`text-xs font-medium ${(formState.relato || "").length < 250 ? "text-error" : "text-success"}`}>
+                      {(formState.relato || "").length} / 250 caracteres
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Gravação de Áudio */}
-              <div className="bg-surface p-4 rounded-lg border border-dashed border-soft flex flex-col items-center justify-center gap-3">
+              <div className={`bg-surface p-4 rounded-lg border border-dashed ${formErrors.audio ? "border-error bg-red-50/10" : "border-soft"} flex flex-col items-center justify-center gap-3`}>
                 <p className="text-sm text-muted">
-                  Prefere falar? Grave um áudio contando sua história.
+                  {formState.prefersAudio ? <strong className="text-primary">Grave seu relato aqui (Obrigatório)</strong> : "Prefere falar? Grave um áudio contando sua história."}
                 </p>
                 {!isRecording && !formState.audioBlob && (
                   <button
@@ -2298,6 +2382,9 @@ export const FormularioSubmissao = () => {
                   </div>
                 )}
               </div>
+              {formErrors.audio && (
+                <p className="text-sm text-error font-bold text-center">{formErrors.audio}</p>
+              )}
 
               {/* Checklist e Upload */}
               {listaDeDocumentos.length > 0 && (
@@ -2324,7 +2411,7 @@ export const FormularioSubmissao = () => {
                 </div>
               )}
 
-              <div className="bg-surface p-4 rounded-lg border border-dashed border-soft">
+              <div className={`bg-surface p-4 rounded-lg border border-dashed ${formErrors.documentos ? "border-error bg-red-50/10" : "border-soft"}`}>
                 <input
                   type="file"
                   accept=".pdf,.jpg,.jpeg,.png"
@@ -2350,6 +2437,15 @@ export const FormularioSubmissao = () => {
                         className="flex items-center justify-between bg-slate-100 dark:bg-slate-700 p-2 rounded text-sm"
                       >
                         <span className="truncate max-w-xs">{file.name}</span>
+                        <input
+                          type="text"
+                          placeholder="Nomeie este documento (ex: RG, Comprovante)"
+                          className="input py-1 px-2 text-sm flex-1 h-8"
+                          value={formState.documentNames[file.name] || ""}
+                          onChange={(e) =>
+                            handleDocumentNameChange(file.name, e.target.value)
+                          }
+                        />
                         <button
                           type="button"
                           onClick={() => removeDocument(file.name)}
@@ -2362,6 +2458,9 @@ export const FormularioSubmissao = () => {
                   </div>
                 )}
               </div>
+              {formErrors.documentos && (
+                <p className="text-sm text-red-500 font-bold text-center">{formErrors.documentos}</p>
+              )}
             </section>
 
             {/* --- BOTÃO FINAL --- */}

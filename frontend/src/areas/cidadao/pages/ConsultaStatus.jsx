@@ -1,4 +1,4 @@
-﻿﻿import React, { useState } from "react";
+﻿﻿import React, { useState, useRef } from "react";
 import { motion } from "framer-motion";
 import {
   Search,
@@ -9,15 +9,25 @@ import {
   Clock,
   Video,
   HelpCircle,
+  AlertTriangle,
+  Upload,
+  X,
 } from "lucide-react";
 import { API_BASE } from "../../../utils/apiBase";
+import { useToast } from "../../../contexts/ToastContext";
 
 export const ConsultaStatus = () => {
+  const { toast } = useToast();
   const [cpf, setCpf] = useState("");
   const [chave, setChave] = useState("");
   const [caso, setCaso] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // Estados para Upload Complementar
+  const [files, setFiles] = useState([]);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
 
   const handleConsulta = async (e) => {
     e.preventDefault();
@@ -28,7 +38,7 @@ export const ConsultaStatus = () => {
     const cpfLimpo = cpf.replace(/\D/g, "");
     try {
       const response = await fetch(
-        `${API_BASE}/status?cpf=${cpfLimpo}&chave=${chave}`
+        `${API_BASE}/status?cpf=${cpfLimpo}&chave=${chave}`,
       );
       const data = await response.json();
 
@@ -41,6 +51,65 @@ export const ConsultaStatus = () => {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+  const handleFileSelect = (e) => {
+    const selected = Array.from(e.target.files).map((file) => ({
+      file,
+      customName: file.name, // Nome inicial
+    }));
+    setFiles([...files, ...selected]);
+  };
+
+  const handleNameChange = (index, newName) => {
+    const newFiles = [...files];
+    newFiles[index].customName = newName;
+    setFiles(newFiles);
+  };
+
+  const removeFile = (index) => {
+    setFiles(files.filter((_, i) => i !== index));
+  };
+
+  const handleUploadComplementar = async () => {
+    if (files.length === 0) return;
+    setUploading(true);
+
+    const formData = new FormData();
+    const namesMap = {};
+
+    files.forEach((item) => {
+      // Envia o arquivo
+      formData.append("documentos", item.file);
+      // Mapeia o nome original para o nome personalizado
+      namesMap[item.file.name] = item.customName;
+    });
+
+    formData.append("nomes_arquivos", JSON.stringify(namesMap));
+
+    try {
+      const response = await fetch(
+        `${API_BASE}/casos/${caso.id || 0}/upload-complementar`,
+        {
+          // Precisa do ID do caso, que não vem no endpoint público padrão às vezes.
+          // NOTA: O endpoint /status atual retorna dados limitados.
+          // O backend precisa retornar o ID do caso no statusController.js para isso funcionar.
+          // Vou assumir que o ID foi adicionado ao retorno do statusController.js
+          method: "POST",
+          body: formData,
+        },
+      );
+
+      if (!response.ok) throw new Error("Erro ao enviar.");
+
+      toast.success("Documentos enviados! O defensor será notificado.");
+      setFiles([]);
+      // Recarrega status
+      handleConsulta({ preventDefault: () => {} });
+    } catch (err) {
+      toast.error("Falha ao enviar documentos.");
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -196,6 +265,82 @@ export const ConsultaStatus = () => {
                     <FileText size={20} />
                     Baixar Capa do Processo
                   </a>
+                )}
+              </div>
+            </div>
+          ) : caso.status === "aguardando_docs" ? (
+            // --- TELA DE PENDÊNCIA DE DOCUMENTOS ---
+            <div className="space-y-6 mt-6">
+              <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6">
+                <div className="flex items-center gap-3 mb-3 text-yellow-700">
+                  <AlertTriangle size={24} />
+                  <h3 className="text-lg font-bold">
+                    Ação Necessária: Documentos Pendentes
+                  </h3>
+                </div>
+                <div className="bg-white p-4 rounded border border-yellow-100 text-sm whitespace-pre-wrap font-medium text-slate-700">
+                  {caso.descricao_pendencia ||
+                    "O defensor solicitou documentos adicionais. Por favor, anexe abaixo."}
+                </div>
+              </div>
+
+              {/* ÁREA DE UPLOAD */}
+              <div className="bg-surface border border-soft rounded-xl p-6">
+                <h4 className="font-semibold mb-4">
+                  Enviar Documentos Solicitados
+                </h4>
+
+                <input
+                  type="file"
+                  multiple
+                  className="hidden"
+                  ref={fileInputRef}
+                  onChange={handleFileSelect}
+                />
+
+                <button
+                  onClick={() => fileInputRef.current.click()}
+                  className="btn btn-secondary w-full border-dashed border-2 border-soft hover:border-primary mb-4"
+                >
+                  <Upload size={20} className="mr-2" />
+                  Selecionar Arquivos
+                </button>
+
+                {files.length > 0 && (
+                  <div className="space-y-3 mb-4">
+                    {files.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center gap-2 bg-app p-2 rounded"
+                      >
+                        <input
+                          type="text"
+                          value={item.customName}
+                          onChange={(e) =>
+                            handleNameChange(idx, e.target.value)
+                          }
+                          className="input text-sm py-1 flex-1"
+                          placeholder="Nome do documento (ex: RG)"
+                        />
+                        <button
+                          onClick={() => removeFile(idx)}
+                          className="text-red-500 p-1"
+                        >
+                          <X size={18} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {files.length > 0 && (
+                  <button
+                    onClick={handleUploadComplementar}
+                    disabled={uploading}
+                    className="btn btn-primary w-full"
+                  >
+                    {uploading ? "Enviando..." : "Enviar Documentos"}
+                  </button>
                 )}
               </div>
             </div>

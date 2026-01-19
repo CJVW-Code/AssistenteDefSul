@@ -25,7 +25,7 @@ const storageBuckets = {
 };
 
 const salarioMinimoAtual = Number.parseFloat(
-  process.env.SALARIO_MINIMO_ATUAL || "1.621"
+  process.env.SALARIO_MINIMO_ATUAL || "1621"
 );
 
 // --- UTILS DE FORMATAÇÃO E PARSE ---
@@ -903,12 +903,13 @@ export async function processarCasoEmBackground(
 
     // Gerar DOCX
     let url_documento_gerado = null;
+    const normalizedData = { 
+      comarca: process.env.DEFENSORIA_DEFAULT_COMARCA || "Teixeira de Freitas/BA",
+      defensoraNome: process.env.DEFENSORIA_DEFAULT_DEFENSORA || "DEFENSOR(A) PÚBLICO(A) DO ESTADO DA BAHIA",
+      triagemNumero: protocolo
+    };
+
     try {
-      const normalizedData = { 
-        comarca: process.env.DEFENSORIA_DEFAULT_COMARCA || "Teixeira de Freitas/BA",
-        defensoraNome: process.env.DEFENSORIA_DEFAULT_DEFENSORA || "DEFENSOR(A) PÚBLICO(A) DO ESTADO DA BAHIA",
-        triagemNumero: protocolo
-      };
       const docxData = buildDocxTemplatePayload(
         normalizedData,
         dosFatosTexto,
@@ -972,6 +973,7 @@ export const criarNovoCaso = async (req, res) => {
       tipoAcao,
       relato,
       documentos_informados,
+      documentos_nomes,
       // ... todos os outros campos mantidos ...
     } = dados_formulario;
 
@@ -981,7 +983,7 @@ export const criarNovoCaso = async (req, res) => {
     const chaveAcessoHash = hashKeyWithSalt(chaveAcesso);
 
     logger.info(
-      `Iniciando criação de caso. Protocolo: ${protocolo}, Tipo: ${tipoAcao}`
+      `Iniciando criação de caso. Protocolo: ${protocolo}, Tipo: ${tipoAcao}`,
     );
 
     // Upload de arquivos
@@ -1038,6 +1040,12 @@ export const criarNovoCaso = async (req, res) => {
       }
     }
 
+    // Mescla os nomes dos documentos nos dados do formulário
+    const dadosFormularioFinal = {
+      ...dados_formulario,
+      document_names: JSON.parse(documentos_nomes || "{}"),
+    };
+
     // Salvar no Banco (Resposta Rápida)
     logger.debug("Salvando dados básicos no Supabase...");
     const { error: dbError } = await supabase.from("casos").insert({
@@ -1053,7 +1061,7 @@ export const criarNovoCaso = async (req, res) => {
       url_peticao,
       urls_documentos,
       documentos_informados: documentosInformadosArray,
-      dados_formulario: dados_formulario,
+      dados_formulario: dadosFormularioFinal,
       status: "recebido",
       created_at: new Date(),
     });
@@ -1098,7 +1106,7 @@ export const criarNovoCaso = async (req, res) => {
             dados_formulario,
             urls_documentos,
             url_audio,
-            url_peticao
+            url_peticao,
           );
         } catch (error) {
           logger.error(`Erro fatal no worker fallback: ${error.message}`);
@@ -1180,11 +1188,11 @@ export const obterDetalhesCaso = async (req, res) => {
 
 export const atualizarStatusCaso = async (req, res) => {
   const { id } = req.params;
-  const { status } = req.body;
+  const { status, descricao_pendencia } = req.body;
   try {
     const { data, error = null } = await supabase
       .from("casos")
-      .update({ status })
+      .update({ status, descricao_pendencia })
       .eq("id", id)
       .select()
       .single();
@@ -1226,6 +1234,13 @@ export const salvarFeedback = async (req, res) => {
 export const regenerarDosFatos = async (req, res) => {
   const { id } = req.params;
   try {
+    // Restrição: Apenas administradores podem regenerar os fatos
+    if (!req.user || req.user.cargo !== "admin") {
+      return res.status(403).json({
+        error: "Acesso negado. Apenas administradores podem regenerar os fatos.",
+      });
+    }
+
     const { data: caso, error } = await supabase
       .from("casos")
       .select("*")
@@ -1536,6 +1551,83 @@ export const resetarChaveAcesso = async (req, res) => {
     res.status(500).json({ error: "Erro ao resetar chave." });
   }
 };
+export const receberDocumentosComplementares = async (req, res) => {
+  const { id } = req.params;
+  const { nomes_arquivos } = req.body; // JSON string com os nomes personalizados
+
+  try {
+    // 1. Busca o caso atual
+    const { data: caso, error: fetchError } = await supabase
+      .from("casos")
+      .select("urls_documentos, dados_formulario, protocolo")
+      .eq("id", id)
+      .single();
+
+    if (fetchError || !caso) throw new Error("Caso não encontrado.");
+
+    const novosUrls = [];
+
+    // 2. Processa os arquivos enviados
+    if (req.files && req.files.documentos) {
+      for (const docFile of req.files.documentos) {
+        // Sanitiza nome
+        const safeName = docFile.originalname
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "");
+        const filePath = `${caso.protocolo}/complementar_${Date.now()}_${safeName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from(storageBuckets.documentos)
+          .upload(filePath, await fs.readFile(docFile.path), {
+            contentType: docFile.mimetype,
+          });
+
+        if (uploadError) {
+          logger.error(`Erro upload complementar: ${uploadError.message}`);
+        } else {
+          novosUrls.push(filePath);
+        }
+
+        // Limpa arquivo temporário
+        try {
+          await fs.unlink(docFile.path);
+        } catch (e) {}
+      }
+    }
+
+    if (novosUrls.length === 0) {
+      return res.status(400).json({ error: "Nenhum arquivo foi enviado." });
+    }
+
+    // 3. Atualiza metadados de nomes (dados_formulario.document_names)
+    const nomesMap = JSON.parse(nomes_arquivos || "{}");
+    const currentNames = caso.dados_formulario?.document_names || {};
+
+    const updatedNames = { ...currentNames, ...nomesMap };
+    const updatedDadosFormulario = {
+      ...caso.dados_formulario,
+      document_names: updatedNames,
+    };
+
+    // 4. Atualiza o banco
+    const { error: updateError } = await supabase
+      .from("casos")
+      .update({
+        urls_documentos: [...(caso.urls_documentos || []), ...novosUrls],
+        dados_formulario: updatedDadosFormulario,
+        status: "documentos_entregues", // Novo status
+        updated_at: new Date(),
+      })
+      .eq("id", id);
+
+    if (updateError) throw updateError;
+
+    res.status(200).json({ message: "Documentos enviados com sucesso!" });
+  } catch (error) {
+    logger.error(`Erro upload complementar: ${error.message}`);
+    res.status(500).json({ error: "Falha ao enviar documentos." });
+  }
+};
 
 // --- DELETAR CASO (Apenas Admin) ---
 export const deletarCaso = async (req, res) => {
@@ -1605,5 +1697,43 @@ export const deletarCaso = async (req, res) => {
   } catch (err) {
     logger.error(`Erro ao deletar caso ${req.params.id}: ${err.message}`);
     res.status(500).json({ error: "Erro ao excluir caso." });
+  }
+};
+
+// --- REPROCESSAR CASO (Manual) ---
+export const reprocessarCaso = async (req, res) => {
+  const { id } = req.params;
+  try {
+    // Busca os dados originais do caso
+    const { data: caso, error } = await supabase
+      .from("casos")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (error || !caso) {
+      return res.status(404).json({ error: "Caso não encontrado." });
+    }
+
+    // Responde imediatamente para a interface não travar
+    res.status(200).json({ message: "Reprocessamento iniciado em background." });
+
+    // Dispara o worker novamente
+    setImmediate(async () => {
+      try {
+        await processarCasoEmBackground(
+          caso.protocolo,
+          caso.dados_formulario,
+          caso.urls_documentos || [],
+          caso.url_audio,
+          caso.url_peticao
+        );
+      } catch (err) {
+        logger.error(`Erro ao reprocessar caso ${id}: ${err.message}`);
+      }
+    });
+  } catch (error) {
+    logger.error(`Erro ao solicitar reprocessamento: ${error.message}`);
+    if (!res.headersSent) res.status(500).json({ error: "Erro interno ao reprocessar." });
   }
 };

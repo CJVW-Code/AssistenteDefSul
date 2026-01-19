@@ -18,6 +18,7 @@ import {
   Save,
   Video,
   Calendar,
+  Bell,
 } from "lucide-react";
 import { API_BASE } from "../../../utils/apiBase";
 import { useToast } from "../../../contexts/ToastContext";
@@ -27,11 +28,13 @@ const statusOptions = [
   { value: "recebido", label: "Recebido" },
   { value: "em_analise", label: "Em análise" },
   { value: "aguardando_docs", label: "Pendentes de documentos" },
+  { value: "documentos_entregues", label: "Documentos Entregues (Novo)" },
 ];
 
 const statusBadges = {
   recebido: "bg-amber-100 text-amber-800 border-amber-200",
   em_analise: "bg-sky-100 text-sky-800 border-sky-200",
+  documentos_entregues: "bg-indigo-100 text-indigo-800 border-indigo-200",
   aguardando_docs: "bg-purple-100 text-purple-800 border-purple-200",
   processando: "bg-blue-100 text-blue-800 border-blue-200",
   processado: "bg-green-100 text-green-800 border-green-200",
@@ -51,6 +54,8 @@ const statusDescriptions = {
     "O caso está sendo analisado manualmente por um defensor ou estagiário.",
   aguardando_docs:
     "O processo está pausado, aguardando o envio de documentos adicionais pelo cidadão.",
+  documentos_entregues:
+    "O cidadão enviou novos documentos. Verifique os anexos.",
   encaminhado_solar:
     "O caso foi finalizado e encaminhado para o sistema Solar da defensoria.",
   finalizado: "O caso foi concluído.",
@@ -149,6 +154,8 @@ export const DetalhesCaso = () => {
   const [dataAgendamento, setDataAgendamento] = useState("");
   const [linkAgendamento, setLinkAgendamento] = useState("");
   const [isAgendando, setIsAgendando] = useState(false);
+  const [isReprocessing, setIsReprocessing] = useState(false);
+  const [pendenciaTexto, setPendenciaTexto] = useState("");
 
   const fetchDetalhes = useCallback(
     async (silent = false) => {
@@ -162,7 +169,9 @@ export const DetalhesCaso = () => {
           // Converte a data UTC do banco para o formato local esperado pelo input datetime-local
           const date = new Date(data.agendamento_data);
           const offset = date.getTimezoneOffset() * 60000;
-          const localISOTime = new Date(date.getTime() - offset).toISOString().slice(0, 16);
+          const localISOTime = new Date(date.getTime() - offset)
+            .toISOString()
+            .slice(0, 16);
           setDataAgendamento(localISOTime);
         }
         setLinkAgendamento(data.agendamento_link || "");
@@ -173,7 +182,7 @@ export const DetalhesCaso = () => {
         if (!silent) setLoading(false);
       }
     },
-    [id, token]
+    [id, token],
   );
 
   useEffect(() => {
@@ -195,6 +204,7 @@ export const DetalhesCaso = () => {
   useEffect(() => {
     if (caso && !feedbackInitialized) {
       setFeedback(caso.feedback || "");
+      setPendenciaTexto(caso.descricao_pendencia || "");
       setFeedbackInitialized(true);
     }
   }, [caso, feedbackInitialized]);
@@ -210,7 +220,13 @@ export const DetalhesCaso = () => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ status: novoStatus }),
+        body: JSON.stringify({
+          status: novoStatus,
+          descricao_pendencia:
+            novoStatus === "aguardando_docs"
+              ? pendenciaTexto
+              : caso.descricao_pendencia,
+        }),
       });
 
       if (!response.ok) {
@@ -304,8 +320,14 @@ export const DetalhesCaso = () => {
   };
 
   const handleRegenerateMinuta = async () => {
-    if (!(await confirm("Isso irá gerar um novo arquivo Word com os dados atuais. O arquivo anterior será substituído. Continuar?", "Regerar Minuta"))) return;
-    
+    if (
+      !(await confirm(
+        "Isso irá gerar um novo arquivo Word com os dados atuais. O arquivo anterior será substituído. Continuar?",
+        "Regerar Minuta",
+      ))
+    )
+      return;
+
     setIsRegeneratingMinuta(true);
     try {
       const response = await fetch(`${API_BASE}/casos/${id}/regerar-minuta`, {
@@ -390,7 +412,7 @@ export const DetalhesCaso = () => {
     if (
       await confirm(
         `Tem certeza que deseja excluir permanentemente o caso ${caso.protocolo}?`,
-        "Excluir Caso"
+        "Excluir Caso",
       )
     ) {
       setIsDeleting(true);
@@ -462,7 +484,7 @@ export const DetalhesCaso = () => {
     if (
       !(await confirm(
         "Esta ação irá reabrir o caso, remover os números de Solar/Processo e excluir a capa processual anexada. Deseja continuar?",
-        "Reverter Finalização?"
+        "Reverter Finalização?",
       ))
     ) {
       return;
@@ -477,7 +499,7 @@ export const DetalhesCaso = () => {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
 
       if (!response.ok) {
@@ -492,6 +514,28 @@ export const DetalhesCaso = () => {
       toast.error(error.message);
     } finally {
       setIsReverting(false);
+    }
+  };
+
+  const handleReprocessar = async () => {
+    if (!await confirm("Isso irá reiniciar todo o processo de leitura de documentos (OCR) e geração de texto pela IA. Deseja continuar?", "Reprocessar Caso")) {
+      return;
+    }
+
+    setIsReprocessing(true);
+    try {
+      const response = await fetch(`${API_BASE}/casos/${id}/reprocessar`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error("Erro ao solicitar reprocessamento.");
+      
+      toast.success("Processamento reiniciado! Aguarde alguns instantes.");
+      fetchDetalhes(true); // Atualiza para ver o status mudando para 'processando'
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setIsReprocessing(false);
     }
   };
 
@@ -513,6 +557,22 @@ export const DetalhesCaso = () => {
         </div>
       </div>
 
+      {/* NOTIFICAÇÃO DE DOCUMENTOS ENTREGUES */}
+      {caso.status === "documentos_entregues" && (
+        <div className="bg-indigo-50 border-l-4 border-indigo-500 p-4 rounded-r shadow-sm flex items-start gap-3 animate-fade-in mb-6">
+          <Bell className="text-indigo-600 shrink-0 mt-1" size={24} />
+          <div>
+            <h3 className="font-bold text-indigo-800">
+              Novos Documentos Recebidos!
+            </h3>
+            <p className="text-indigo-700 text-sm">
+              O cidadão enviou os documentos complementares solicitados.
+              Verifique os itens destacados abaixo na seção de anexos.
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="grid gap-6 lg:grid-cols-3">
         <section className="space-y-6 lg:col-span-2">
           <div className="card space-y-4">
@@ -523,7 +583,7 @@ export const DetalhesCaso = () => {
               {renderDataField("Telefone", caso.telefone_assistido)}
               {renderDataField(
                 "Tipo de ação",
-                caso.tipo_acao?.replace("_", " ")
+                caso.tipo_acao?.replace("_", " "),
               )}
             </div>
             <div className="pt-4">
@@ -541,12 +601,16 @@ export const DetalhesCaso = () => {
                   let outrosFilhos = [];
                   try {
                     if (dados.outros_filhos_detalhes) {
-                      outrosFilhos = typeof dados.outros_filhos_detalhes === 'string'
-                        ? JSON.parse(dados.outros_filhos_detalhes)
-                        : dados.outros_filhos_detalhes;
+                      outrosFilhos =
+                        typeof dados.outros_filhos_detalhes === "string"
+                          ? JSON.parse(dados.outros_filhos_detalhes)
+                          : dados.outros_filhos_detalhes;
                     }
                   } catch (e) {
-                    console.error("Erro ao processar dados de outros filhos:", e);
+                    console.error(
+                      "Erro ao processar dados de outros filhos:",
+                      e,
+                    );
                   }
 
                   return (
@@ -563,34 +627,34 @@ export const DetalhesCaso = () => {
                           {renderDataField("CPF", dados.cpf)}
                           {renderDataField(
                             "Data de Nascimento",
-                            dados.assistido_data_nascimento
+                            dados.assistido_data_nascimento,
                           )}
                           {renderDataField(
                             "Nacionalidade",
-                            dados.assistido_nacionalidade
+                            dados.assistido_nacionalidade,
                           )}
                           {renderDataField(
                             "Estado Civil",
-                            dados.assistido_estado_civil
+                            dados.assistido_estado_civil,
                           )}
                           {renderDataField(
                             "Endereço Residencial",
-                            dados.endereco_assistido
+                            dados.endereco_assistido,
                           )}
                           {renderDataField("Email", dados.email_assistido)}
                           {renderDataField(
                             "Telefone de Contato",
-                            dados.telefone
+                            dados.telefone,
                           )}
                           {renderDataField(
                             "WhatsApp para Reunião",
-                            dados.whatsapp_contato
+                            dados.whatsapp_contato,
                           )}
                           {renderDataField(
                             "RG",
                             `${dados.assistido_rg_numero || ""} ${
                               dados.assistido_rg_orgao || ""
-                            }`.trim()
+                            }`.trim(),
                           )}
                         </div>
                       </div>
@@ -611,17 +675,17 @@ export const DetalhesCaso = () => {
                               {renderDataField("CPF", filho.cpf)}
                               {renderDataField(
                                 "Data de Nascimento",
-                                filho.dataNascimento
+                                filho.dataNascimento,
                               )}
                               {renderDataField(
                                 "Nacionalidade",
-                                filho.nacionalidade
+                                filho.nacionalidade,
                               )}
                               {renderDataField(
                                 "RG",
                                 `${filho.rgNumero || ""} ${
                                   filho.rgOrgao || ""
-                                }`.trim()
+                                }`.trim(),
                               )}
                             </div>
                           </div>
@@ -636,42 +700,42 @@ export const DetalhesCaso = () => {
                           <div className="grid gap-4 md:grid-cols-2">
                             {renderDataField(
                               "Nome Completo",
-                              dados.representante_nome
+                              dados.representante_nome,
                             )}
                             {renderDataField("CPF", dados.representante_cpf)}
                             {renderDataField(
                               "Nacionalidade",
-                              dados.representante_nacionalidade
+                              dados.representante_nacionalidade,
                             )}
                             {renderDataField(
                               "Estado Civil",
-                              dados.representante_estado_civil
+                              dados.representante_estado_civil,
                             )}
                             {renderDataField(
                               "Profissão",
-                              dados.representante_ocupacao
+                              dados.representante_ocupacao,
                             )}
                             {renderDataField(
                               "Endereço Residencial",
-                              dados.representante_endereco_residencial
+                              dados.representante_endereco_residencial,
                             )}
                             {renderDataField(
                               "Endereço Profissional",
-                              dados.representante_endereco_profissional
+                              dados.representante_endereco_profissional,
                             )}
                             {renderDataField(
                               "Email",
-                              dados.representante_email
+                              dados.representante_email,
                             )}
                             {renderDataField(
                               "Telefone",
-                              dados.representante_telefone
+                              dados.representante_telefone,
                             )}
                             {renderDataField(
                               "RG",
                               `${dados.representante_rg_numero || ""} ${
                                 dados.representante_rg_orgao || ""
-                              }`.trim()
+                              }`.trim(),
                             )}
                           </div>
                         </div>
@@ -685,29 +749,29 @@ export const DetalhesCaso = () => {
                         <div className="grid gap-4 md:grid-cols-2">
                           {renderDataField(
                             "Nome Completo",
-                            dados.nome_requerido
+                            dados.nome_requerido,
                           )}
                           {renderDataField("CPF", dados.cpf_requerido)}
                           {renderDataField(
                             "Endereço conhecido",
-                            dados.endereco_requerido
+                            dados.endereco_requerido,
                           )}
                           {renderDataField(
                             "Telefone",
-                            dados.requerido_telefone
+                            dados.requerido_telefone,
                           )}
                           {renderDataField("Email", dados.requerido_email)}
                           {renderDataField(
                             "Profissão",
-                            dados.requerido_ocupacao
+                            dados.requerido_ocupacao,
                           )}
                           {renderDataField(
                             "Endereço de Trabalho",
-                            dados.requerido_endereco_profissional
+                            dados.requerido_endereco_profissional,
                           )}
                           {renderDataField(
                             "Dados Adicionais",
-                            dados.dados_adicionais_requerido
+                            dados.dados_adicionais_requerido,
                           )}
                         </div>
                       </div>
@@ -720,47 +784,47 @@ export const DetalhesCaso = () => {
                         <div className="grid gap-4 md:grid-cols-2">
                           {renderDataField(
                             "Valor da Pensão Solicitado",
-                            dados.valor_mensal_pensao
+                            dados.valor_mensal_pensao,
                           )}
                           {renderDataField(
                             "Dados Bancários para Depósito",
-                            dados.dados_bancarios_deposito
+                            dados.dados_bancarios_deposito,
                           )}
                           {renderDataField(
                             "Descrição da Guarda",
-                            dados.descricao_guarda
+                            dados.descricao_guarda,
                           )}
                           {renderDataField(
                             "Situação Financeira de quem cuida",
-                            dados.situacao_financeira_genitora
+                            dados.situacao_financeira_genitora,
                           )}
                           {renderDataField(
                             "Requerido tem emprego formal?",
-                            dados.requerido_tem_emprego_formal
+                            dados.requerido_tem_emprego_formal,
                           )}
                           {renderDataField(
                             "Nome da Empresa",
-                            dados.empregador_requerido_nome
+                            dados.empregador_requerido_nome,
                           )}
                           {renderDataField(
                             "Endereço da Empresa",
-                            dados.empregador_requerido_endereco
+                            dados.empregador_requerido_endereco,
                           )}
                           {/* Adicionar outros campos específicos da ação, se houver */}
                           {dados.numero_processo_originario &&
                             renderDataField(
                               "Processo Original",
-                              dados.numero_processo_originario
+                              dados.numero_processo_originario,
                             )}
                           {dados.periodo_debito_execucao &&
                             renderDataField(
                               "Período do Débito",
-                              dados.periodo_debito_execucao
+                              dados.periodo_debito_execucao,
                             )}
                           {dados.valor_total_debito_execucao &&
                             renderDataField(
                               "Valor Total do Débito",
-                              dados.valor_total_debito_execucao
+                              dados.valor_total_debito_execucao,
                             )}
                         </div>
                       </div>
@@ -795,20 +859,22 @@ export const DetalhesCaso = () => {
                 defaultCollapsed={true}
               />
             </div>
-            <button
-              onClick={handleGenerateFatos}
-              disabled={isGenerating || caso.status === "processando"}
-              className="btn btn-primary w-full mt-4 flex items-center justify-center gap-2"
-            >
-              {isGenerating || caso.status === "processando" ? (
-                <>
-                  <Loader2 size={18} className="animate-spin" />
-                  Processando IA...
-                </>
-              ) : (
-                "Gerar sessão dos fatos"
-              )}
-            </button>
+            {user?.cargo === "admin" && (
+              <button
+                onClick={handleGenerateFatos}
+                disabled={isGenerating || caso.status === "processando"}
+                className="btn btn-primary w-full mt-4 flex items-center justify-center gap-2"
+              >
+                {isGenerating || caso.status === "processando" ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" />
+                    Processando IA...
+                  </>
+                ) : (
+                  "Gerar sessão dos fatos"
+                )}
+              </button>
+            )}
           </section>
 
           <section className="card space-y-4">
@@ -844,7 +910,8 @@ export const DetalhesCaso = () => {
               <h2 className="heading-2">Anotações / Feedback</h2>
             </div>
             <p className="text-sm text-muted">
-              Espaço para observações internas sobre o caso ou ajustes necessários na minuta.
+              Espaço para observações internas sobre o caso ou ajustes
+              necessários na minuta.
             </p>
             <textarea
               className="input min-h-[120px] resize-y font-sans"
@@ -909,8 +976,13 @@ export const DetalhesCaso = () => {
                       disabled={isRegeneratingMinuta}
                       className="btn btn-ghost border border-soft w-full justify-start text-xs"
                     >
-                      <RefreshCw size={14} className={isRegeneratingMinuta ? "animate-spin" : ""} />
-                      {isRegeneratingMinuta ? "Regerando..." : "Regerar Minuta Word"}
+                      <RefreshCw
+                        size={14}
+                        className={isRegeneratingMinuta ? "animate-spin" : ""}
+                      />
+                      {isRegeneratingMinuta
+                        ? "Regerando..."
+                        : "Regerar Minuta Word"}
                     </button>
                   )}
                 </div>
@@ -932,7 +1004,10 @@ export const DetalhesCaso = () => {
                       disabled={isGeneratingTermo}
                       className="btn btn-ghost border border-soft w-full justify-start text-xs"
                     >
-                      <RefreshCw size={14} className={isGeneratingTermo ? "animate-spin" : ""} />
+                      <RefreshCw
+                        size={14}
+                        className={isGeneratingTermo ? "animate-spin" : ""}
+                      />
                       {isGeneratingTermo ? "Regerando..." : "Regerar Termo"}
                     </button>
                   )}
@@ -940,22 +1015,22 @@ export const DetalhesCaso = () => {
               ) : (
                 user?.cargo === "admin" && (
                   <button
-                  onClick={handleGenerateTermo}
-                  disabled={isGeneratingTermo}
-                  className="btn btn-secondary w-full justify-start"
-                >
-                  {isGeneratingTermo ? (
-                    <>
-                      <Loader2 size={18} className="animate-spin" />
-                      Gerando Termo...
-                    </>
-                  ) : (
-                    <>
-                      <FileText size={18} />
-                      Gerar Termo de Declaração
-                    </>
-                  )}
-                </button>
+                    onClick={handleGenerateTermo}
+                    disabled={isGeneratingTermo}
+                    className="btn btn-secondary w-full justify-start"
+                  >
+                    {isGeneratingTermo ? (
+                      <>
+                        <Loader2 size={18} className="animate-spin" />
+                        Gerando Termo...
+                      </>
+                    ) : (
+                      <>
+                        <FileText size={18} />
+                        Gerar Termo de Declaração
+                      </>
+                    )}
+                  </button>
                 )
               )}
               {caso.url_audio && (
@@ -970,18 +1045,51 @@ export const DetalhesCaso = () => {
                 </a>
               )}
               {caso.urls_documentos?.length > 0 ? (
-                caso.urls_documentos.map((url, index) => (
-                  <a
-                    key={url}
-                    href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn btn-ghost border border-soft w-full justify-start"
-                  >
-                    <FileText size={18} />
-                    Documento {index + 1}
-                  </a>
-                ))
+                caso.urls_documentos.map((url, index) => {
+                  // Tenta extrair o nome original do arquivo da URL ou usa o mapa de nomes
+                  const fileName = url.split("/").pop().split("?")[0];
+                  // Procura no mapa de nomes (se existir)
+                  // A chave no mapa pode ser o nome original do arquivo antes do upload
+                  // Como o backend renomeia, a correspondência exata pode ser difícil sem um ID.
+                  // Vamos tentar exibir o nome personalizado se encontrarmos uma chave parcial ou usar o índice.
+
+                  // Melhor abordagem: Iterar e exibir. Se tivermos metadados, usamos.
+                  // O backend salva em dados_formulario.document_names { "nome_original": "Classificacao" }
+                  // Mas aqui temos a URL assinada.
+                  // Vamos exibir o nome do arquivo limpo ou "Documento X"
+                  const isComplementar = url.includes("complementar_");
+
+                  return (
+                    <a
+                      key={url}
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`btn btn-ghost border w-full justify-start text-left break-all group ${
+                        isComplementar
+                          ? "border-indigo-300 bg-indigo-50 hover:bg-indigo-100"
+                          : "border-soft"
+                      }`}
+                    >
+                      <FileText
+                        size={18}
+                        className={`shrink-0 ${isComplementar ? "text-indigo-600" : ""}`}
+                      />
+                      <span
+                        className={
+                          isComplementar ? "font-medium text-indigo-900" : ""
+                        }
+                      >
+                        {decodeURIComponent(fileName)}
+                      </span>
+                      {isComplementar && (
+                        <span className="ml-auto text-[10px] uppercase font-bold bg-indigo-200 text-indigo-700 px-2 py-0.5 rounded-full">
+                          Novo
+                        </span>
+                      )}
+                    </a>
+                  );
+                })
               ) : (
                 <p className="text-sm text-muted">
                   Nenhum documento complementar enviado.
@@ -1025,6 +1133,18 @@ export const DetalhesCaso = () => {
               </div>
             </div>
 
+            {/* BOTÃO DE REPROCESSAMENTO (Aparece em caso de ERRO ou para ADMIN) */}
+            {(statusKey === 'erro' || user?.cargo === 'admin') && (
+              <button
+                onClick={handleReprocessar}
+                disabled={isReprocessing || caso.status === 'processando'}
+                className="btn btn-ghost border border-red-200 bg-red-50 text-red-700 w-full flex items-center justify-center gap-2 hover:bg-red-100"
+              >
+                <RefreshCw size={16} className={isReprocessing ? "animate-spin" : ""} />
+                {isReprocessing ? "Reiniciando..." : "Reprocessar Caso (OCR + IA)"}
+              </button>
+            )}
+
             {/* SEÇÃO DE AGENDAMENTO ONLINE */}
             <div className="card space-y-4 border-t-4 border-t-blue-500">
               <h2 className="heading-2 flex items-center gap-2">
@@ -1033,7 +1153,9 @@ export const DetalhesCaso = () => {
               </h2>
               <div className="space-y-3">
                 <div>
-                  <label className="text-xs text-muted uppercase font-bold">Data e Hora</label>
+                  <label className="text-xs text-muted uppercase font-bold">
+                    Data e Hora
+                  </label>
                   <input
                     type="datetime-local"
                     className="input mt-1"
@@ -1042,7 +1164,9 @@ export const DetalhesCaso = () => {
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-muted uppercase font-bold">Link da Reunião</label>
+                  <label className="text-xs text-muted uppercase font-bold">
+                    Link da Reunião
+                  </label>
                   <input
                     type="text"
                     placeholder="Google Meet, Teams, etc."
@@ -1064,8 +1188,10 @@ export const DetalhesCaso = () => {
                     <a
                       href={`https://wa.me/55${(caso.whatsapp_contato || caso.telefone_assistido)?.replace(/\D/g, "")}?text=${encodeURIComponent(
                         `Olá, Sr(a). ${caso.nome_assistido}. A Defensoria Pública agendou seu atendimento online para ${new Date(
-                          caso.agendamento_data
-                        ).toLocaleString("pt-BR")}. Acesse pelo link: ${caso.agendamento_link}. Favor confirmar.`
+                          caso.agendamento_data,
+                        ).toLocaleString(
+                          "pt-BR",
+                        )}. Acesse pelo link: ${caso.agendamento_link}. Favor confirmar.`,
                       )}`}
                       target="_blank"
                       rel="noopener noreferrer"
@@ -1079,6 +1205,24 @@ export const DetalhesCaso = () => {
               </div>
             </div>
 
+            {/* ÁREA DE PENDÊNCIA (Só aparece se selecionar aguardando_docs) */}
+            {statusKey === "aguardando_docs" && (
+              <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg space-y-2 animate-fade-in">
+                <label className="text-sm font-bold text-purple-800">
+                  Descreva os documentos pendentes:
+                </label>
+                <textarea
+                  className="input w-full min-h-[100px] text-sm"
+                  placeholder="Ex: - RG do cônjuge&#10;- Comprovante de residência atualizado"
+                  value={pendenciaTexto}
+                  onChange={(e) => setPendenciaTexto(e.target.value)}
+                />
+                <p className="text-xs text-purple-600">
+                  Este texto aparecerá para o assistido na consulta.
+                </p>
+              </div>
+            )}
+            
             <select
               className="input disabled:opacity-70 disabled:cursor-not-allowed"
               onChange={(e) => handleStatusChange(e.target.value)}
