@@ -169,7 +169,8 @@ const numeroParaExtenso = (valor) => {
 
 const calcularPercentualSalarioMinimo = (valorMensalPensao) => {
   if (!valorMensalPensao) return "";
-  const valorNumerico = Number(valorMensalPensao);
+  const valorNumerico = parseCurrencyToNumber(valorMensalPensao);
+  logger.info(`[Cálculo Percentual] Valor Pensão: ${valorMensalPensao} -> Numérico: ${valorNumerico} | Salário Mínimo: ${salarioMinimoAtual}`);
   if (
     !salarioMinimoAtual ||
     Number.isNaN(valorNumerico) ||
@@ -178,6 +179,7 @@ const calcularPercentualSalarioMinimo = (valorMensalPensao) => {
     return "";
   }
   const percentual = (valorNumerico / salarioMinimoAtual) * 100;
+  logger.info(`[Cálculo Percentual] Resultado: ${percentual}%`);
   const percentualLimpo = Number(percentual.toFixed(2));
   if (Number.isNaN(percentualLimpo)) return "";
   if (Number.isInteger(percentualLimpo)) return String(percentualLimpo);
@@ -550,11 +552,6 @@ const buildDocxTemplatePayload = (
     baseData.percentual_ou_valor_fixado ||
     "";
   const percentualExtras = baseData.percentual_definitivo_extras || "0";
-  const percentualProvisorioBase =
-    baseData.percentual_provisorio_salario_min ||
-    baseData.percentual_salario_minimo ||
-    baseData.percentual_ou_valor_fixado ||
-    "";
   const diaPagamentoBase =
     baseData.dia_pagamento_fixado || baseData.dia_pagamento_requerido;
   const assistidoNome =
@@ -660,8 +657,9 @@ const buildDocxTemplatePayload = (
     executado_email: ensureText(baseData.requerido_email),
     executado_telefone: ensureText(baseData.requerido_telefone),
     valor_pensao: ensureText(baseData.valor_pensao),
+    valor_pensao_solicitado: ensureText(baseData.valor_pensao_solicitado || baseData.valor_pensao),
+    valor_salario_minimo: ensureText(baseData.valor_salario_minimo || baseData.salario_minimo_formatado),
     percentual_definitivo_salario_min: ensureText(percentualDefinitivoBase),
-    percentual_provisorio_salario_min: ensureText(percentualProvisorioBase),
     percentual_definitivo_extras: ensureText(
       baseData.percentual_definitivo_extras,
     ),
@@ -921,15 +919,15 @@ export async function processarCasoEmBackground(
       valor_debito_extenso: dados_formulario.valor_debito_extenso,
       percentual_definitivo_salario_min:
         dados_formulario.percentual_definitivo_salario_min,
-      percentual_provisorio_salario_min:
-        dados_formulario.percentual_provisorio_salario_min,
       percentual_definitivo_extras:
         dados_formulario.percentual_definitivo_extras,
       valor_pensao: formattedValorPensao,
+      valor_pensao_solicitado: formattedValorPensao,
       valor_mensal_pensao: dados_formulario.valor_mensal_pensao,
       percentual_salario_minimo: percentualSalarioMinimoCalculado,
       salario_minimo_atual: salarioMinimoAtual,
       salario_minimo_formatado: formatCurrencyBr(salarioMinimoAtual),
+      valor_salario_minimo: formatCurrencyBr(salarioMinimoAtual),
       dia_pagamento_requerido: formattedDiaPagamentoRequerido,
       dados_bancarios_deposito: dados_formulario.dados_bancarios_deposito,
       requerido_tem_emprego_formal:
@@ -1461,13 +1459,18 @@ export const regerarMinuta = async (req, res) => {
     const baseData = caso.dados_formulario || caso;
     const valorMensalPensao = baseData.valor_mensal_pensao;
     const percentualSalarioMinimoCalculado = calcularPercentualSalarioMinimo(valorMensalPensao);
+    const valorPensaoFormatado = formatCurrencyBr(valorMensalPensao);
 
     // Adiciona o percentual calculado e o salário mínimo correto aos dados do formulário
     const dadosComPercentual = {
       ...baseData,
       percentual_salario_minimo: percentualSalarioMinimoCalculado,
+      percentual_definitivo_salario_min: percentualSalarioMinimoCalculado,
       salario_minimo_atual: salarioMinimoAtual,
       salario_minimo_formatado: formatCurrencyBr(salarioMinimoAtual),
+      valor_salario_minimo: formatCurrencyBr(salarioMinimoAtual),
+      valor_pensao: valorPensaoFormatado,
+      valor_pensao_solicitado: valorPensaoFormatado,
     };
 
     // 3. Gera o novo payload e o buffer do Word
