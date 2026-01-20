@@ -1074,16 +1074,12 @@ export const DetalhesCaso = () => {
               {caso.urls_documentos?.length > 0 ? (
                 caso.urls_documentos.map((url, index) => {
                   // Tenta extrair o nome original do arquivo da URL ou usa o mapa de nomes
-                  const fileName = url.split("/").pop().split("?")[0];
-                  // Procura no mapa de nomes (se existir)
-                  // A chave no mapa pode ser o nome original do arquivo antes do upload
-                  // Como o backend renomeia, a correspondência exata pode ser difícil sem um ID.
-                  // Vamos tentar exibir o nome personalizado se encontrarmos uma chave parcial ou usar o índice.
+                  let fileName = url.split("/").pop().split("?")[0];
+                  fileName = decodeURIComponent(fileName);
 
-                  // Melhor abordagem: Iterar e exibir. Se tivermos metadados, usamos.
-                  // O backend salva em dados_formulario.document_names { "nome_original": "Classificacao" }
-                  // Mas aqui temos a URL assinada.
-                  // Vamos exibir o nome do arquivo limpo ou "Documento X"
+                  // Limpeza visual do nome: remove prefixos "complementar_" e timestamps numéricos
+                  fileName = fileName.replace(/^complementar_(\d+_)?/, "").replace(/^\d+_/, "");
+
                   const isComplementar = url.includes("complementar_");
 
                   return (
@@ -1107,10 +1103,10 @@ export const DetalhesCaso = () => {
                           isComplementar ? "font-medium text-indigo-900" : ""
                         }
                       >
-                        {decodeURIComponent(fileName)}
+                        {fileName}
                       </span>
                       {isComplementar && (
-                        <span className="ml-auto text-[10px] uppercase font-bold bg-indigo-200 text-indigo-700 px-2 py-0.5 rounded-full">
+                        <span className="ml-auto text-[10px] uppercase font-bold bg-indigo-200 text-special px-2 py-0.5 rounded-full">
                           Novo
                         </span>
                       )}
