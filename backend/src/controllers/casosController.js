@@ -3,6 +3,7 @@ import path from "path";
 import {
   generateCredentials,
   hashKeyWithSalt,
+  verifyKey,
 } from "../services/securityService.js";
 import fs from "fs/promises";
 import { extractTextFromImage } from "../services/documentService.js";
@@ -241,7 +242,7 @@ const attachSignedUrls = async (caso) => {
   return enriched;
 };
 
-const ensureText = (value, fallback = "[PREENCHER]") => {
+const ensureText = (value, fallback = "") => {
   if (value === null || value === undefined) return fallback;
   const text = String(value).trim();
   return text.length ? text : fallback;
@@ -1553,17 +1554,47 @@ export const resetarChaveAcesso = async (req, res) => {
 };
 export const receberDocumentosComplementares = async (req, res) => {
   const { id } = req.params;
-  const { nomes_arquivos } = req.body; // JSON string com os nomes personalizados
+  // Tenta pegar do body (FormData) ou da query string (URL) para garantir
+  const cpfRaw = req.body.cpf || req.query.cpf;
+  const cpf = cpfRaw ? String(cpfRaw).replace(/\D/g, "") : null;
+  const chave = req.body.chave || req.query.chave;
+  const { nomes_arquivos } = req.body;
 
   try {
-    // 1. Busca o caso atual
-    const { data: caso, error: fetchError } = await supabase
-      .from("casos")
-      .select("urls_documentos, dados_formulario, protocolo")
-      .eq("id", id)
-      .single();
+    logger.info(`[Upload Complementar] Iniciando. ID: ${id}, CPF recebido: ${!!cpf}, Chave recebida: ${!!chave}`);
 
-    if (fetchError || !caso) throw new Error("Caso não encontrado.");
+    let caso = null;
+
+    // 1. Tenta buscar por ID ou Protocolo na URL
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    const isInt = /^\d+$/.test(id) && id !== "0";
+
+    if (isUUID || isInt) {
+      const { data } = await supabase.from("casos").select("*").eq("id", id).single();
+      caso = data;
+    } else if (id !== "0") {
+      const { data } = await supabase.from("casos").select("*").eq("protocolo", id).single();
+      caso = data;
+    }
+
+    // 2. Fallback: Se não achou pelo ID (ex: frontend enviou 0), tenta por CPF + Chave
+    if (!caso) {
+      if (cpf && chave) {
+        // Busca todos os casos do CPF e verifica a chave em memória (pois o hash pode ser aleatório/bcrypt)
+        const { data: casosCpf } = await supabase
+          .from("casos")
+          .select("*")
+          .eq("cpf_assistido", cpf);
+
+        if (casosCpf && casosCpf.length > 0) {
+          caso = casosCpf.find((c) => verifyKey(chave, c.chave_acesso_hash));
+        }
+      } else {
+        logger.warn(`[Upload Complementar] Falha: ID inválido (${id}) e credenciais não fornecidas no corpo da requisição.`);
+      }
+    }
+
+    if (!caso) throw new Error("Caso não encontrado. Verifique se o CPF e a Chave estão corretos.");
 
     const novosUrls = [];
 
@@ -1618,14 +1649,14 @@ export const receberDocumentosComplementares = async (req, res) => {
         status: "documentos_entregues", // Novo status
         updated_at: new Date(),
       })
-      .eq("id", id);
+      .eq("id", caso.id);
 
     if (updateError) throw updateError;
 
     res.status(200).json({ message: "Documentos enviados com sucesso!" });
   } catch (error) {
     logger.error(`Erro upload complementar: ${error.message}`);
-    res.status(500).json({ error: "Falha ao enviar documentos." });
+    res.status(500).json({ error: error.message || "Falha ao enviar documentos." });
   }
 };
 

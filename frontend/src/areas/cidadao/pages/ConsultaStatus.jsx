@@ -78,23 +78,28 @@ export const ConsultaStatus = () => {
     const formData = new FormData();
     const namesMap = {};
 
+    // IMPORTANTE: Enviar campos de texto PRIMEIRO para garantir leitura correta no backend
+    formData.append("cpf", cpf.replace(/\D/g, ""));
+    formData.append("chave", chave.trim());
+
     files.forEach((item) => {
-      // Envia o arquivo
-      formData.append("documentos", item.file);
       // Mapeia o nome original para o nome personalizado
       namesMap[item.file.name] = item.customName;
     });
-
     formData.append("nomes_arquivos", JSON.stringify(namesMap));
 
+    // Envia os arquivos por último
+    files.forEach((item) => {
+      formData.append("documentos", item.file);
+    });
+
     try {
+      // Tenta usar ID ou Protocolo (fallback para evitar ID 0)
+      const identificador = caso.id || caso.protocolo || 0;
+
       const response = await fetch(
-        `${API_BASE}/casos/${caso.id || 0}/upload-complementar`,
+        `${API_BASE}/casos/${identificador}/upload-complementar?cpf=${cpf.replace(/\D/g, "")}&chave=${encodeURIComponent(chave.trim())}`,
         {
-          // Precisa do ID do caso, que não vem no endpoint público padrão às vezes.
-          // NOTA: O endpoint /status atual retorna dados limitados.
-          // O backend precisa retornar o ID do caso no statusController.js para isso funcionar.
-          // Vou assumir que o ID foi adicionado ao retorno do statusController.js
           method: "POST",
           body: formData,
         },
@@ -268,7 +273,8 @@ export const ConsultaStatus = () => {
                 )}
               </div>
             </div>
-          ) : caso.status === "aguardando_docs" ? (
+          ) : caso.status === "aguardando_docs" ||
+            caso.status === "documentos pendente" ? (
             // --- TELA DE PENDÊNCIA DE DOCUMENTOS ---
             <div className="space-y-6 mt-6">
               <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6">

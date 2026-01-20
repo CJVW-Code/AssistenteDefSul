@@ -25,7 +25,7 @@ export const consultarStatus = async (req, res) => {
     const { data: caso, error } = await supabase
       .from("casos")
       .select(
-        "status, chave_acesso_hash, nome_assistido, numero_processo, numero_solar, url_capa_processual, url_documento_gerado, agendamento_data, agendamento_link, agendamento_status"
+        "status, chave_acesso_hash, nome_assistido, numero_processo, numero_solar, url_capa_processual, url_documento_gerado, agendamento_data, agendamento_link, agendamento_status, descricao_pendencia"
       )
       .eq("cpf_assistido", cpfLimpo)
       .single(); // .single() garante que apenas um resultado seja retornado

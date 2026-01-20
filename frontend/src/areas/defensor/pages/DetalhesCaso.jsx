@@ -209,6 +209,33 @@ export const DetalhesCaso = () => {
     }
   }, [caso, feedbackInitialized]);
 
+  const handleSalvarPendencia = async () => {
+    setIsUpdating(true);
+    try {
+      const response = await fetch(`${API_BASE}/casos/${id}/status`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          status: "aguardando_docs",
+          descricao_pendencia: pendenciaTexto,
+        }),
+      });
+
+      if (!response.ok) throw new Error("Falha ao atualizar pendência.");
+
+      const casoAtualizado = await response.json();
+      setCaso(casoAtualizado);
+      toast.success("Descrição da pendência salva!");
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   const handleStatusChange = async (novoStatus) => {
     if (!caso || !novoStatus || novoStatus === caso.status) return;
 
@@ -1217,9 +1244,18 @@ export const DetalhesCaso = () => {
                   value={pendenciaTexto}
                   onChange={(e) => setPendenciaTexto(e.target.value)}
                 />
-                <p className="text-xs text-purple-600">
-                  Este texto aparecerá para o assistido na consulta.
-                </p>
+                <div className="flex justify-between items-center">
+                  <p className="text-xs text-purple-600">
+                    Este texto aparecerá para o assistido na consulta.
+                  </p>
+                  <button
+                    onClick={handleSalvarPendencia}
+                    disabled={isUpdating}
+                    className="btn btn-sm bg-purple-600 hover:bg-purple-700 text-white border-none"
+                  >
+                    {isUpdating ? "Salvando..." : "Salvar Descrição"}
+                  </button>
+                </div>
               </div>
             )}
             

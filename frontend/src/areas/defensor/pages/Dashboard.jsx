@@ -76,13 +76,13 @@ export const Dashboard = () => {
   const resumo = useMemo(() => {
     const total = casos.length;
     const encaminhadosSolar = casos.filter(
-      (caso) => normalizeStatus(caso.status) === "encaminhado_solar"
+      (caso) => normalizeStatus(caso.status) === "encaminhado_solar",
     ).length;
     const aguardandoDocs = casos.filter(
-      (caso) => normalizeStatus(caso.status) === "aguardando_docs"
+      (caso) => normalizeStatus(caso.status) === "aguardando_docs",
     ).length;
     const emAnalise = casos.filter(
-      (caso) => normalizeStatus(caso.status) === "em_analise"
+      (caso) => normalizeStatus(caso.status) === "em_analise",
     ).length;
     const ativos = total - encaminhadosSolar;
     return { total, encaminhadosSolar, aguardandoDocs, emAnalise, ativos };
@@ -124,7 +124,7 @@ export const Dashboard = () => {
 
   const casosRecentes = useMemo(
     () => filteredCasos.slice(0, 6),
-    [filteredCasos]
+    [filteredCasos],
   );
   const ultimaAtualizacao = casos[0]?.created_at
     ? new Date(casos[0].created_at).toLocaleString("pt-BR", {
@@ -170,7 +170,8 @@ export const Dashboard = () => {
               Painel atualizado
             </p>
             <h1 className="heading-hero mt-2">
-              Olá, Dr(a). {defensor?.nome || "Defensor"}
+              Olá, {defensor?.cargo === "defensor" ? "Dr(a). " : ""}
+              {defensor?.nome || "Usuário"}
             </h1>
             <p className="text-white/80 max-w-2xl mt-2">
               Acompanhe os casos recebidos pelo Assistente Def Sul, identifique
@@ -392,7 +393,7 @@ export const Dashboard = () => {
                             {
                               day: "2-digit",
                               month: "short",
-                            }
+                            },
                           )}
                         </div>
                       </div>
