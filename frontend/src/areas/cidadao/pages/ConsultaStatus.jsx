@@ -277,14 +277,14 @@ export const ConsultaStatus = () => {
             caso.status === "documentos pendente" ? (
             // --- TELA DE PENDÊNCIA DE DOCUMENTOS ---
             <div className="space-y-6 mt-6">
-              <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6">
-                <div className="flex items-center gap-3 mb-3 text-yellow-700">
+              <div className="bg-bg border border-border rounded-xl p-6">
+                <div className="flex items-center gap-3 mb-3 text">
                   <AlertTriangle size={24} />
                   <h3 className="text-lg font-bold">
                     Ação Necessária: Documentos Pendentes
                   </h3>
                 </div>
-                <div className="bg-white p-4 rounded border border-yellow-100 text-sm whitespace-pre-wrap font-medium text-slate-700">
+                <div className="bg-bg p-4 rounded border border-border text-sm whitespace-pre-wrap font-medium text">
                   {caso.descricao_pendencia ||
                     "O defensor solicitou documentos adicionais. Por favor, anexe abaixo."}
                 </div>

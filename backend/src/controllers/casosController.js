@@ -1,4 +1,4 @@
-﻿﻿﻿﻿import { supabase } from "../config/supabase.js";
+﻿﻿﻿import { supabase } from "../config/supabase.js";
 import path from "path";
 import {
   generateCredentials,
@@ -7,7 +7,10 @@ import {
 } from "../services/securityService.js";
 import fs from "fs/promises";
 import { extractTextFromImage } from "../services/documentService.js";
-import { generateDocx, generateTermoDeclaracao } from "../services/documentGenerationService.js";
+import {
+  generateDocx,
+  generateTermoDeclaracao,
+} from "../services/documentGenerationService.js";
 import { analyzeCase, generateDosFatos } from "../services/geminiService.js";
 import { getVaraByTipoAcao } from "../config/varasMapping.js";
 import logger from "../utils/logger.js";
@@ -16,7 +19,7 @@ import { Client } from "@upstash/qstash";
 // Tempo de expiração (em segundos) para URLs assinadas do Supabase
 const signedExpires = Number.parseInt(
   process.env.SIGNED_URL_EXPIRES || "86400",
-  10
+  10,
 );
 
 const storageBuckets = {
@@ -26,7 +29,7 @@ const storageBuckets = {
 };
 
 const salarioMinimoAtual = Number.parseFloat(
-  process.env.SALARIO_MINIMO_ATUAL || "1621"
+  process.env.SALARIO_MINIMO_ATUAL || "1621",
 );
 
 // --- UTILS DE FORMATAÇÃO E PARSE ---
@@ -204,7 +207,7 @@ const buildSignedUrl = async (bucket, storedValue) => {
   if (error) {
     if (error.message && error.message.includes("Object not found")) {
       logger.warn(
-        `[Storage] Arquivo ausente (Link órfão no Banco): ${objectPath}`
+        `[Storage] Arquivo ausente (Link órfão no Banco): ${objectPath}`,
       );
     } else {
       logger.error(`[Storage] Erro ao gerar URL para ${objectPath}:`, {
@@ -232,8 +235,8 @@ const attachSignedUrls = async (caso) => {
   if (Array.isArray(caso.urls_documentos) && caso.urls_documentos.length) {
     const signedDocs = await Promise.all(
       caso.urls_documentos.map((value) =>
-        buildSignedUrl(storageBuckets.documentos, value)
-      )
+        buildSignedUrl(storageBuckets.documentos, value),
+      ),
     );
     enriched.urls_documentos = signedDocs.filter(Boolean);
   } else {
@@ -302,7 +305,7 @@ const formatCurrencyBr = (value) => {
 
 const buildFallbackDosFatos = (caseData = {}) => {
   const safe = (value) =>
-    typeof value === "string" ? value.trim() : value ?? "";
+    typeof value === "string" ? value.trim() : (value ?? "");
   const paragraphs = [];
   const assistidoNome =
     safe(caseData.nome_assistido) ||
@@ -327,14 +330,14 @@ const buildFallbackDosFatos = (caseData = {}) => {
       ? `relata que ${requeridoNome} não contribui de forma regular para o custeio das despesas básicas`
       : "relata a ausência de contribuição regular da outra parte para o custeio das despesas básicas";
     paragraphs.push(
-      `${sujeito} ${complemento}, razão pela qual busca a tutela jurisdicional para garantir a subsistência da criança.`
+      `${sujeito} ${complemento}, razão pela qual busca a tutela jurisdicional para garantir a subsistência da criança.`,
     );
   }
   if (safe(caseData.descricao_guarda)) {
     paragraphs.push(
       `A guarda fática atualmente é descrita da seguinte forma: ${safe(
-        caseData.descricao_guarda
-      )}.`
+        caseData.descricao_guarda,
+      )}.`,
     );
   }
   const situacaoAssistido = [
@@ -346,14 +349,14 @@ const buildFallbackDosFatos = (caseData = {}) => {
     .join(" ");
   if (situacaoAssistido) {
     paragraphs.push(
-      `Sobre a realidade econômica de quem assume as despesas, informa-se que ${situacaoAssistido}.`
+      `Sobre a realidade econômica de quem assume as despesas, informa-se que ${situacaoAssistido}.`,
     );
   }
   if (safe(caseData.dados_adicionais_requerido)) {
     paragraphs.push(
       `Quanto ao requerido, destacam-se os seguintes elementos: ${safe(
-        caseData.dados_adicionais_requerido
-      )}.`
+        caseData.dados_adicionais_requerido,
+      )}.`,
     );
   }
   const valorPretendido =
@@ -369,7 +372,7 @@ const buildFallbackDosFatos = (caseData = {}) => {
       }` +
         (diaPagamento
           ? `, com vencimento no dia ${diaPagamento} de cada mês.`
-          : ".")
+          : "."),
     );
   }
   if (safe(caseData.relato_texto)) {
@@ -383,11 +386,11 @@ const buildFallbackDosFatos = (caseData = {}) => {
     paragraphs.push(
       `Os fatos narrados encontram respaldo nos documentos informados no formulário, tais como ${resumoDocs}${
         documentosInformados.length > 3 ? ", entre outros" : ""
-      }.`
+      }.`,
     );
   } else {
     paragraphs.push(
-      "A narrativa será complementada com a documentação que acompanha o formulário e eventuais provas a serem juntadas posteriormente."
+      "A narrativa será complementada com a documentação que acompanha o formulário e eventuais provas a serem juntadas posteriormente.",
     );
   }
   return paragraphs.filter(Boolean).join("\n\n");
@@ -396,17 +399,18 @@ const buildFallbackDosFatos = (caseData = {}) => {
 const buildDocxTemplatePayload = (
   normalizedData,
   dosFatosTexto,
-  baseData = {}
+  baseData = {},
 ) => {
   const normalizeGenderTerm = (val) => {
-    if (!val || typeof val !== 'string') return val;
+    if (!val || typeof val !== "string") return val;
     const lower = val.toLowerCase().trim();
-    if (lower.includes('brasileir')) return 'brasileiro(a)';
-    if (lower.includes('solteir')) return 'solteiro(a)';
-    if (lower.includes('casad')) return 'casado(a)';
-    if (lower.includes('divorciad')) return 'divorciado(a)';
-    if (lower.includes('viúv') || lower.includes('viuv')) return 'viúvo(a)';
-    if (lower.includes('união estável') || lower.includes('uniao estavel')) return 'união estável';
+    if (lower.includes("brasileir")) return "brasileiro(a)";
+    if (lower.includes("solteir")) return "solteiro(a)";
+    if (lower.includes("casad")) return "casado(a)";
+    if (lower.includes("divorciad")) return "divorciado(a)";
+    if (lower.includes("viúv") || lower.includes("viuv")) return "viúvo(a)";
+    if (lower.includes("união estável") || lower.includes("uniao estavel"))
+      return "união estável";
     return val;
   };
 
@@ -416,10 +420,10 @@ const buildDocxTemplatePayload = (
   const calcularIdade = (dataNascString) => {
     if (!dataNascString) return null;
     let nascimento;
-    if (dataNascString.includes('/')) {
-      const [dia, mes, ano] = dataNascString.split('/');
+    if (dataNascString.includes("/")) {
+      const [dia, mes, ano] = dataNascString.split("/");
       nascimento = new Date(`${ano}-${mes}-${dia}T00:00:00`);
-    } else if (dataNascString.includes('-')) {
+    } else if (dataNascString.includes("-")) {
       nascimento = new Date(`${dataNascString}T00:00:00`);
     } else {
       return null;
@@ -437,20 +441,42 @@ const buildDocxTemplatePayload = (
   };
 
   // 2. Unifica todos os filhos (principal + outros) em uma única lista
-  const rawDetails = baseData.outros_filhos_detalhes || baseData.dados_formulario?.outros_filhos_detalhes;
+  const rawDetails =
+    baseData.outros_filhos_detalhes ||
+    baseData.dados_formulario?.outros_filhos_detalhes;
   const outrosFilhosRaw = rawDetails
-    ? (typeof rawDetails === 'string' ? JSON.parse(rawDetails) : rawDetails)
+    ? typeof rawDetails === "string"
+      ? JSON.parse(rawDetails)
+      : rawDetails
     : [];
 
   const filhoPrincipal = {
-    nome: ensureText(baseData.nome || baseData.nome_assistido || normalizedData.requerente_nome),
-    cpf: ensureText(baseData.cpf || baseData.cpf_assistido || normalizedData.requerente_cpf),
-    nascimento: ensureText(formatDateBr(baseData.assistido_data_nascimento || baseData.dataNascimentoAssistido || baseData.dados_formulario?.assistido_data_nascimento)),
-    rg: ensureText(baseData.assistido_rg_numero ? `${baseData.assistido_rg_numero} ${baseData.assistido_rg_orgao}` : ""),
-    nacionalidade: ensureText(normalizeGenderTerm(baseData.assistido_nacionalidade)),
+    nome: ensureText(
+      baseData.nome ||
+        baseData.nome_assistido ||
+        normalizedData.requerente_nome,
+    ),
+    cpf: ensureText(
+      baseData.cpf || baseData.cpf_assistido || normalizedData.requerente_cpf,
+    ),
+    nascimento: ensureText(
+      formatDateBr(
+        baseData.assistido_data_nascimento ||
+          baseData.dataNascimentoAssistido ||
+          baseData.dados_formulario?.assistido_data_nascimento,
+      ),
+    ),
+    rg: ensureText(
+      baseData.assistido_rg_numero
+        ? `${baseData.assistido_rg_numero} ${baseData.assistido_rg_orgao}`
+        : "",
+    ),
+    nacionalidade: ensureText(
+      normalizeGenderTerm(baseData.assistido_nacionalidade),
+    ),
   };
 
-  const irmaos = outrosFilhosRaw.map(f => ({
+  const irmaos = outrosFilhosRaw.map((f) => ({
     nome: ensureText(f.nome),
     cpf: ensureText(f.cpf),
     nascimento: ensureText(formatDateBr(f.dataNascimento)),
@@ -460,41 +486,46 @@ const buildDocxTemplatePayload = (
 
   // Filtra para garantir que não há entradas vazias e converte nomes para maiúsculo
   const lista_filhos = [filhoPrincipal, ...irmaos]
-    .filter(f => f.nome && f.nome !== "[PREENCHER]")
-    .map(f => ({ ...f, nome: f.nome.toUpperCase() }));
+    .filter((f) => f.nome && f.nome !== "[PREENCHER]")
+    .map((f) => ({ ...f, nome: f.nome.toUpperCase() }));
 
   // 3. Monta o texto corrido para qualificação dos filhos
   const texto_qualificacao_filhos = lista_filhos
-    .map(f => {
-      const rgPart = f.rg !== "[PREENCHER]" ? `, portador(a) do RG nº ${f.rg}` : "";
-      const nacPart = f.nacionalidade !== "[PREENCHER]" ? `, ${f.nacionalidade}` : "";
+    .map((f) => {
+      const rgPart =
+        f.rg !== "[PREENCHER]" ? `, portador(a) do RG nº ${f.rg}` : "";
+      const nacPart =
+        f.nacionalidade !== "[PREENCHER]" ? `, ${f.nacionalidade}` : "";
       return `${f.nome}${nacPart}, nascido(a) em ${f.nascimento}, inscrito(a) no CPF nº ${f.cpf}${rgPart}`;
     })
     .join("; e ");
 
   // 4. Lógica de Concordância (ECA + Código Civil + Pedido do Usuário)
-  const idades = lista_filhos.map(f => calcularIdade(f.nascimento)).filter(age => age !== null);
+  const idades = lista_filhos
+    .map((f) => calcularIdade(f.nascimento))
+    .filter((age) => age !== null);
   const isPlural = lista_filhos.length > 1;
-  const temMenorDe16 = idades.some(idade => idade < 16);
-  const temEntre16e18 = idades.some(idade => idade >= 16 && idade < 18);
+  const temMenorDe16 = idades.some((idade) => idade < 16);
+  const temEntre16e18 = idades.some((idade) => idade >= 16 && idade < 18);
 
   // Termo "incapaz" ou "incapazes"
   const termo_incapaz = isPlural ? "incapazes" : "incapaz";
-  
+
   // Termo de representação/assistência
   let termo_representacao = "";
   if (isPlural) {
-      if (temMenorDe16 && temEntre16e18) {
-          termo_representacao = "neste ato representados e assistidos";
-      } else if (temEntre16e18) {
-          termo_representacao = "neste ato assistidos";
-      } else { // Implícito que só tem menores de 16 ou a lista está vazia
-          termo_representacao = "neste ato representados";
-      }
-  } else if (idades.length === 1) { // Singular
-      termo_representacao = idades[0] < 16
-        ? "neste ato representado(a)" 
-        : "neste ato assistido(a)";
+    if (temMenorDe16 && temEntre16e18) {
+      termo_representacao = "neste ato representados e assistidos";
+    } else if (temEntre16e18) {
+      termo_representacao = "neste ato assistidos";
+    } else {
+      // Implícito que só tem menores de 16 ou a lista está vazia
+      termo_representacao = "neste ato representados";
+    }
+  } else if (idades.length === 1) {
+    // Singular
+    termo_representacao =
+      idades[0] < 16 ? "neste ato representado(a)" : "neste ato assistido(a)";
   }
 
   // --- FIM DA LÓGICA DE FILHOS ---
@@ -509,27 +540,38 @@ const buildDocxTemplatePayload = (
   const cidadeAssinatura =
     baseData.cidade_assinatura || normalizedData.cidadeDataAssinatura;
   const valorCausaNumero = calcularValorCausa(
-    baseData.valor_mensal_pensao || baseData.valor_pensao || 0
+    baseData.valor_mensal_pensao || baseData.valor_pensao || 0,
   );
   const valorCausaCalculado = formatCurrencyBr(valorCausaNumero);
   const valorCausaExtenso = numeroParaExtenso(valorCausaNumero);
   const percentualDefinitivoBase =
-    baseData.percentual_definitivo_salario_min ||
     baseData.percentual_salario_minimo ||
+    baseData.percentual_definitivo_salario_min ||
     baseData.percentual_ou_valor_fixado ||
     "";
   const percentualExtras = baseData.percentual_definitivo_extras || "0";
+  const percentualProvisorioBase =
+    baseData.percentual_provisorio_salario_min ||
+    baseData.percentual_salario_minimo ||
+    baseData.percentual_ou_valor_fixado ||
+    "";
   const diaPagamentoBase =
     baseData.dia_pagamento_fixado || baseData.dia_pagamento_requerido;
-  const assistidoNome = lista_filhos.length > 0 ? lista_filhos.map(f => f.nome).join(', ') : (baseData.nome_assistido || requerente.nome);
+  const assistidoNome =
+    lista_filhos.length > 0
+      ? lista_filhos.map((f) => f.nome).join(", ")
+      : baseData.nome_assistido || requerente.nome;
   const assistidoCpf = baseData.cpf_assistido || requerente.cpf;
   const dadosBancarios = baseData.dados_bancarios_deposito;
   const executadoEndereco =
     baseData.endereco_requerido || requerido.endereco || "";
   // Usa o primeiro filho da lista para o campo de data de nascimento principal, se aplicável
-  const dataNascimentoAssistidoBr = lista_filhos.length > 0
-    ? lista_filhos[0].nascimento
-    : formatDateBr(baseData.assistido_data_nascimento || requerente.dataNascimento);
+  const dataNascimentoAssistidoBr =
+    lista_filhos.length > 0
+      ? lista_filhos[0].nascimento
+      : formatDateBr(
+          baseData.assistido_data_nascimento || requerente.dataNascimento,
+        );
 
   const payload = {
     ...baseData,
@@ -537,7 +579,7 @@ const buildDocxTemplatePayload = (
     texto_qualificacao_filhos,
     termo_incapaz,
     termo_representacao,
-    
+
     vara: ensureText(varaPreferida),
     comarca: ensureText(normalizedData.comarca),
     triagemNumero: ensureText(normalizedData.triagemNumero),
@@ -545,7 +587,7 @@ const buildDocxTemplatePayload = (
     processoTituloNumero: ensureText(baseData.processo_titulo_numero),
     requerente_nome: ensureText(assistidoNome).toUpperCase(),
     requerente_incapaz_sim_nao: ensureText(
-      baseData.assistido_eh_incapaz || "nao"
+      baseData.assistido_eh_incapaz || "nao",
     ),
     requerente_dataNascimento: ensureText(dataNascimentoAssistidoBr),
     requerente_data_nascimento: ensureText(dataNascimentoAssistidoBr),
@@ -553,10 +595,14 @@ const buildDocxTemplatePayload = (
     requerente_rg: ensureText(
       baseData.assistido_rg_numero
         ? `${baseData.assistido_rg_numero} ${baseData.assistido_rg_orgao}`
-        : ""
+        : "",
     ),
-    requerente_nacionalidade: ensureText(normalizeGenderTerm(baseData.assistido_nacionalidade)),
-    requerente_estado_civil: ensureText(normalizeGenderTerm(baseData.assistido_estado_civil)),
+    requerente_nacionalidade: ensureText(
+      normalizeGenderTerm(baseData.assistido_nacionalidade),
+    ),
+    requerente_estado_civil: ensureText(
+      normalizeGenderTerm(baseData.assistido_estado_civil),
+    ),
     requerente_ocupacao: ensureText(baseData.assistido_ocupacao),
     requerente_email: ensureText(baseData.email_assistido),
     requerente_telefone: ensureText(baseData.telefone_assistido),
@@ -564,51 +610,60 @@ const buildDocxTemplatePayload = (
     requerente_representante: ensureText(requerente.representante),
     representante_nome: ensureText(baseData.representante_nome).toUpperCase(),
     representante_nacionalidade: ensureInlineValue(
-      normalizeGenderTerm(baseData.representante_nacionalidade)
+      normalizeGenderTerm(baseData.representante_nacionalidade),
     ),
     representante_estado_civil: ensureInlineValue(
-      normalizeGenderTerm(baseData.representante_estado_civil)
+      normalizeGenderTerm(baseData.representante_estado_civil),
     ),
     representante_ocupacao: ensureText(baseData.representante_ocupacao),
     representante_cpf: ensureText(baseData.representante_cpf),
     representante_rg: ensureText(
       baseData.representante_rg_numero
         ? `${baseData.representante_rg_numero} ${baseData.representante_rg_orgao}`
-        : ""
+        : "",
     ),
     representante_endereco_residencial: ensureText(
-      baseData.representante_endereco_residencial
+      baseData.representante_endereco_residencial,
     ),
     representante_endereco_profissional: ensureText(
-      baseData.representante_endereco_profissional
+      baseData.representante_endereco_profissional,
     ),
     representante_email: ensureText(baseData.representante_email),
     representante_telefone: ensureText(baseData.representante_telefone),
     exequente_nome: ensureText(assistidoNome),
     exequente_incapaz_sim_nao: ensureText(
-      baseData.assistido_eh_incapaz || "nao"
+      baseData.assistido_eh_incapaz || "nao",
     ),
     exequente_data_nascimento: ensureText(dataNascimentoAssistidoBr),
     exequente_cpf: ensureText(assistidoCpf),
     exequente_representante: ensureText(requerente.representante),
-    executado_nome: ensureText(baseData.nome_requerido || requerido.nome).toUpperCase(),
+    executado_nome: ensureText(
+      baseData.nome_requerido || requerido.nome,
+    ).toUpperCase(),
     executado_cpf: ensureText(baseData.cpf_requerido || requerido.cpf),
-    requerido_nome: ensureText(baseData.nome_requerido || requerido.nome).toUpperCase(),
+    requerido_nome: ensureText(
+      baseData.nome_requerido || requerido.nome,
+    ).toUpperCase(),
     requerido_cpf: ensureText(baseData.cpf_requerido || requerido.cpf),
-    executado_nacionalidade: ensureText(normalizeGenderTerm(baseData.requerido_nacionalidade)),
-    executado_estado_civil: ensureText(normalizeGenderTerm(baseData.requerido_estado_civil)),
+    executado_nacionalidade: ensureText(
+      normalizeGenderTerm(baseData.requerido_nacionalidade),
+    ),
+    executado_estado_civil: ensureText(
+      normalizeGenderTerm(baseData.requerido_estado_civil),
+    ),
     executado_ocupacao: ensureText(baseData.requerido_ocupacao),
     executado_endereco_residencial: ensureText(executadoEndereco),
     requerido_endereco_residencial: ensureText(executadoEndereco),
     executado_endereco_profissional: ensureText(
-      baseData.requerido_endereco_profissional
+      baseData.requerido_endereco_profissional,
     ),
     executado_email: ensureText(baseData.requerido_email),
     executado_telefone: ensureText(baseData.requerido_telefone),
     valor_pensao: ensureText(baseData.valor_pensao),
     percentual_definitivo_salario_min: ensureText(percentualDefinitivoBase),
+    percentual_provisorio_salario_min: ensureText(percentualProvisorioBase),
     percentual_definitivo_extras: ensureText(
-      baseData.percentual_definitivo_extras
+      baseData.percentual_definitivo_extras,
     ),
     dia_pagamento: ensureText(diaPagamentoBase),
     periodo_meses_ano: ensureText(baseData.periodo_debito_execucao),
@@ -620,7 +675,7 @@ const buildDocxTemplatePayload = (
     dados_bancarios_requerente: ensureText(dadosBancarios),
     empregador_nome: ensureText(baseData.empregador_requerido_nome),
     empregador_endereco_profissional: ensureText(
-      baseData.empregador_requerido_endereco
+      baseData.empregador_requerido_endereco,
     ),
     empregador_email: ensureText(baseData.empregador_email),
     cidadeDataAssinatura: ensureText(cidadeAssinatura),
@@ -629,12 +684,12 @@ const buildDocxTemplatePayload = (
     valor_causa: ensureText(valorCausaCalculado),
     valor_causa_extenso: ensureText(valorCausaExtenso),
     dados_adicionais_requerente: ensureText(
-      sanitizeInlineText(baseData.dados_adicionais_requerente)
+      sanitizeInlineText(baseData.dados_adicionais_requerente),
     ),
     percentual_despesas_extras: ensureText(
       baseData.percentual_despesas_extras ||
         baseData.percentual_definitivo_extras ||
-        percentualExtras
+        percentualExtras,
     ),
     dos_fatos:
       ensureText(dosFatosTexto, "[DESCREVER OS FATOS]") ||
@@ -716,7 +771,7 @@ export async function processarCasoEmBackground(
   dados_formulario,
   urls_documentos,
   url_audio,
-  url_peticao
+  url_peticao,
 ) {
   try {
     await supabase
@@ -744,7 +799,7 @@ export async function processarCasoEmBackground(
 
           if (downloadError) {
             throw new Error(
-              `Erro no download do arquivo ${docPath}: ${downloadError.message}`
+              `Erro no download do arquivo ${docPath}: ${downloadError.message}`,
             );
           }
 
@@ -771,33 +826,33 @@ export async function processarCasoEmBackground(
 
     // Formatação de Dados
     const formattedAssistidoNascimento = formatDateBr(
-      dados_formulario.assistido_data_nascimento
+      dados_formulario.assistido_data_nascimento,
     );
     const formattedDataInicioRelacao = formatDateBr(
-      dados_formulario.data_inicio_relacao
+      dados_formulario.data_inicio_relacao,
     );
     const formattedDataSeparacao = formatDateBr(
-      dados_formulario.data_separacao
+      dados_formulario.data_separacao,
     );
     const formattedDiaPagamentoRequerido = formatDateBr(
-      dados_formulario.dia_pagamento_requerido
+      dados_formulario.dia_pagamento_requerido,
     );
     const formattedDiaPagamentoFixado = formatDateBr(
-      dados_formulario.dia_pagamento_fixado
+      dados_formulario.dia_pagamento_fixado,
     );
     const formattedValorPensao = formatCurrencyBr(
-      dados_formulario.valor_mensal_pensao
+      dados_formulario.valor_mensal_pensao,
     );
     // [CORREÇÃO] Calculando o valor formatado que faltava
     const formattedValorTotalDebitoExecucao = formatCurrencyBr(
-      dados_formulario.valor_total_debito_execucao
+      dados_formulario.valor_total_debito_execucao,
     );
     const percentualSalarioMinimoCalculado = calcularPercentualSalarioMinimo(
-      dados_formulario.valor_mensal_pensao
+      dados_formulario.valor_mensal_pensao,
     );
 
     const documentosInformadosArray = JSON.parse(
-      dados_formulario.documentos_informados || "[]"
+      dados_formulario.documentos_informados || "[]",
     );
     const varaMapeada = getVaraByTipoAcao(dados_formulario.tipoAcao);
     const varaAutomatica =
@@ -866,11 +921,15 @@ export async function processarCasoEmBackground(
       valor_debito_extenso: dados_formulario.valor_debito_extenso,
       percentual_definitivo_salario_min:
         dados_formulario.percentual_definitivo_salario_min,
+      percentual_provisorio_salario_min:
+        dados_formulario.percentual_provisorio_salario_min,
       percentual_definitivo_extras:
         dados_formulario.percentual_definitivo_extras,
       valor_pensao: formattedValorPensao,
       valor_mensal_pensao: dados_formulario.valor_mensal_pensao,
       percentual_salario_minimo: percentualSalarioMinimoCalculado,
+      salario_minimo_atual: salarioMinimoAtual,
+      salario_minimo_formatado: formatCurrencyBr(salarioMinimoAtual),
       dia_pagamento_requerido: formattedDiaPagamentoRequerido,
       dados_bancarios_deposito: dados_formulario.dados_bancarios_deposito,
       requerido_tem_emprego_formal:
@@ -892,7 +951,7 @@ export async function processarCasoEmBackground(
     };
 
     const caseDataForPetition = sanitizeCaseDataInlineFields(
-      caseDataForPetitionRaw
+      caseDataForPetitionRaw,
     );
 
     try {
@@ -904,17 +963,20 @@ export async function processarCasoEmBackground(
 
     // Gerar DOCX
     let url_documento_gerado = null;
-    const normalizedData = { 
-      comarca: process.env.DEFENSORIA_DEFAULT_COMARCA || "Teixeira de Freitas/BA",
-      defensoraNome: process.env.DEFENSORIA_DEFAULT_DEFENSORA || "DEFENSOR(A) PÚBLICO(A) DO ESTADO DA BAHIA",
-      triagemNumero: protocolo
+    const normalizedData = {
+      comarca:
+        process.env.DEFENSORIA_DEFAULT_COMARCA || "Teixeira de Freitas/BA",
+      defensoraNome:
+        process.env.DEFENSORIA_DEFAULT_DEFENSORA ||
+        "DEFENSOR(A) PÚBLICO(A) DO ESTADO DA BAHIA",
+      triagemNumero: protocolo,
     };
 
     try {
       const docxData = buildDocxTemplatePayload(
         normalizedData,
         dosFatosTexto,
-        caseDataForPetition
+        caseDataForPetition,
       );
       const docxBuffer = await generateDocx(docxData);
       const docxPath = `${protocolo}/peticao_inicial_${protocolo}.docx`;
@@ -934,7 +996,11 @@ export async function processarCasoEmBackground(
 
     // Gerar texto completo para backup/visualização
     const peticao_completa_texto = gerarTextoCompletoPeticao(
-      buildDocxTemplatePayload(normalizedData, dosFatosTexto, caseDataForPetition)
+      buildDocxTemplatePayload(
+        normalizedData,
+        dosFatosTexto,
+        caseDataForPetition,
+      ),
     );
 
     // Finalizar processamento
@@ -1153,7 +1219,9 @@ export const listarCasos = async (req, res) => {
 
     // Se o CPF for fornecido na query, filtra por ele
     if (cpf) {
-      query = query.eq("cpf_assistido", cpf);
+      query = query.or(
+        `cpf_assistido.eq.${cpf},dados_formulario->>representante_cpf.eq.${cpf}`,
+      );
     }
 
     // Ordena os resultados
@@ -1238,7 +1306,8 @@ export const regenerarDosFatos = async (req, res) => {
     // Restrição: Apenas administradores podem regenerar os fatos
     if (!req.user || req.user.cargo !== "admin") {
       return res.status(403).json({
-        error: "Acesso negado. Apenas administradores podem regenerar os fatos.",
+        error:
+          "Acesso negado. Apenas administradores podem regenerar os fatos.",
       });
     }
 
@@ -1269,7 +1338,8 @@ export const gerarTermoDeclaracao = async (req, res) => {
     // Restrição: Apenas administradores podem gerar ou regerar o termo
     if (!req.user || req.user.cargo !== "admin") {
       return res.status(403).json({
-        error: "Acesso negado. Apenas administradores podem realizar esta operação.",
+        error:
+          "Acesso negado. Apenas administradores podem realizar esta operação.",
       });
     }
 
@@ -1289,16 +1359,25 @@ export const gerarTermoDeclaracao = async (req, res) => {
       representante_nome: (dados.representante_nome || "").toUpperCase(),
       cpf_assistido: dados.cpf || caso.cpf_assistido,
       relato_texto: (caso.relato_texto || "").replace(/\n/g, "\r\n"),
-      filhos_info: (dados.filhos_info || dados.nome || caso.nome_assistido || "").toUpperCase(),
+      filhos_info: (
+        dados.filhos_info ||
+        dados.nome ||
+        caso.nome_assistido ||
+        ""
+      ).toUpperCase(),
       data_atual: new Date().toLocaleDateString("pt-BR"),
       protocolo: caso.protocolo,
       tipo_acao: caso.tipo_acao,
       // Helpers para o template .docx
-      eh_representacao: dados.assistido_eh_incapaz === 'sim',
-      endereco_assistido: dados.endereco_assistido || dados.representante_endereco_residencial,
+      eh_representacao: dados.assistido_eh_incapaz === "sim",
+      endereco_assistido:
+        dados.endereco_assistido || dados.representante_endereco_residencial,
       telefone_assistido: dados.telefone || caso.telefone_assistido,
-      profissao: dados.assistido_ocupacao || dados.representante_ocupacao || "Não informada",
-      estado_civil: dados.assistido_estado_civil || "Não informado"
+      profissao:
+        dados.assistido_ocupacao ||
+        dados.representante_ocupacao ||
+        "Não informada",
+      estado_civil: dados.assistido_estado_civil || "Não informado",
     };
 
     // Generate the term declaration document
@@ -1313,12 +1392,15 @@ export const gerarTermoDeclaracao = async (req, res) => {
     const { error: uploadError } = await supabase.storage
       .from("peticoes")
       .upload(termoPath, docxBuffer, {
-        contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        contentType:
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         upsert: true,
       });
 
     if (uploadError) {
-      logger.error(`Erro ao fazer upload do termo de declaração: ${uploadError.message}`);
+      logger.error(
+        `Erro ao fazer upload do termo de declaração: ${uploadError.message}`,
+      );
       throw new Error("Falha ao salvar o termo de declaração");
     }
 
@@ -1331,7 +1413,10 @@ export const gerarTermoDeclaracao = async (req, res) => {
     if (updateError) throw updateError;
 
     // Return the updated case with signed URL
-    const casoAtualizado = await attachSignedUrls({ ...caso, url_termo_declaracao: termoPath });
+    const casoAtualizado = await attachSignedUrls({
+      ...caso,
+      url_termo_declaracao: termoPath,
+    });
     res.status(200).json(casoAtualizado);
   } catch (error) {
     logger.error(`Erro ao gerar termo de declaração: ${error.message}`);
@@ -1358,25 +1443,49 @@ export const regerarMinuta = async (req, res) => {
     if (error || !caso) throw new Error("Caso não encontrado");
 
     // 1. Prepara os dados baseados no estado atual do caso no banco
-    const dosFatosTexto = (caso.peticao_inicial_rascunho || "").replace("DOS FATOS\n\n", "");
-    
-    const normalizedData = { 
-      comarca: process.env.DEFENSORIA_DEFAULT_COMARCA || "Teixeira de Freitas/BA",
-      defensoraNome: process.env.DEFENSORIA_DEFAULT_DEFENSORA || "DEFENSOR(A) PÚBLICO(A) DO ESTADO DA BAHIA",
-      triagemNumero: caso.protocolo
+    const dosFatosTexto = (caso.peticao_inicial_rascunho || "").replace(
+      "DOS FATOS\n\n",
+      "",
+    );
+
+    const normalizedData = {
+      comarca:
+        process.env.DEFENSORIA_DEFAULT_COMARCA || "Teixeira de Freitas/BA",
+      defensoraNome:
+        process.env.DEFENSORIA_DEFAULT_DEFENSORA ||
+        "DEFENSOR(A) PÚBLICO(A) DO ESTADO DA BAHIA",
+      triagemNumero: caso.protocolo,
     };
 
-    // 2. Gera o novo payload e o buffer do Word
-    const payload = buildDocxTemplatePayload(normalizedData, dosFatosTexto, caso.dados_formulario || caso);
+    // 2. Prepara os dados do formulário com o percentual recalculado e salário mínimo correto
+    const baseData = caso.dados_formulario || caso;
+    const valorMensalPensao = baseData.valor_mensal_pensao;
+    const percentualSalarioMinimoCalculado = calcularPercentualSalarioMinimo(valorMensalPensao);
+
+    // Adiciona o percentual calculado e o salário mínimo correto aos dados do formulário
+    const dadosComPercentual = {
+      ...baseData,
+      percentual_salario_minimo: percentualSalarioMinimoCalculado,
+      salario_minimo_atual: salarioMinimoAtual,
+      salario_minimo_formatado: formatCurrencyBr(salarioMinimoAtual),
+    };
+
+    // 3. Gera o novo payload e o buffer do Word
+    const payload = buildDocxTemplatePayload(
+      normalizedData,
+      dosFatosTexto,
+      dadosComPercentual,
+    );
     const docxBuffer = await generateDocx(payload);
 
     // 3. Define o caminho e faz o upload (substituindo o anterior)
     const docxPath = `${caso.protocolo}/peticao_inicial_${caso.protocolo}.docx`;
-    
+
     const { error: uploadError } = await supabase.storage
       .from("peticoes")
       .upload(docxPath, docxBuffer, {
-        contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        contentType:
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         upsert: true,
       });
 
@@ -1389,8 +1498,11 @@ export const regerarMinuta = async (req, res) => {
       .eq("id", id);
 
     // 5. Retorna o caso atualizado com as novas URLs assinadas
-    const casoAtualizado = await attachSignedUrls({ ...caso, url_documento_gerado: docxPath });
-    
+    const casoAtualizado = await attachSignedUrls({
+      ...caso,
+      url_documento_gerado: docxPath,
+    });
+
     res.status(200).json(casoAtualizado);
   } catch (error) {
     logger.error(`Erro ao regerar minuta: ${error.message}`);
@@ -1453,7 +1565,7 @@ export const agendarReuniao = async (req, res) => {
   const { agendamento_data, agendamento_link } = req.body;
 
   // Define o status como 'agendado' se houver dados, ou 'pendente' se estiverem vazios
-  const status = (agendamento_data && agendamento_link) ? "agendado" : "pendente";
+  const status = agendamento_data && agendamento_link ? "agendado" : "pendente";
 
   try {
     const { data, error } = await supabase
@@ -1478,7 +1590,8 @@ export const agendarReuniao = async (req, res) => {
 export const reverterFinalizacao = async (req, res) => {
   if (!req.user || req.user.cargo !== "admin") {
     return res.status(403).json({
-      error: "Acesso negado. Apenas administradores podem reverter a finalização.",
+      error:
+        "Acesso negado. Apenas administradores podem reverter a finalização.",
     });
   }
 
@@ -1498,13 +1611,17 @@ export const reverterFinalizacao = async (req, res) => {
     if (caso.url_capa_processual) {
       const filePath = extractObjectPath(caso.url_capa_processual);
       if (filePath) {
-        logger.info(`Revertendo finalização: Excluindo capa processual '${filePath}' do caso ${id}`);
+        logger.info(
+          `Revertendo finalização: Excluindo capa processual '${filePath}' do caso ${id}`,
+        );
         const { error: deleteError } = await supabase.storage
           .from(storageBuckets.documentos)
           .remove([filePath]);
-        
+
         if (deleteError) {
-            logger.warn(`Falha ao excluir capa do storage durante a reversão: ${deleteError.message}`);
+          logger.warn(
+            `Falha ao excluir capa do storage durante a reversão: ${deleteError.message}`,
+          );
         }
       }
     }
@@ -1522,11 +1639,15 @@ export const reverterFinalizacao = async (req, res) => {
 
     if (updateError) throw updateError;
 
-    logger.info(`Finalização do caso ${caso.protocolo} (ID: ${id}) revertida por ${req.user.email}.`);
+    logger.info(
+      `Finalização do caso ${caso.protocolo} (ID: ${id}) revertida por ${req.user.email}.`,
+    );
     // Apenas retorna uma mensagem de sucesso, pois o frontend já recarrega os dados.
     res.status(200).json({ message: "Finalização revertida com sucesso." });
   } catch (error) {
-    logger.error(`Erro ao reverter finalização do caso ${id}: ${error.message}`);
+    logger.error(
+      `Erro ao reverter finalização do caso ${id}: ${error.message}`,
+    );
     res.status(500).json({ error: "Erro ao reverter finalização do caso." });
   }
 };
@@ -1561,19 +1682,32 @@ export const receberDocumentosComplementares = async (req, res) => {
   const { nomes_arquivos } = req.body;
 
   try {
-    logger.info(`[Upload Complementar] Iniciando. ID: ${id}, CPF recebido: ${!!cpf}, Chave recebida: ${!!chave}`);
+    logger.info(
+      `[Upload Complementar] Iniciando. ID: ${id}, CPF recebido: ${!!cpf}, Chave recebida: ${!!chave}`,
+    );
 
     let caso = null;
 
     // 1. Tenta buscar por ID ou Protocolo na URL
-    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    const isUUID =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        id,
+      );
     const isInt = /^\d+$/.test(id) && id !== "0";
 
     if (isUUID || isInt) {
-      const { data } = await supabase.from("casos").select("*").eq("id", id).single();
+      const { data } = await supabase
+        .from("casos")
+        .select("*")
+        .eq("id", id)
+        .single();
       caso = data;
     } else if (id !== "0") {
-      const { data } = await supabase.from("casos").select("*").eq("protocolo", id).single();
+      const { data } = await supabase
+        .from("casos")
+        .select("*")
+        .eq("protocolo", id)
+        .single();
       caso = data;
     }
 
@@ -1590,11 +1724,16 @@ export const receberDocumentosComplementares = async (req, res) => {
           caso = casosCpf.find((c) => verifyKey(chave, c.chave_acesso_hash));
         }
       } else {
-        logger.warn(`[Upload Complementar] Falha: ID inválido (${id}) e credenciais não fornecidas no corpo da requisição.`);
+        logger.warn(
+          `[Upload Complementar] Falha: ID inválido (${id}) e credenciais não fornecidas no corpo da requisição.`,
+        );
       }
     }
 
-    if (!caso) throw new Error("Caso não encontrado. Verifique se o CPF e a Chave estão corretos.");
+    if (!caso)
+      throw new Error(
+        "Caso não encontrado. Verifique se o CPF e a Chave estão corretos.",
+      );
 
     const novosUrls = [];
 
@@ -1656,7 +1795,9 @@ export const receberDocumentosComplementares = async (req, res) => {
     res.status(200).json({ message: "Documentos enviados com sucesso!" });
   } catch (error) {
     logger.error(`Erro upload complementar: ${error.message}`);
-    res.status(500).json({ error: error.message || "Falha ao enviar documentos." });
+    res
+      .status(500)
+      .json({ error: error.message || "Falha ao enviar documentos." });
   }
 };
 
@@ -1702,16 +1843,20 @@ export const deletarCaso = async (req, res) => {
     addFile(storageBuckets.documentos, caso.url_capa_processual);
 
     if (Array.isArray(caso.urls_documentos)) {
-      caso.urls_documentos.forEach((doc) => addFile(storageBuckets.documentos, doc));
+      caso.urls_documentos.forEach((doc) =>
+        addFile(storageBuckets.documentos, doc),
+      );
     }
 
     await Promise.all(
       Object.entries(filesToDelete).map(async ([bucket, files]) => {
         if (files.length > 0) {
-          logger.info(`🗑️ Excluindo ${files.length} arquivos do bucket '${bucket}' vinculados ao caso ${id}`);
+          logger.info(
+            `🗑️ Excluindo ${files.length} arquivos do bucket '${bucket}' vinculados ao caso ${id}`,
+          );
           await supabase.storage.from(bucket).remove(files);
         }
-      })
+      }),
     );
 
     // Excluir o caso do banco de dados
@@ -1747,7 +1892,9 @@ export const reprocessarCaso = async (req, res) => {
     }
 
     // Responde imediatamente para a interface não travar
-    res.status(200).json({ message: "Reprocessamento iniciado em background." });
+    res
+      .status(200)
+      .json({ message: "Reprocessamento iniciado em background." });
 
     // Dispara o worker novamente
     setImmediate(async () => {
@@ -1757,7 +1904,7 @@ export const reprocessarCaso = async (req, res) => {
           caso.dados_formulario,
           caso.urls_documentos || [],
           caso.url_audio,
-          caso.url_peticao
+          caso.url_peticao,
         );
       } catch (err) {
         logger.error(`Erro ao reprocessar caso ${id}: ${err.message}`);
@@ -1765,6 +1912,7 @@ export const reprocessarCaso = async (req, res) => {
     });
   } catch (error) {
     logger.error(`Erro ao solicitar reprocessamento: ${error.message}`);
-    if (!res.headersSent) res.status(500).json({ error: "Erro interno ao reprocessar." });
+    if (!res.headersSent)
+      res.status(500).json({ error: "Erro interno ao reprocessar." });
   }
 };

@@ -29,14 +29,16 @@ const statusOptions = [
   { value: "em_analise", label: "Em análise" },
   { value: "aguardando_docs", label: "Pendentes de documentos" },
   { value: "documentos_entregues", label: "Documentos Entregues (Novo)" },
+  { value: "reuniao_agendada", label: "Reunião Agendada" },
 ];
 
 const statusBadges = {
-  recebido: "bg-amber-100 text-amber-800 border-amber-200",
-  em_analise: "bg-sky-100 text-sky-800 border-sky-200",
-  documentos_entregues: "bg-indigo-100 text-indigo-800 border-indigo-200",
-  aguardando_docs: "bg-purple-100 text-purple-800 border-purple-200",
-  processando: "bg-blue-100 text-blue-800 border-blue-200",
+  recebido: "bg-slate-100 text-slate-700 border-slate-200",
+  em_analise: "bg-special/10 text-special border-special/20",
+  documentos_entregues: "bg-highlight/15 text-highlight border-highlight/30",
+  reuniao_agendada: "bg-purple-100 text-purple-800 border-purple-200",
+  aguardando_docs: "bg-orange-100 text-orange-800 border-orange-200",
+  processando: "bg-indigo-100 text-indigo-800 border-indigo-200",
   processado: "bg-green-100 text-green-800 border-green-200",
   encaminhado_solar: "bg-teal-100 text-teal-800 border-teal-200",
   finalizado: "bg-gray-100 text-gray-800 border-gray-200",
@@ -56,6 +58,7 @@ const statusDescriptions = {
     "O processo está pausado, aguardando o envio de documentos adicionais pelo cidadão.",
   documentos_entregues:
     "O cidadão enviou novos documentos. Verifique os anexos.",
+  reuniao_agendada: "O atendimento com o defensor foi agendado. Aguarde a data prevista.",
   encaminhado_solar:
     "O caso foi finalizado e encaminhado para o sistema Solar da defensoria.",
   finalizado: "O caso foi concluído.",
@@ -586,13 +589,13 @@ export const DetalhesCaso = () => {
 
       {/* NOTIFICAÇÃO DE DOCUMENTOS ENTREGUES */}
       {caso.status === "documentos_entregues" && (
-        <div className="bg-indigo-50 border-l-4 border-indigo-500 p-4 rounded-r shadow-sm flex items-start gap-3 animate-fade-in mb-6">
-          <Bell className="text-indigo-600 shrink-0 mt-1" size={24} />
+        <div className="bg-highlight/10 border-l-4 border-highlight p-4 rounded-r shadow-sm flex items-start gap-3 animate-fade-in mb-6">
+          <Bell className="text-highlight shrink-0 mt-1" size={24} />
           <div>
-            <h3 className="font-bold text-indigo-800">
+            <h3 className="font-bold text-highlight">
               Novos Documentos Recebidos!
             </h3>
-            <p className="text-indigo-700 text-sm">
+            <p className="text-highlight/90 text-sm">
               O cidadão enviou os documentos complementares solicitados.
               Verifique os itens destacados abaixo na seção de anexos.
             </p>
@@ -964,16 +967,14 @@ export const DetalhesCaso = () => {
           {user?.cargo === "admin" && (
             <div className="card space-y-4">
               <div className="flex items-center justify-between">
-                <h2 className="heading-2 text-red-500">
-                  Ações Administrativas
-                </h2>
+                <h2 className="heading-2 text-error">Excluir Caso</h2>
                 <button
                   onClick={handleDeleteCaso}
                   disabled={isDeleting}
                   className="btn btn-danger w-fit flex items-center gap-2"
                 >
                   <Trash2 size={18} />
-                  {isDeleting ? "Excluindo..." : "Excluir Caso"}
+                  {isDeleting ? "Excluindo..." : ""}
                 </button>
               </div>
               <p className="text-sm text-muted">
@@ -1078,7 +1079,9 @@ export const DetalhesCaso = () => {
                   fileName = decodeURIComponent(fileName);
 
                   // Limpeza visual do nome: remove prefixos "complementar_" e timestamps numéricos
-                  fileName = fileName.replace(/^complementar_(\d+_)?/, "").replace(/^\d+_/, "");
+                  fileName = fileName
+                    .replace(/^complementar_(\d+_)?/, "")
+                    .replace(/^\d+_/, "");
 
                   const isComplementar = url.includes("complementar_");
 
@@ -1090,23 +1093,23 @@ export const DetalhesCaso = () => {
                       rel="noopener noreferrer"
                       className={`btn btn-ghost border w-full justify-start text-left break-all group ${
                         isComplementar
-                          ? "border-indigo-300 bg-indigo-50 hover:bg-indigo-100"
+                          ? "border-highlight/30 bg-highlight/5 hover:bg-highlight/10"
                           : "border-soft"
                       }`}
                     >
                       <FileText
                         size={18}
-                        className={`shrink-0 ${isComplementar ? "text-indigo-600" : ""}`}
+                        className={`shrink-0 ${isComplementar ? "text-highlight" : ""}`}
                       />
                       <span
                         className={
-                          isComplementar ? "font-medium text-indigo-900" : ""
+                          isComplementar ? "font-medium text-highlight" : ""
                         }
                       >
                         {fileName}
                       </span>
                       {isComplementar && (
-                        <span className="ml-auto text-[10px] uppercase font-bold bg-indigo-200 text-special px-2 py-0.5 rounded-full">
+                        <span className="ml-auto text-[10px] uppercase font-bold bg-highlight/20 text-highlight px-2 py-0.5 rounded-full">
                           Novo
                         </span>
                       )}
@@ -1157,14 +1160,19 @@ export const DetalhesCaso = () => {
             </div>
 
             {/* BOTÃO DE REPROCESSAMENTO (Aparece em caso de ERRO ou para ADMIN) */}
-            {(statusKey === 'erro' || user?.cargo === 'admin') && (
+            {(statusKey === "erro" || user?.cargo === "admin") && (
               <button
                 onClick={handleReprocessar}
-                disabled={isReprocessing || caso.status === 'processando'}
+                disabled={isReprocessing || caso.status === "processando"}
                 className="btn btn-ghost border border-red-200 bg-red-50 text-red-700 w-full flex items-center justify-center gap-2 hover:bg-red-100"
               >
-                <RefreshCw size={16} className={isReprocessing ? "animate-spin" : ""} />
-                {isReprocessing ? "Reiniciando..." : "Reprocessar Caso (OCR + IA)"}
+                <RefreshCw
+                  size={16}
+                  className={isReprocessing ? "animate-spin" : ""}
+                />
+                {isReprocessing
+                  ? "Reiniciando..."
+                  : "Reprocessar Caso (OCR + IA)"}
               </button>
             )}
 
@@ -1230,8 +1238,8 @@ export const DetalhesCaso = () => {
 
             {/* ÁREA DE PENDÊNCIA (Só aparece se selecionar aguardando_docs) */}
             {statusKey === "aguardando_docs" && (
-              <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg space-y-2 animate-fade-in">
-                <label className="text-sm font-bold text-purple-800">
+              <div className="p-4 bg-bg border border-border rounded-lg space-y-2 animate-fade-in">
+                <label className="text-sm font-bold text">
                   Descreva os documentos pendentes:
                 </label>
                 <textarea
@@ -1241,20 +1249,20 @@ export const DetalhesCaso = () => {
                   onChange={(e) => setPendenciaTexto(e.target.value)}
                 />
                 <div className="flex justify-between items-center">
-                  <p className="text-xs text-purple-600">
+                  <p className="text-xs text">
                     Este texto aparecerá para o assistido na consulta.
                   </p>
                   <button
                     onClick={handleSalvarPendencia}
                     disabled={isUpdating}
-                    className="btn btn-sm bg-purple-600 hover:bg-purple-700 text-white border-none"
+                    className="btn btn-sm bg-orange-600 hover:bg-orange-700 text-white border-none"
                   >
                     {isUpdating ? "Salvando..." : "Salvar Descrição"}
                   </button>
                 </div>
               </div>
             )}
-            
+
             <select
               className="input disabled:opacity-70 disabled:cursor-not-allowed"
               onChange={(e) => handleStatusChange(e.target.value)}

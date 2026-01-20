@@ -15,6 +15,7 @@
   --color-secondary: #006837; /* Dourado-laranja */
   --color-secondary-600: #00562b;
   --color-special: #00548b; /* azul */
+  --color-laranja: #b45d35; /* laranja */
   /* Surfaces & text */
   --color-bg: #dddddd;
   --color-surface: #cfcfcf;
@@ -27,6 +28,7 @@
   /* Feedback */
   --color-success: #1fa97c;
   --color-error: #d64545;
+  --color-highlight: #0e7490; /* Ciano (Cyan-700) para combinar com o verde da DPE */
 
   /* Acessibilidade */
   --color-focus: #0b67a3;
@@ -49,12 +51,12 @@
   --color-bg: #0b1520; /* azul-petróleo escuro */
   --color-surface: #142433; /* cards/painéis */
   --color-border: #1e3a4a;
-
   --color-text: #ffffff;
   --color-text-muted: #c9d1d9;
 
   --color-success: #1fa97c;
   --color-error: #d64545;
+  --color-highlight: #22d3ee; /* Ciano claro (Cyan-400) para dark mode */
 
   --color-focus: #7cc3ff;
   --shadow-soft: 0 8px 32px 0 rgb(0 0 0 / 0.35);
@@ -79,7 +81,7 @@
   /* -----------------------------------------------------------
      CORES (Cria classes: text-*, bg-*, border-*, ring-*)
      ----------------------------------------------------------- */
-  
+
   /* Primária */
   --color-primary: var(--color-primary);
   --color-primary-600: var(--color-primary-600);
@@ -90,21 +92,21 @@
   --color-special: var(--color-special); /* azul */
   /* Estruturais */
   /* Cria bg-app, text-app, border-app */
-  --color-app: var(--color-bg); 
-  
+  --color-app: var(--color-bg);
+
   /* Cria bg-surface, text-surface (para cards) */
-  --color-surface: var(--color-surface); 
-  
+  --color-surface: var(--color-surface);
+
   /* Cria border-border (para bordas genéricas) */
-  --color-border: var(--color-border); 
+  --color-border: var(--color-border);
 
   /* Tipografia */
   /* Cria text-main (cor padrão do texto) */
   --color-main: var(--color-text);
-  
+
   /* Cria text-muted (texto cinza/secundário) */
   --color-muted: var(--color-text-muted);
-  
+
   /* Cria text-thirt (seu 'text-thirt' definido no root) */
   --color-thirt: var(--color-text-thirt);
 
@@ -112,17 +114,18 @@
   --color-success: var(--color-success);
   --color-error: var(--color-error);
   --color-focus: var(--color-focus);
+  --color-highlight: var(--color-highlight);
 
   /* -----------------------------------------------------------
      OUTROS UTILITÁRIOS (Baseados nas suas variáveis)
      ----------------------------------------------------------- */
-  
+
   /* Arredondamento */
   /* Cria rounded-card (12px/0.75rem) */
-  --radius-card: var(--radius); 
-  
+  --radius-card: var(--radius);
+
   /* Cria rounded-badge (8px/0.5rem) */
-  --radius-badge: var(--radius-sm); 
+  --radius-badge: var(--radius-sm);
 
   /* Sombras */
   /* Cria shadow-soft */
@@ -195,7 +198,6 @@
     background-color: var(--color-surface);
     box-shadow: var(--shadow-soft);
   }
-
 
   /* Inputs */
   .input {
@@ -339,5 +341,3 @@
 .container-app {
   @apply max-w-6xl mx-auto px-4 sm:px-6 lg:px-8;
 }
-
-

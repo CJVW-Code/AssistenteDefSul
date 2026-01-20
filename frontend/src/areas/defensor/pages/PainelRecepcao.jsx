@@ -82,7 +82,7 @@ export const PainelRecepcao = () => {
         <form onSubmit={handleBuscar} className="flex gap-4 items-end">
           <div className="flex-1">
             <label className="text-sm text-muted uppercase font-bold mb-2 block">
-              CPF do Assistido
+              CPF do Assistido ou Representante
             </label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
@@ -109,7 +109,7 @@ export const PainelRecepcao = () => {
       {/* RESULTADOS DA BUSCA */}
       {casosEncontrados.length > 0 && (
         <div className="space-y-4">
-          <h2 className="heading-2 text-white">
+          <h2 className="heading-2 text-muted">
             Casos Encontrados ({casosEncontrados.length})
           </h2>
           {casosEncontrados.map((caso) => (
@@ -118,7 +118,7 @@ export const PainelRecepcao = () => {
               className="bg-surface border border-soft p-6 rounded-xl flex items-center justify-between"
             >
               <div>
-                <h3 className="text-xl font-bold text-white">
+                <h3 className="text-xl font-bold text-muted">
                   {caso.nome_assistido}
                 </h3>
                 <p className="text-muted">
@@ -132,7 +132,7 @@ export const PainelRecepcao = () => {
 
               <button
                 onClick={() => handleResetarChave(caso.id)}
-                className="btn btn-secondary border-red-500/30 hover:bg-red-500/10 text-red-400 gap-2"
+                className="btn btn-secondary border-error/30 hover:bg-error/10 text-error gap-2"
               >
                 <RotateCcw size={18} />
                 Resetar Chave

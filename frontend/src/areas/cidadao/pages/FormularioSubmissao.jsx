@@ -1108,12 +1108,12 @@ export const FormularioSubmissao = () => {
         <div>
           <h3 className="font-bold text-special text-lg">Antes de começar</h3>
           <p className="text-muted mt-1">
-            Tenha em mãos seus documentos digitalizados (RG, CPF, Comprovantes). 
+            Tenha em mãos seus documentos (RG, CPF, Comprovantes). 
             Para garantir a análise do seu caso, será necessário:
           </p>
           <ul className="list-disc list-inside text-muted text-sm mt-2 space-y-1 font-medium">
             <li>Anexar pelo menos <strong>4 documentos</strong>;</li>
-            <li>Escrever um relato detalhado com no mínimo <strong>250 caracteres</strong>.</li>
+            
           </ul>
         </div>
       </div>
