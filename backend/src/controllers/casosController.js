@@ -806,16 +806,32 @@ export async function processarCasoEmBackground(
           // 2. Converter o Blob para Buffer
           const buffer = Buffer.from(await blob.arrayBuffer());
 
-          // 3. Extrair texto (Gemini para PDF, Tesseract para Imagens)
+          // 3. Extrair texto (IA com Fallback para Tesseract em imagens)
           let textoExtraido = "";
-          if (docPath.toLowerCase().endsWith(".pdf")) {
-            textoExtraido = await visionOCR(buffer, "application/pdf", "Transcreva todo o texto deste documento PDF fielmente.");
-          } else {
-            textoExtraido = await extractTextFromImage(buffer);
+          const lowerPath = docPath.toLowerCase();
+          // Define o tipo correto para a IA (PDF ou Imagem)
+          let mimeType = lowerPath.endsWith(".pdf") ? "application/pdf" : (lowerPath.endsWith(".png") ? "image/png" : "image/jpeg");
+
+          try {
+            textoExtraido = await visionOCR(buffer, mimeType, "Transcreva todo o texto deste documento fielmente.");
+            logger.info(`[OCR IA] Sucesso ao extrair texto de ${docPath}`);
+          } catch (aiError) {
+            logger.warn(`[OCR IA] Falha ao processar ${docPath}: ${aiError.message}`);
+            // Fallback: Tesseract (Apenas para imagens, pois Tesseract puro não lê PDF binário)
+            if (mimeType !== "application/pdf") {
+              logger.info(`[OCR Fallback] Tentando Tesseract local para ${docPath}...`);
+              textoExtraido = await extractTextFromImage(buffer);
+              logger.info(`[OCR Fallback] Sucesso com Tesseract.`);
+            } else {
+              throw aiError; // Se for PDF e a IA falhar, repassa o erro
+            }
           }
 
-          textoCompleto += `\n\n--- TEXTO EXTRAÍDO (${docPath}) ---\n${textoExtraido}`;
-          logger.info(`[OCR] Sucesso ao extrair texto de ${docPath} (${textoExtraido.length} caracteres)`);
+          if (textoExtraido) {
+            // Log do texto extraído (Preview) para conferência
+            logger.info(`[OCR CONTEÚDO] ${docPath} (Preview):\n${textoExtraido.substring(0, 500).replace(/\n/g, " ")}...`);
+            textoCompleto += `\n\n--- TEXTO EXTRAÍDO (${docPath}) ---\n${textoExtraido}`;
+          }
         } catch (ocrError) {
           logger.warn(`Falha no OCR para ${docPath}: ${ocrError.message}`);
         }

@@ -4,7 +4,8 @@ import Tesseract from "tesseract.js";
 
 export const extractTextFromImage = async (imagePath) => {
   try {
-    console.log(`Iniciando OCR para a imagem: ${imagePath}`);
+    const inputLabel = Buffer.isBuffer(imagePath) ? "Buffer de memória" : imagePath;
+    console.log(`Iniciando OCR (Tesseract) para: ${inputLabel}`);
 
     const {
       data: { text },
