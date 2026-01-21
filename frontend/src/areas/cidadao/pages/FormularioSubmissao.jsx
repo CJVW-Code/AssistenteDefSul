@@ -18,6 +18,7 @@ import {
   Calendar,
   Scale,
   Plus,
+  Info,
 } from "lucide-react";
 import { documentosPorAcao } from "../../../data/documentos.js";
 import { API_BASE } from "../../../utils/apiBase";
@@ -44,6 +45,9 @@ const initialState = {
   whatsappContato: "", // Novo campo
   assistidoRgNumero: "",
   assistidoRgOrgao: "",
+
+  // --- NOVO: ARRAY PARA MAIS FILHOS ---
+  outrosFilhos: [], // Estrutura: [{ nome: "", cpf: "", dataNascimento: "" }]
 
   // Representante Legal (apenas se assistidoEhIncapaz === 'sim')
   representanteNome: "",
@@ -119,7 +123,9 @@ const initialState = {
 
   // Narrativa e Arquivos
   relato: "",
+  prefersAudio: false,
   documentFiles: [],
+  documentNames: {},
   documentosMarcados: [],
   audioBlob: null,
 };
@@ -129,12 +135,42 @@ function formReducer(state, action) {
   switch (action.type) {
     case "UPDATE_FIELD":
       return { ...state, [action.field]: action.value };
+
+    // --- NOVOS CASOS ---
+    case "ADD_FILHO":
+      return {
+        ...state,
+        outrosFilhos: [
+          ...state.outrosFilhos,
+          {
+            nome: "",
+            cpf: "",
+            dataNascimento: "",
+            rgNumero: "",
+            rgOrgao: "",
+            nacionalidade: "brasileiro(a)",
+          },
+        ],
+      };
+    case "REMOVE_FILHO":
+      return {
+        ...state,
+        outrosFilhos: state.outrosFilhos.filter(
+          (_, index) => index !== action.index
+        ),
+      };
+    case "UPDATE_FILHO":
+      const novosFilhos = [...state.outrosFilhos];
+      novosFilhos[action.index][action.field] = action.value;
+      return { ...state, outrosFilhos: novosFilhos };
+
     case "RESET_FORM":
       return {
         ...initialState,
         documentFiles: [],
         documentosMarcados: [],
         requeridoOutrosSelecionados: [],
+        outrosFilhos: [], // Limpa os filhos extras também
       };
     case "SET_ACAO":
       // Limpa campos específicos ao trocar a ação para evitar confusão
@@ -151,17 +187,17 @@ function formReducer(state, action) {
 
 const nacionalidadeOptions = [
   { value: "", label: "Nacionalidade" },
-  { value: "brasileira", label: "Brasileiro(a)" },
-  { value: "estrangeira", label: "Estrangeiro(a)" },
+  { value: "brasileiro(a)", label: "Brasileiro(a)" },
+  { value: "estrangeiro(a)", label: "Estrangeiro(a)" },
 ];
 
 const estadoCivilOptions = [
   { value: "", label: "Estado Civil" },
-  { value: "solteiro", label: "Solteiro(a)" },
-  { value: "casado", label: "Casado(a)" },
-  { value: "divorciado", label: "Divorciado(a)" },
-  { value: "viuvo", label: "Viúvo(a)" },
-  { value: "uniao_estavel", label: "União Estável" },
+  { value: "solteiro(a)", label: "Solteiro(a)" },
+  { value: "casado(a)", label: "Casado(a)" },
+  { value: "divorciado(a)", label: "Divorciado(a)" },
+  { value: "viúvo(a)", label: "Viúvo(a)" },
+  { value: "união estável", label: "União Estável" },
 ];
 
 const orgaoEmissorOptions = [
@@ -329,6 +365,7 @@ const currencyFields = new Set([
 export const FormularioSubmissao = () => {
   const { toast } = useToast();
   const [formState, dispatch] = useReducer(formReducer, initialState);
+  useEffect( () => {fetch(`${API_BASE}/health`).catch(()=>{});},[]);
   const [statusMessage, setStatusMessage] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -541,6 +578,16 @@ export const FormularioSubmissao = () => {
     });
   };
 
+  const handleDocumentNameChange = (fileName, newName) => {
+    const currentNames = formState.documentNames || {};
+    const updatedNames = { ...currentNames, [fileName]: newName };
+    dispatch({
+      type: "UPDATE_FIELD",
+      field: "documentNames",
+      value: updatedNames,
+    });
+  };
+
   const removeDocument = (fileName) => {
     const updatedFiles = formState.documentFiles.filter(
       (file) => file.name !== fileName
@@ -596,6 +643,30 @@ export const FormularioSubmissao = () => {
         validationErrors.requeridoContato =
           "Informe pelo menos um endereço, e-mail ou telefone da outra parte.";
       }
+    }
+
+    // --- NOVAS VALIDAÇÕES OBRIGATÓRIAS ---
+    
+    // 1. WhatsApp Obrigatório
+    if (!stripNonDigits(formState.whatsappContato)) {
+      validationErrors.whatsappContato = "O WhatsApp para reunião é obrigatório.";
+    }
+
+    // 2. Validação Relato vs Áudio
+    if (formState.prefersAudio) {
+      if (!formState.audioBlob) {
+        validationErrors.audio = "Como você optou por enviar áudio, a gravação é obrigatória.";
+      }
+    } else {
+      const relatoLimpo = (formState.relato || "").trim();
+      if (relatoLimpo.length < 250) {
+        validationErrors.relato = `O relato deve ser mais detalhado (mínimo 250 caracteres). Atual: ${relatoLimpo.length}.`;
+      }
+    }
+
+    // 3. Mínimo 4 Documentos
+    if (formState.documentFiles.length < 4) {
+      validationErrors.documentos = `É necessário anexar pelo menos 4 documentos (RG, CPF, Comprovantes, etc). Atual: ${formState.documentFiles.length}.`;
     }
 
     if (Object.keys(validationErrors).length > 0) {
@@ -758,9 +829,18 @@ export const FormularioSubmissao = () => {
       "cpfRequerido",
       "requeridoTelefone",
     ]);
+
+    // Ajuste para representação (criança): usa contatos do representante
+    const valuesToSubmit = { ...formState };
+    if (valuesToSubmit.assistidoEhIncapaz === "sim") {
+      valuesToSubmit.telefone = valuesToSubmit.representanteTelefone;
+      valuesToSubmit.emailAssistido = valuesToSubmit.representanteEmail;
+      valuesToSubmit.assistidoEstadoCivil = "solteiro(a)";
+    }
+
     // Preenche o FormData usando o mapeamento
     Object.keys(fieldMapping).forEach((key) => {
-      const rawValue = formState[key];
+      const rawValue = valuesToSubmit[key];
       if (!rawValue) {
         return;
       }
@@ -780,9 +860,30 @@ export const FormularioSubmissao = () => {
     const tipoAcaoFormatado = `${formState.tipoAcao} - ${formState.acaoEspecifica}`;
     formData.append("tipoAcao", tipoAcaoFormatado);
 
-    // Se for representação, preenche filhos_info com o nome da criança para o Termo de Declaração
-    if (formState.assistidoEhIncapaz === "sim" && formState.nome) {
-      formData.append("filhos_info", formState.nome);
+    // Lógica para múltiplos filhos
+    if (formState.assistidoEhIncapaz === "sim") {
+      // Filho 1 (Principal)
+      let infoFilhos = formState.nome;
+
+      // Filhos Extras
+      if (formState.outrosFilhos.length > 0) {
+        const nomesExtras = formState.outrosFilhos
+          .map((f) => f.nome)
+          .filter((n) => n.trim() !== "")
+          .join(", ");
+        if (nomesExtras) infoFilhos += `, ${nomesExtras}`;
+
+        // Envia o array completo como JSON string para o backend processar
+        formData.append(
+          "outros_filhos_detalhes",
+          JSON.stringify(formState.outrosFilhos)
+        );
+      }
+
+      // Envia a string completa com todos os nomes
+      if (infoFilhos) {
+        formData.append("filhos_info", infoFilhos);
+      }
     }
 
     // 3. Construção de Campos Compostos para a IA (Gemini)
@@ -796,11 +897,11 @@ export const FormularioSubmissao = () => {
           : "Não informado"
       },`,
       `Nacionalidade: ${formState.assistidoNacionalidade || "Não informado"},`,
-      `Estado Civil: ${formState.assistidoEstadoCivil || "Não informado"},`,
+      !isFixacaoDeAlimentos ? `Estado Civil: ${formState.assistidoEstadoCivil || "Não informado"},` : "",
       `Data Nascimento: ${
         formatDateToBr(formState.dataNascimentoAssistido) || "Não informado"
       },`,
-    ].join(" ");
+    ].filter(Boolean).join(" ");
     formData.append(
       "dados_adicionais_requerente",
       `${dadosAdicionaisRequerente.trim()} `
@@ -862,6 +963,10 @@ export const FormularioSubmissao = () => {
     formData.append(
       "documentos_informados",
       JSON.stringify(formState.documentosMarcados)
+    );
+    formData.append(
+      "documentos_nomes",
+      JSON.stringify(formState.documentNames || {})
     );
     if (formState.audioBlob)
       formData.append("audio", formState.audioBlob, "gravacao.webm");
@@ -927,7 +1032,7 @@ export const FormularioSubmissao = () => {
   // Lógica de Representação (CRUCIAL para organização)
   const isRepresentacao = formState.assistidoEhIncapaz === "sim";
   const labelAutor = isRepresentacao
-    ? "Dados da Criança/Adolescente (Beneficiário)"
+    ? "Dados da Criança/Adolescente (Assistido)"
     : "Seus Dados (Você é o autor da ação)";
   const mostrarEmpregador = formState.requeridoTemEmpregoFormal === "sim";
 
@@ -959,7 +1064,7 @@ export const FormularioSubmissao = () => {
         animate={{ opacity: 1, y: 0 }}
         className="card text-center p-8"
       >
-        <h3 className="text-2xl font-bold text-green-400 mb-4">
+        <h3 className="text-2xl font-bold text-muted mb-4">
           Cadastro Realizado!
         </h3>
         <div className="bg-surface border border-soft p-4 rounded-xl mb-4 text-left space-y-3">
@@ -967,7 +1072,9 @@ export const FormularioSubmissao = () => {
             <p className="text-xs text-muted uppercase font-bold">
               CPF (Seu Login)
             </p>
-            <p className="text-xl font-mono text-primary">{formState.cpf}</p>
+            <p className="text-xl font-mono text-primary-600">
+              {formState.cpf}
+            </p>
           </div>
           <div>
             <p className="text-xs text-muted uppercase font-bold">
@@ -978,15 +1085,15 @@ export const FormularioSubmissao = () => {
             </p>
           </div>
           <div className="pt-2 border-t border-soft/50">
-            <p className="text-base text-muted">
+            <p className="text-x text-muted">
               Protocolo do sistema:{" "}
-              <span className="font-mono text-primary">
+              <span className="font-mono text-primary-600">
                 {generatedCredentials.protocolo}
               </span>
             </p>
           </div>
         </div>
-        <div className="bg-border/10 p-3 rounded border border-border/30 text-primary text-sm text-left flex gap-2">
+        <div className="bg-border/10 p-3 rounded border border-border/30 text-error text-sm text-left flex gap-2">
           <AlertTriangle className="w-5 h-5 shrink-0" />
           <p>
             Tire um print! Você precisará do seu CPF e desta Chave de Acesso
@@ -1013,6 +1120,22 @@ export const FormularioSubmissao = () => {
       animate={{ opacity: 1 }}
       className="max-w-4xl mx-auto px-3 sm:px-0"
     >
+      {/* AVISO INICIAL DE REQUISITOS */}
+      <div className="card border-l-4 border-special mb-8 flex items-start gap-3">
+        <Info className="text-special shrink-0 mt-1" size={24} />
+        <div>
+          <h3 className="font-bold text-special text-lg">Antes de começar</h3>
+          <p className="text-muted mt-1">
+            Tenha em mãos seus documentos (RG, CPF, Comprovantes). 
+            Para garantir a análise do seu caso, será necessário:
+          </p>
+          <ul className="list-disc list-inside text-muted text-sm mt-2 space-y-1 font-medium">
+            <li>Anexar pelo menos <strong>4 documentos</strong>;</li>
+            
+          </ul>
+        </div>
+      </div>
+
       <form onSubmit={handleSubmit} className="space-y-8">
         {/* --- ETAPA 1: DEFINIÇÃO DA AÇÃO --- */}
         <section className="card space-y-4 border-l-4 border-l-blue-500">
@@ -1103,7 +1226,7 @@ export const FormularioSubmissao = () => {
                 </div>
               )}
 
-              {/* Dados do Autor/Beneficiário */}
+              {/* Dados do Autor/Asssitido */}
               <div className="space-y-4">
                 <h3 className="heading-3 text-primary">{labelAutor}</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1127,7 +1250,9 @@ export const FormularioSubmissao = () => {
                     className="input"
                   />
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div
+                  className={`grid grid-cols-1 ${isFixacaoDeAlimentos ? "md:grid-cols-2" : "md:grid-cols-3"} gap-4`}
+                >
                   <input
                     type="date"
                     placeholder="Data de Nascimento"
@@ -1148,18 +1273,20 @@ export const FormularioSubmissao = () => {
                       </option>
                     ))}
                   </select>
-                  <select
-                    name="assistidoEstadoCivil"
-                    value={formState.assistidoEstadoCivil}
-                    onChange={handleFieldChange}
-                    className="input"
-                  >
-                    {estadoCivilOptions.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
+                  {!isRepresentacao && (
+                    <select
+                      name="assistidoEstadoCivil"
+                      value={formState.assistidoEstadoCivil}
+                      onChange={handleFieldChange}
+                      className="input"
+                    >
+                      {estadoCivilOptions.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                   {!isRepresentacao && (
                     <input
                       type="text"
@@ -1191,12 +1318,14 @@ export const FormularioSubmissao = () => {
                     value={formState.assistidoRgNumero}
                     onChange={handleRgChange("assistidoRgNumero")}
                     className="input"
+                    required
                   />
                   <select
                     name="assistidoRgOrgao"
                     value={formState.assistidoRgOrgao}
                     onChange={handleFieldChange}
                     className="input"
+                    required
                   >
                     {orgaoEmissorOptions.map((option) => (
                       <option key={option.value} value={option.value}>
@@ -1254,10 +1383,164 @@ export const FormularioSubmissao = () => {
                     name="whatsappContato"
                     value={formState.whatsappContato}
                     onChange={handlePhoneChange("whatsappContato")}
-                    className="input pl-10 border-green-500/30 focus:ring-green-500"
+                    className={`input pl-10 border-green-500/30 focus:ring-green-500 ${formErrors.whatsappContato ? "border-red-500 ring-1 ring-red-500" : ""}`}
                   />
                 </div>
+                {formErrors.whatsappContato && (
+                  <p className="text-xs text-red-500 font-medium">{formErrors.whatsappContato}</p>
+                )}
               </div>
+
+              {/* --- SEÇÃO DE MÚLTIPLOS FILHOS --- */}
+              {isRepresentacao && (
+                <div className="mt-6 space-y-4">
+                  {formState.outrosFilhos.map((filho, index) => (
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      className="bg-surface-alt p-4 rounded-lg border border-soft relative group"
+                    >
+                      <div className="flex justify-between items-center mb-3">
+                        <h4 className="font-semibold text-sm text-primary">
+                          Filho(a) {index + 2}
+                        </h4>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            dispatch({ type: "REMOVE_FILHO", index })
+                          }
+                          className="text-red-500 hover:text-red-700 p-1"
+                          title="Remover"
+                        >
+                          <X size={18} />
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <input
+                          type="text"
+                          placeholder="Nome Completo"
+                          value={filho.nome}
+                          onChange={(e) =>
+                            dispatch({
+                              type: "UPDATE_FILHO",
+                              index,
+                              field: "nome",
+                              value: e.target.value,
+                            })
+                          }
+                          className="input"
+                          required
+                        />
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          placeholder="CPF"
+                          value={filho.cpf}
+                          onChange={(e) => {
+                            const val = formatCpf(e.target.value);
+                            dispatch({
+                              type: "UPDATE_FILHO",
+                              index,
+                              field: "cpf",
+                              value: val,
+                            });
+                          }}
+                          className="input"
+                          required
+                        />
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                        <input
+                          type="date"
+                          placeholder="Data de Nascimento"
+                          value={filho.dataNascimento}
+                          onChange={(e) =>
+                            dispatch({
+                              type: "UPDATE_FILHO",
+                              index,
+                              field: "dataNascimento",
+                              value: e.target.value,
+                            })
+                          }
+                          className="input"
+                          required
+                        />
+                        <select
+                          value={filho.nacionalidade}
+                          onChange={(e) =>
+                            dispatch({
+                              type: "UPDATE_FILHO",
+                              index,
+                              field: "nacionalidade",
+                              value: e.target.value,
+                            })
+                          }
+                          className="input"
+                          required
+                        >
+                          {nacionalidadeOptions.map((o) => (
+                            <option
+                              key={`filho-nac-${index}-${o.value}`}
+                              value={o.value}
+                            >
+                              {o.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          placeholder="RG"
+                          value={filho.rgNumero}
+                          onChange={(e) =>
+                            dispatch({
+                              type: "UPDATE_FILHO",
+                              index,
+                              field: "rgNumero",
+                              value: formatRgNumber(e.target.value),
+                            })
+                          }
+                          className="input"
+                        />
+                        <select
+                          value={filho.rgOrgao}
+                          onChange={(e) =>
+                            dispatch({
+                              type: "UPDATE_FILHO",
+                              index,
+                              field: "rgOrgao",
+                              value: e.target.value,
+                            })
+                          }
+                          className="input"
+                        >
+                          {orgaoEmissorOptions.map((option) => (
+                            <option
+                              key={`filho-${index}-${option.value}`}
+                              value={option.value}
+                            >
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </motion.div>
+                  ))}
+
+                  <button
+                    type="button"
+                    onClick={() => dispatch({ type: "ADD_FILHO" })}
+                    className="btn btn-ghost border border-dashed border-primary text-primary w-full flex items-center justify-center gap-2 hover:bg-primary/5"
+                  >
+                    <Plus size={18} />
+                    Adicionar mais um filho(a)
+                  </button>
+                </div>
+              )}
 
               {/* Dados do Representante (Condicional) */}
               {isRepresentacao && (
@@ -1278,6 +1561,7 @@ export const FormularioSubmissao = () => {
                       value={formState.representanteNome}
                       onChange={handleFieldChange}
                       className="input"
+                      required
                     />
                     <input
                       type="text"
@@ -1287,6 +1571,7 @@ export const FormularioSubmissao = () => {
                       value={formState.representanteCpf}
                       onChange={handleCpfChange("representanteCpf")}
                       className="input"
+                      required
                     />
                   </div>
 
@@ -1379,12 +1664,14 @@ export const FormularioSubmissao = () => {
                       value={formState.representanteRgNumero}
                       onChange={handleRgChange("representanteRgNumero")}
                       className="input"
+                      required
                     />
                     <select
                       name="representanteRgOrgao"
                       value={formState.representanteRgOrgao}
                       onChange={handleFieldChange}
                       className="input"
+                      required
                     >
                       {orgaoEmissorOptions.map((option) => (
                         <option key={option.value} value={option.value}>
@@ -1537,7 +1824,7 @@ export const FormularioSubmissao = () => {
                     {outrosDadosRequeridoConfig.map((item) => {
                       const selecionado =
                         formState.requeridoOutrosSelecionados.includes(
-                          item.key
+                          item.key,
                         );
                       return (
                         <div
@@ -1564,7 +1851,7 @@ export const FormularioSubmissao = () => {
                                     name="requeridoRgNumero"
                                     value={formState.requeridoRgNumero}
                                     onChange={handleRgChange(
-                                      "requeridoRgNumero"
+                                      "requeridoRgNumero",
                                     )}
                                     className="input"
                                   />
@@ -1862,7 +2149,7 @@ export const FormularioSubmissao = () => {
                         name="valorTotalDebitoExecucao"
                         value={formState.valorTotalDebitoExecucao}
                         onChange={handleCurrencyChange(
-                          "valorTotalDebitoExecucao"
+                          "valorTotalDebitoExecucao",
                         )}
                         className="input pl-12"
                       />
@@ -2023,23 +2310,60 @@ export const FormularioSubmissao = () => {
               </div>
 
               <div>
-                <label className="label font-bold">
-                  Relato dos Fatos (O que aconteceu?)
-                </label>
+                <div className="flex justify-between items-end mb-2">
+                  <label className="label font-bold mb-0">
+                    Relato dos Fatos (O que aconteceu?)
+                  </label>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer bg-surface p-2 rounded-lg border border-soft hover:border-primary transition select-none">
+                    <input
+                      type="checkbox"
+                      name="prefersAudio"
+                      checked={formState.prefersAudio}
+                      onChange={(e) => dispatch({ type: "UPDATE_FIELD", field: "prefersAudio", value: e.target.checked })}
+                      className="w-4 h-4 accent-primary"
+                    />
+                    <span className="text-primary font-medium flex items-center gap-1">
+                      <Mic size={14} /> Prefiro enviar áudio
+                    </span>
+                  </label>
+                </div>
                 <textarea
-                  placeholder="Conte detalhadamente o que aconteceu, por que você precisa da justiça, como está a situação atual..."
+                  placeholder={formState.prefersAudio ? "Se desejar, faça um breve resumo aqui (opcional)..." : "Conte detalhadamente o que aconteceu, por que você precisa da justiça, como está a situação atual..."}
                   value={formState.relato}
                   onChange={handleFieldChange}
                   name="relato"
-                  rows="6"
-                  className="input w-full"
+                  rows="10"
+                  className={`input w-full ${formErrors.relato ? "border-error ring-1 ring-error" : ""}`}
                 ></textarea>
+                
+                {/* Barra de Progresso */}
+                {!formState.prefersAudio && (
+                  <div className="w-full h-2 bg-app rounded-full mt-2 overflow-hidden border border-soft">
+                    <div 
+                      className={`h-full transition-all duration-500 ${
+                        (formState.relato || "").length >= 250 ? "bg-success" : "bg-error"
+                      }`}
+                      style={{ width: `${Math.min(((formState.relato || "").length / 250) * 100, 100)}%` }}
+                    />
+                  </div>
+                )}
+
+                <div className="flex justify-between mt-1 px-1">
+                  <span className="text-xs text-error font-medium">
+                    {formErrors.relato}
+                  </span>
+                  {!formState.prefersAudio && (
+                    <span className={`text-xs font-medium ${(formState.relato || "").length < 250 ? "text-error" : "text-success"}`}>
+                      {(formState.relato || "").length} / 250 caracteres
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Gravação de Áudio */}
-              <div className="bg-surface p-4 rounded-lg border border-dashed border-soft flex flex-col items-center justify-center gap-3">
+              <div className={`bg-surface p-4 rounded-lg border border-dashed ${formErrors.audio ? "border-error bg-red-50/10" : "border-soft"} flex flex-col items-center justify-center gap-3`}>
                 <p className="text-sm text-muted">
-                  Prefere falar? Grave um áudio contando sua história.
+                  {formState.prefersAudio ? <strong className="text-primary">Grave seu relato aqui (Obrigatório)</strong> : "Prefere falar? Grave um áudio contando sua história."}
                 </p>
                 {!isRecording && !formState.audioBlob && (
                   <button
@@ -2076,6 +2400,9 @@ export const FormularioSubmissao = () => {
                   </div>
                 )}
               </div>
+              {formErrors.audio && (
+                <p className="text-sm text-error font-bold text-center">{formErrors.audio}</p>
+              )}
 
               {/* Checklist e Upload */}
               {listaDeDocumentos.length > 0 && (
@@ -2102,7 +2429,7 @@ export const FormularioSubmissao = () => {
                 </div>
               )}
 
-              <div className="bg-surface p-4 rounded-lg border border-dashed border-soft">
+              <div className={`bg-surface p-4 rounded-lg border border-dashed ${formErrors.documentos ? "border-error bg-red-50/10" : "border-soft"}`}>
                 <input
                   type="file"
                   accept=".pdf,.jpg,.jpeg,.png"
@@ -2128,6 +2455,15 @@ export const FormularioSubmissao = () => {
                         className="flex items-center justify-between bg-slate-100 dark:bg-slate-700 p-2 rounded text-sm"
                       >
                         <span className="truncate max-w-xs">{file.name}</span>
+                        <input
+                          type="text"
+                          placeholder="Nomeie este documento (ex: RG, Comprovante)"
+                          className="input py-1 px-2 text-sm flex-1 h-8"
+                          value={formState.documentNames?.[file.name] || ""}
+                          onChange={(e) =>
+                            handleDocumentNameChange(file.name, e.target.value)
+                          }
+                        />
                         <button
                           type="button"
                           onClick={() => removeDocument(file.name)}
@@ -2140,6 +2476,9 @@ export const FormularioSubmissao = () => {
                   </div>
                 )}
               </div>
+              {formErrors.documentos && (
+                <p className="text-sm text-red-500 font-bold text-center">{formErrors.documentos}</p>
+              )}
             </section>
 
             {/* --- BOTÃO FINAL --- */}

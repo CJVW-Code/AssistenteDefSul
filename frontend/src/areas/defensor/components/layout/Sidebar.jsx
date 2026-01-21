@@ -80,7 +80,7 @@ export const Sidebar = () => {
               className={navLinkClass("/painel/recepcao")}
             >
               <Search size={20} />
-              Atendimento / Reset
+              Recepção
             </Link>
           )}
 

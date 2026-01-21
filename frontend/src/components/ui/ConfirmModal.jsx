@@ -26,11 +26,11 @@ export const ConfirmModal = () => {
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             className="relative bg-surface border border-primary/30 p-6 rounded-2xl shadow-2xl max-w-md w-full space-y-4"
           >
-            <div className="flex items-center gap-3 text-amber-400">
-              <div className="bg-amber-500/20 p-3 rounded-full">
+            <div className="flex items-center gap-3 text-error">
+              <div className="bg-error/20 p-3 rounded-full">
                 <AlertTriangle size={24} />
               </div>
-              <h3 className="text-xl font-bold text-white">
+              <h3 className="text-xl font-bold text-error">
                 {confirmState.title}
               </h3>
             </div>
@@ -42,13 +42,13 @@ export const ConfirmModal = () => {
             <div className="flex gap-3 pt-4">
               <button
                 onClick={() => handleClose(false)}
-                className="btn btn-ghost flex-1 border border-soft hover:bg-white/5"
+                className="btn btn-ghost flex-1 border border-soft hover:bg-error/5"
               >
                 Cancelar
               </button>
               <button
                 onClick={() => handleClose(true)}
-                className="btn btn-primary flex-1 bg-primary hover:bg-primary-600"
+                className="btn btn-primary flex-1 bg-primary hover:bg-error"
               >
                 Confirmar
               </button>

@@ -23,7 +23,8 @@ export const Header = () => {
               Painel do Defensor
             </p>
             <p className="text-lg font-semibold mt-1">
-              Dr(a). {defensorName}
+              {defensor?.cargo === "defensor" ? "Dr(a). " : ""}
+              {defensorName}
             </p>
           </div>
         </div>

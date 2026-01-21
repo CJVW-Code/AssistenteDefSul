@@ -9,14 +9,18 @@ import {
   AlertTriangle,
   BarChart3,
   PieChart,
+  Bell,
+  Calendar,
 } from "lucide-react";
 import { jwtDecode } from "jwt-decode";
 import { API_BASE } from "../../../utils/apiBase";
 
 const statusStyles = {
-  recebido: "bg-amber-100 text-amber-800 border-amber-200",
-  em_analise: "bg-sky-100 text-sky-800 border-sky-200",
-  aguardando_docs: "bg-purple-100 text-purple-800 border-purple-200",
+  recebido: "bg-slate-100 text-slate-700 border-slate-200",
+  em_analise: "bg-blue-100 text-blue-800 border-blue-200",
+  aguardando_docs: "bg-amber-100 text-amber-800 border-amber-200",
+  documentos_entregues: "bg-highlight/15 text-highlight border-highlight/30",
+  reuniao_agendada: "bg-purple-100 text-purple-800 border-purple-200",
   encaminhado_solar: "bg-emerald-100 text-emerald-800 border-emerald-200",
   default: "bg-slate-100 text-slate-700 border-slate-200",
 };
@@ -27,6 +31,10 @@ const summaryFilters = {
   ativos: (caso) => normalizeStatus(caso.status) !== "encaminhado_solar",
   em_analise: (caso) => normalizeStatus(caso.status) === "em_analise",
   aguardando_docs: (caso) => normalizeStatus(caso.status) === "aguardando_docs",
+  documentos_entregues: (caso) =>
+    normalizeStatus(caso.status) === "documentos_entregues",
+  reuniao_agendada: (caso) =>
+    normalizeStatus(caso.status) === "reuniao_agendada",
   encaminhado_solar: (caso) =>
     normalizeStatus(caso.status) === "encaminhado_solar",
 };
@@ -35,6 +43,8 @@ const summaryFilterLabels = {
   ativos: "casos ativos",
   em_analise: "casos em análise",
   aguardando_docs: "casos aguardando documentos",
+  documentos_entregues: "casos com documentos entregues",
+  reuniao_agendada: "reuniões agendadas",
   encaminhado_solar: "casos encaminhados ao Solar",
 };
 
@@ -76,16 +86,30 @@ export const Dashboard = () => {
   const resumo = useMemo(() => {
     const total = casos.length;
     const encaminhadosSolar = casos.filter(
-      (caso) => normalizeStatus(caso.status) === "encaminhado_solar"
+      (caso) => normalizeStatus(caso.status) === "encaminhado_solar",
     ).length;
     const aguardandoDocs = casos.filter(
-      (caso) => normalizeStatus(caso.status) === "aguardando_docs"
+      (caso) => normalizeStatus(caso.status) === "aguardando_docs",
     ).length;
     const emAnalise = casos.filter(
-      (caso) => normalizeStatus(caso.status) === "em_analise"
+      (caso) => normalizeStatus(caso.status) === "em_analise",
+    ).length;
+    const documentosEntregues = casos.filter(
+      (caso) => normalizeStatus(caso.status) === "documentos_entregues",
+    ).length;
+    const reuniaoAgendada = casos.filter(
+      (caso) => normalizeStatus(caso.status) === "reuniao_agendada",
     ).length;
     const ativos = total - encaminhadosSolar;
-    return { total, encaminhadosSolar, aguardandoDocs, emAnalise, ativos };
+    return {
+      total,
+      encaminhadosSolar,
+      aguardandoDocs,
+      emAnalise,
+      ativos,
+      documentosEntregues,
+      reuniaoAgendada,
+    };
   }, [casos]);
 
   // --- ESTATÍSTICAS DO SISTEMA (Novo) ---
@@ -124,7 +148,7 @@ export const Dashboard = () => {
 
   const casosRecentes = useMemo(
     () => filteredCasos.slice(0, 6),
-    [filteredCasos]
+    [filteredCasos],
   );
   const ultimaAtualizacao = casos[0]?.created_at
     ? new Date(casos[0].created_at).toLocaleString("pt-BR", {
@@ -170,7 +194,8 @@ export const Dashboard = () => {
               Painel atualizado
             </p>
             <h1 className="heading-hero mt-2">
-              Olá, Dr(a). {defensor?.nome || "Defensor"}
+              Olá, {defensor?.cargo === "defensor" ? "Dr(a). " : ""}
+              {defensor?.nome || "Usuário"}
             </h1>
             <p className="text-white/80 max-w-2xl mt-2">
               Acompanhe os casos recebidos pelo Assistente Def Sul, identifique
@@ -192,7 +217,7 @@ export const Dashboard = () => {
         )}
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {[
           {
             key: "ativos",
@@ -208,7 +233,7 @@ export const Dashboard = () => {
             value: resumo.emAnalise,
             helper: "Casos aguardando movimentação.",
             icon: Clock,
-            accent: "text-sky-500",
+            accent: "text-blue-500",
           },
           {
             key: "aguardando_docs",
@@ -216,6 +241,22 @@ export const Dashboard = () => {
             value: resumo.aguardandoDocs,
             helper: "Solicite complemento ao cidadão.",
             icon: AlertTriangle,
+            accent: "text-amber-500",
+          },
+          {
+            key: "documentos_entregues",
+            label: "Docs. Entregues",
+            value: resumo.documentosEntregues,
+            helper: "Novos documentos para análise.",
+            icon: Bell,
+            accent: "text-highlight",
+          },
+          {
+            key: "reuniao_agendada",
+            label: "Reuniões",
+            value: resumo.reuniaoAgendada,
+            helper: "Agendamentos futuros.",
+            icon: Calendar,
             accent: "text-purple-500",
           },
           {
@@ -392,7 +433,7 @@ export const Dashboard = () => {
                             {
                               day: "2-digit",
                               month: "short",
-                            }
+                            },
                           )}
                         </div>
                       </div>

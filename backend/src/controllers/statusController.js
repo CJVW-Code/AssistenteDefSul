@@ -25,7 +25,7 @@ export const consultarStatus = async (req, res) => {
     const { data: caso, error } = await supabase
       .from("casos")
       .select(
-        "status, chave_acesso_hash, nome_assistido, numero_processo, numero_solar, url_capa_processual, url_documento_gerado, agendamento_data, agendamento_link, agendamento_status"
+        "status, chave_acesso_hash, nome_assistido, numero_processo, numero_solar, url_capa_processual, url_documento_gerado, agendamento_data, agendamento_link, agendamento_status, descricao_pendencia",
       )
       .eq("cpf_assistido", cpfLimpo)
       .single(); // .single() garante que apenas um resultado seja retornado
@@ -33,7 +33,7 @@ export const consultarStatus = async (req, res) => {
     // Se o caso não for encontrado, retorna um erro genérico
     if (error || !caso) {
       logger.warn(
-        `Consulta falhou: CPF ${cpfLimpo} não encontrado ou erro no banco.`
+        `Consulta falhou: CPF ${cpfLimpo} não encontrado ou erro no banco.`,
       );
       return res
         .status(404)
@@ -52,7 +52,7 @@ export const consultarStatus = async (req, res) => {
     }
 
     logger.info(
-      `Status consultado com sucesso para CPF ${cpfLimpo}. Status: ${caso.status}`
+      `Status consultado com sucesso para CPF ${cpfLimpo}. Status: ${caso.status}`,
     );
 
     // Mapeamento de status internos para os 4 status públicos solicitados
@@ -62,6 +62,8 @@ export const consultarStatus = async (req, res) => {
       processado: "em triagem",
       em_analise: "em triagem",
       aguardando_docs: "documentos pendente",
+      documentos_entregues: "em triagem", // Mapeia o novo status para algo genérico pro cidadão
+      reuniao_agendada: "reuniao agendada",
       encaminhado_solar: "encaminhamento solar",
       finalizado: "encaminhamento solar",
       erro: "enviado",
@@ -78,6 +80,7 @@ export const consultarStatus = async (req, res) => {
       agendamento_data: caso.agendamento_data,
       agendamento_link: caso.agendamento_link,
       agendamento_status: caso.agendamento_status,
+      descricao_pendencia: caso.descricao_pendencia, // Envia a pendência para o frontend
     });
   } catch (err) {
     logger.error(`Erro crítico ao consultar status: ${err.message}`, {
