@@ -24,7 +24,7 @@ function escapeRegExp(string) {
 export const visionOCR = async (
   bufferImagem,
   mimeType,
-  promptContexto = ""
+  promptContexto = "",
 ) => {
   try {
     const model = geminiClient.getGenerativeModel({
@@ -62,7 +62,7 @@ export const generateLegalText = async (
   systemPrompt,
   userPrompt,
   temperature = 0.3,
-  piiMap = {}
+  piiMap = {},
 ) => {
   // --- ETAPA 1: SANITIZAÇÃO (ANONIMIZAÇÃO) ---
   // Substitui dados reais por placeholders ANTES de sair do servidor
@@ -94,7 +94,7 @@ export const generateLegalText = async (
   // console.log("SYS:", safeSystemPrompt.substring(0, 50) + "..."); // Opcional
   console.log(
     "USER PROMPT (TRECHO):",
-    safeUserPrompt.substring(0, 300) + "..."
+    safeUserPrompt.substring(0, 300) + "...",
   );
   console.log("---------------------------------------------------\n");
   let generatedText = "";
@@ -128,7 +128,7 @@ export const generateLegalText = async (
         groqPromise,
         createTimeoutPromise(
           IA_TIMEOUT_MS,
-          "Timeout: Chamada Groq excedeu o limite de tempo"
+          "Timeout: Chamada Groq excedeu o limite de tempo",
         ),
       ]);
 
@@ -137,7 +137,7 @@ export const generateLegalText = async (
     } catch (groqError) {
       console.warn(
         "⚠️ Groq instável ou Rate Limit. Ativando Fallback para Gemini...",
-        groqError.message
+        groqError.message,
       );
 
       // TENTATIVA 2: Gemini 2.5 Flash (Fallback: Segurança)
@@ -155,7 +155,7 @@ export const generateLegalText = async (
           geminiCall,
           createTimeoutPromise(
             IA_TIMEOUT_MS,
-            "Timeout: Chamada Gemini excedeu o limite de tempo"
+            "Timeout: Chamada Gemini excedeu o limite de tempo",
           ),
         ]);
 
@@ -165,14 +165,14 @@ export const generateLegalText = async (
       } catch (geminiError) {
         console.error("❌ Erro na chamada Gemini:", geminiError.message);
         throw new Error(
-          "Ambos os serviços de IA falharam ou excederam o tempo limite."
+          "Ambos os serviços de IA falharam ou excederam o tempo limite.",
         );
       }
     }
   } catch (error) {
     console.error("❌ Erro Crítico IA:", error.message);
     throw new Error(
-      "Serviço de Inteligência Artificial indisponível no momento."
+      "Serviço de Inteligência Artificial indisponível no momento.",
     );
   }
 
