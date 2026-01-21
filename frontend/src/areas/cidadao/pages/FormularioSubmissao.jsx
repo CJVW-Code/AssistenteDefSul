@@ -125,6 +125,7 @@ const initialState = {
   relato: "",
   prefersAudio: false,
   documentFiles: [],
+  documentNames: {},
   documentosMarcados: [],
   audioBlob: null,
 };
@@ -575,6 +576,16 @@ export const FormularioSubmissao = () => {
     });
   };
 
+  const handleDocumentNameChange = (fileName, newName) => {
+    const currentNames = formState.documentNames || {};
+    const updatedNames = { ...currentNames, [fileName]: newName };
+    dispatch({
+      type: "UPDATE_FIELD",
+      field: "documentNames",
+      value: updatedNames,
+    });
+  };
+
   const removeDocument = (fileName) => {
     const updatedFiles = formState.documentFiles.filter(
       (file) => file.name !== fileName
@@ -949,6 +960,10 @@ export const FormularioSubmissao = () => {
     formData.append(
       "documentos_informados",
       JSON.stringify(formState.documentosMarcados)
+    );
+    formData.append(
+      "documentos_nomes",
+      JSON.stringify(formState.documentNames || {})
     );
     if (formState.audioBlob)
       formData.append("audio", formState.audioBlob, "gravacao.webm");
@@ -2441,7 +2456,7 @@ export const FormularioSubmissao = () => {
                           type="text"
                           placeholder="Nomeie este documento (ex: RG, Comprovante)"
                           className="input py-1 px-2 text-sm flex-1 h-8"
-                          value={formState.documentNames[file.name] || ""}
+                          value={formState.documentNames?.[file.name] || ""}
                           onChange={(e) =>
                             handleDocumentNameChange(file.name, e.target.value)
                           }

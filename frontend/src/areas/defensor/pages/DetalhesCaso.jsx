@@ -1078,12 +1078,40 @@ export const DetalhesCaso = () => {
                   let fileName = url.split("/").pop().split("?")[0];
                   fileName = decodeURIComponent(fileName);
 
-                  // Limpeza visual do nome: remove prefixos "complementar_" e timestamps numéricos
+                  // Limpeza visual do nome: remove prefixos "complementar_" e timestamps numéricos (hífen ou underscore)
                   fileName = fileName
-                    .replace(/^complementar_(\d+_)?/, "")
-                    .replace(/^\d+_/, "");
+                    .replace(/^complementar_(\d+[-_])?/, "")
+                    .replace(/^\d+[-_]/, "");
 
                   const isComplementar = url.includes("complementar_");
+
+                  // Tenta recuperar o nome personalizado definido no formulário
+                  const docNames = caso.dados_formulario?.documentNames || {};
+                  let customName = null;
+
+                  Object.keys(docNames).forEach((originalKey) => {
+                    // Sanitiza a chave original (remove acentos) para comparar com o nome do arquivo salvo
+                    const safeKey = originalKey.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                    
+                    // Normalização agressiva: remove acentos e tudo que não for letra ou número (incluindo pontos e traços)
+                    const fileNameNorm = fileName
+                      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+                      .replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+
+                    const safeKeyNorm = safeKey.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+
+                    // 1. Comparação exata ou flexível
+                    if (safeKey === fileName || fileNameNorm === safeKeyNorm) {
+                      customName = docNames[originalKey];
+                    } 
+                    // 2. Comparação por sufixo (salva casos onde o timestamp não foi removido corretamente)
+                    // Verifica se o nome do arquivo (do URL) termina com o nome original (do formulário)
+                    else if (!customName && fileNameNorm.endsWith(safeKeyNorm) && safeKeyNorm.length > 3) {
+                      customName = docNames[originalKey];
+                    }
+                  });
+
+                  const displayName = customName || fileName;
 
                   return (
                     <a
@@ -1106,7 +1134,7 @@ export const DetalhesCaso = () => {
                           isComplementar ? "font-medium text-highlight" : ""
                         }
                       >
-                        {fileName}
+                        {displayName}
                       </span>
                       {isComplementar && (
                         <span className="ml-auto text-[10px] uppercase font-bold bg-highlight/20 text-highlight px-2 py-0.5 rounded-full">

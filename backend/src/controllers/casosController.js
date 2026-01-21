@@ -7,6 +7,7 @@ import {
 } from "../services/securityService.js";
 import fs from "fs/promises";
 import { extractTextFromImage } from "../services/documentService.js";
+import { visionOCR } from "../services/aiService.js";
 import {
   generateDocx,
   generateTermoDeclaracao,
@@ -443,9 +444,7 @@ const buildDocxTemplatePayload = (
   };
 
   // 2. Unifica todos os filhos (principal + outros) em uma única lista
-  const rawDetails =
-    baseData.outros_filhos_detalhes ||
-    baseData.dados_formulario?.outros_filhos_detalhes;
+  const rawDetails = baseData.outros_filhos_detalhes; // Corrigido: baseData já contém os campos do formulário diretamente
   const outrosFilhosRaw = rawDetails
     ? typeof rawDetails === "string"
       ? JSON.parse(rawDetails)
@@ -486,32 +485,35 @@ const buildDocxTemplatePayload = (
     nacionalidade: ensureText(normalizeGenderTerm(f.nacionalidade)),
   }));
 
-  // Filtra para garantir que não há entradas vazias e converte nomes para maiúsculo
-  const lista_filhos = [filhoPrincipal, ...irmaos]
-    .filter((f) => f.nome && f.nome !== "[PREENCHER]")
-    .map((f) => ({ ...f, nome: f.nome.toUpperCase() }));
-
-  // 3. Monta o texto corrido para qualificação dos filhos
-  const texto_qualificacao_filhos = lista_filhos
-    .map((f) => {
-      const rgPart =
-        f.rg !== "[PREENCHER]" ? `, portador(a) do RG nº ${f.rg}` : "";
-      const nacPart =
-        f.nacionalidade !== "[PREENCHER]" ? `, ${f.nacionalidade}` : "";
-      return `${f.nome}${nacPart}, nascido(a) em ${f.nascimento}, inscrito(a) no CPF nº ${f.cpf}${rgPart}`;
-    })
-    .join("; e ");
+  // Filtra para garantir que não há entradas vazias
+  const lista_filhos_raw = [filhoPrincipal, ...irmaos].filter(
+    (f) => f.nome && f.nome !== "[PREENCHER]",
+  );
 
   // 4. Lógica de Concordância (ECA + Código Civil + Pedido do Usuário)
-  const idades = lista_filhos
+  const idades = lista_filhos_raw
     .map((f) => calcularIdade(f.nascimento))
     .filter((age) => age !== null);
-  const isPlural = lista_filhos.length > 1;
+  const isPlural = lista_filhos_raw.length > 1;
   const temMenorDe16 = idades.some((idade) => idade < 16);
   const temEntre16e18 = idades.some((idade) => idade >= 16 && idade < 18);
 
-  // Termo "incapaz" ou "incapazes"
-  const termo_incapaz = isPlural ? "incapazes" : "incapaz";
+  // 3. Formata a lista para o Word (Loop)
+  const lista_filhos = lista_filhos_raw.map((f, index) => {
+    const ehUltimo = index === lista_filhos_raw.length - 1;
+    return {
+      nome: (f.nome || "").toUpperCase(),
+      qualificacao_incapacidade: "incapaz",
+      nacionalidade: f.nacionalidade || "brasileiro(a)",
+      nascimento: f.nascimento || "[PREENCHER]",
+      cpf: f.cpf || "não inscrito(a)",
+      rg: f.rg || "não informado(a)",
+      separador: ehUltimo ? "" : "; ",
+    };
+  });
+
+  // Rótulo para qualificação (filho/filhos)
+  const rotulo_qualificacao = isPlural ? "filhos(as)" : "filho(a)";
 
   // Termo de representação/assistência
   let termo_representacao = "";
@@ -573,8 +575,7 @@ const buildDocxTemplatePayload = (
   const payload = {
     ...baseData,
     lista_filhos,
-    texto_qualificacao_filhos,
-    termo_incapaz,
+    rotulo_qualificacao,
     termo_representacao,
 
     vara: ensureText(varaPreferida),
@@ -787,8 +788,9 @@ export async function processarCasoEmBackground(
     // OCR
     let textoCompleto = caso.relato_texto || "";
     for (const docPath of urls_documentos) {
-      // Apenas processa imagens
-      if (docPath.match(/\.(jpg|jpeg|png)$/i)) {
+      // Processa imagens e PDFs
+      if (docPath.match(/\.(jpg|jpeg|png|pdf)$/i)) {
+        logger.info(`[OCR] Processando arquivo: ${docPath}`);
         try {
           // 1. Baixar o arquivo do Supabase Storage
           const { data: blob, error: downloadError } = await supabase.storage
@@ -804,12 +806,21 @@ export async function processarCasoEmBackground(
           // 2. Converter o Blob para Buffer
           const buffer = Buffer.from(await blob.arrayBuffer());
 
-          // 3. Extrair texto da imagem
-          const textoDaImagem = await extractTextFromImage(buffer);
-          textoCompleto += `\n\n--- TEXTO EXTRAÍDO: ${docPath} ---\n${textoDaImagem}`;
+          // 3. Extrair texto (Gemini para PDF, Tesseract para Imagens)
+          let textoExtraido = "";
+          if (docPath.toLowerCase().endsWith(".pdf")) {
+            textoExtraido = await visionOCR(buffer, "application/pdf", "Transcreva todo o texto deste documento PDF fielmente.");
+          } else {
+            textoExtraido = await extractTextFromImage(buffer);
+          }
+
+          textoCompleto += `\n\n--- TEXTO EXTRAÍDO (${docPath}) ---\n${textoExtraido}`;
+          logger.info(`[OCR] Sucesso ao extrair texto de ${docPath} (${textoExtraido.length} caracteres)`);
         } catch (ocrError) {
           logger.warn(`Falha no OCR para ${docPath}: ${ocrError.message}`);
         }
+      } else {
+        logger.info(`[OCR] Pulando arquivo (formato não suportado): ${docPath}`);
       }
     }
 
@@ -1161,7 +1172,7 @@ export const criarNovoCaso = async (req, res) => {
         url: `${process.env.API_BASE_URL}/api/jobs/process`,
         body: {
           protocolo,
-          dados_formulario,
+          dados_formulario: dadosFormularioFinal, // Passa os dados do formulário já finalizados
           urls_documentos,
           url_audio,
           url_peticao,
@@ -1234,7 +1245,20 @@ export const listarCasos = async (req, res) => {
       ascending: false,
     });
     if (error) throw error;
-    res.status(200).json(data);
+
+    // Garante compatibilidade com o frontend (documentNames vs document_names)
+    const normalizedData = data.map((caso) => {
+      if (!caso.dados_formulario) caso.dados_formulario = {};
+      if (!caso.dados_formulario.document_names)
+        caso.dados_formulario.document_names = {};
+      if (!caso.dados_formulario.documentNames) {
+        caso.dados_formulario.documentNames =
+          caso.dados_formulario.document_names;
+      }
+      return caso;
+    });
+
+    res.status(200).json(normalizedData);
   } catch (error) {
     logger.error(`Erro ao listar casos: ${error.message}`);
     res.status(500).json({ error: "Erro ao listar casos." });
@@ -1251,6 +1275,19 @@ export const obterDetalhesCaso = async (req, res) => {
       .single();
     if (error) throw error;
     if (!data) return res.status(404).json({ error: "Caso não encontrado." });
+
+    // Garante que dados_formulario e sua propriedade document_names sejam sempre objetos
+    if (!data.dados_formulario) {
+      data.dados_formulario = {};
+    }
+    if (!data.dados_formulario.document_names) {
+      data.dados_formulario.document_names = {};
+    }
+
+    // Garante compatibilidade com o frontend que espera camelCase (documentNames)
+    if (!data.dados_formulario.documentNames) {
+      data.dados_formulario.documentNames = data.dados_formulario.document_names;
+    }
 
     const casoComUrls = await attachSignedUrls(data);
     res.status(200).json(casoComUrls);
@@ -1528,7 +1565,20 @@ export const buscarPorCpf = async (req, res) => {
       .select("*")
       .eq("cpf_assistido", cpf);
     if (error) throw error;
-    res.status(200).json(data);
+
+    // Garante compatibilidade com o frontend (documentNames vs document_names)
+    const normalizedData = (data || []).map((caso) => {
+      if (!caso.dados_formulario) caso.dados_formulario = {};
+      if (!caso.dados_formulario.document_names)
+        caso.dados_formulario.document_names = {};
+      if (!caso.dados_formulario.documentNames) {
+        caso.dados_formulario.documentNames =
+          caso.dados_formulario.document_names;
+      }
+      return caso;
+    });
+
+    res.status(200).json(normalizedData);
   } catch (error) {
     res.status(500).json({ error: "Erro ao buscar por CPF." });
   }
@@ -1789,11 +1839,12 @@ export const receberDocumentosComplementares = async (req, res) => {
       nomesMap = {}; // Fallback seguro
     }
     // -----------------------------------------------------
-    const currentNames = caso.dados_formulario?.document_names || {};
+    const currentDadosFormulario = caso.dados_formulario || {}; // Garante que dados_formulario é um objeto
+    const currentNames = currentDadosFormulario.document_names || {}; // Usa o objeto garantido
 
     const updatedNames = { ...currentNames, ...nomesMap };
     const updatedDadosFormulario = {
-      ...caso.dados_formulario,
+      ...currentDadosFormulario, // Espalha o objeto garantido
       document_names: updatedNames,
     };
 

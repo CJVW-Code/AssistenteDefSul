@@ -25,16 +25,39 @@ const PLACEHOLDER_FIELD = "[DADO PENDENTE]";
 
 // --- FUNÇÕES UTILITÁRIAS DE NORMALIZAÇÃO ---
 
+const formatName = (name) => {
+  if (!name || typeof name !== "string") return undefined;
+
+  // Lista de preposições que devem ficar em minúsculo (padrão ABNT/Jurídico)
+  const exceptions = ["da", "de", "do", "das", "dos", "e", "em"];
+
+  return name
+    .toLowerCase()
+    .trim()
+    .split(/\s+/) // Divide por qualquer espaço em branco
+    .map((word, index) => {
+      // Se for a primeira palavra, sempre capitaliza.
+      // Se não for e estiver na lista de exceções, mantém minúsculo.
+      if (index > 0 && exceptions.includes(word)) {
+        return word;
+      }
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    })
+    .join(" ");
+};
+
 export const normalizePromptData = (raw = {}) => {
   const requerente = raw.requerente ||
     raw.exequente ||
     raw.assistido ||
     raw.cliente || {
-      nome:
+      // AQUI: Aplicando formatName
+      nome: formatName(
         raw.nome_assistido ||
-        raw.requerente_nome ||
-        raw.nome_requerente ||
-        raw.exequente_nome,
+          raw.requerente_nome ||
+          raw.nome_requerente ||
+          raw.exequente_nome,
+      ),
       cpf:
         raw.cpf_assistido ||
         raw.requerente_cpf ||
@@ -44,20 +67,23 @@ export const normalizePromptData = (raw = {}) => {
         raw.requerente_data_nascimento ||
         raw.data_nascimento_assistido ||
         raw.data_nascimento_requerente,
-      representante:
+      // AQUI: Aplicando formatName
+      representante: formatName(
         raw.representante_requerente ||
-        raw.representante ||
-        raw.representante_nome ||
-        undefined,
+          raw.representante ||
+          raw.representante_nome,
+      ),
     };
 
   const requerido = raw.requerido ||
     raw.executado || {
-      nome:
+      // AQUI: Aplicando formatName
+      nome: formatName(
         raw.nome_requerido ||
-        raw.requerido_nome ||
-        raw.executado_nome ||
-        raw.nome_executado,
+          raw.requerido_nome ||
+          raw.executado_nome ||
+          raw.nome_executado,
+      ),
       cpf:
         raw.cpf_requerido ||
         raw.requerido_cpf ||
@@ -95,7 +121,9 @@ export const normalizePromptData = (raw = {}) => {
       raw.cidadeDataAssinatura ||
       raw.cidade_assinatura ||
       DEFAULT_CIDADE_ASSINATURA,
-    defensoraNome: raw.defensoraNome || raw.defensora_nome || DEFAULT_DEFENSORA,
+    // AQUI: É bom garantir que o nome da defensora também esteja formatado, caso venha do banco bagunçado
+    defensoraNome:
+      formatName(raw.defensoraNome || raw.defensora_nome) || DEFAULT_DEFENSORA,
     enderecoDPE: raw.enderecoDPE || raw.endereco_dpe || DEFAULT_ENDERECO_DPE,
     telefoneDPE: raw.telefoneDPE || raw.telefone_dpe || DEFAULT_TELEFONE_DPE,
     relato:
@@ -135,6 +163,7 @@ const valueOrPlaceholder = (value, fallback = PLACEHOLDER_FIELD) => {
 };
 
 const cleanText = (value, fallback = "") => {
+
   if (value === undefined || value === null) return fallback;
   const text = String(value).trim();
   return text.length ? text : fallback;
@@ -180,8 +209,8 @@ export const analyzeCase = async (fullText) => {
     const result = await generateLegalText(systemPrompt, userPrompt, 0.3);
     logger.info(
       `✅ [IA] Análise concluída em ${((Date.now() - start) / 1000).toFixed(
-        2
-      )}s`
+        2,
+      )}s`,
     );
     return result;
   } catch (error) {
@@ -189,7 +218,7 @@ export const analyzeCase = async (fullText) => {
     // Melhor tratamento de erros com mensagens mais específicas
     if (error.message.includes("Timeout")) {
       logger.warn(
-        "⏱️  Análise do caso atingiu timeout. Continuando sem resumo automático."
+        "⏱️  Análise do caso atingiu timeout. Continuando sem resumo automático.",
       );
       return null;
     } else {
@@ -207,7 +236,7 @@ export const generateDosFatos = async (caseData = {}) => {
     const normalized = normalizePromptData(caseData);
     const relatoBase = cleanText(
       normalized.relato,
-      "Relato detalhado não informado."
+      "Relato detalhado não informado.",
     );
 
     const formatDocumentList = (docs = []) => {
@@ -225,7 +254,7 @@ export const generateDosFatos = async (caseData = {}) => {
 
     const filhosInfo = cleanText(
       caseData.filhos_info || caseData.filhosInfo || caseData.descricao_guarda,
-      "Informações sobre filhos não foram apresentadas."
+      "Informações sobre filhos não foram apresentadas.",
     );
 
     // Preparação dos textos descritivos
@@ -251,14 +280,14 @@ export const generateDosFatos = async (caseData = {}) => {
 
     const valorPensao = cleanText(
       normalized.valorMensalPensao,
-      "Valor não informado"
+      "Valor não informado",
     );
     const bensPartilha = cleanText(caseData.bens_partilha);
     const outrosPedidos = [];
     if (bensPartilha) outrosPedidos.push(`Bens a partilhar: ${bensPartilha}`);
     if (caseData.alimentos_para_ex_conjuge)
       outrosPedidos.push(
-        `Alimentos para ex-cônjuge: ${caseData.alimentos_para_ex_conjuge}`
+        `Alimentos para ex-cônjuge: ${caseData.alimentos_para_ex_conjuge}`,
       );
     const contextoExtra = outrosPedidos.length
       ? `\nOutros Pedidos/Detalhes: ${outrosPedidos.join("; ")}`
@@ -310,10 +339,10 @@ Estrutura Lógica Obrigatória:
 
 DADOS DO CASO:
 - Assistido: ${cleanText(normalized.requerente?.nome)} (CPF: ${cleanText(
-      normalized.requerente?.cpf
+      normalized.requerente?.cpf,
     )})
 - Requerido: ${cleanText(normalized.requerido?.nome)} (CPF: ${cleanText(
-      normalized.requerido?.cpf
+      normalized.requerido?.cpf,
     )})
 - Filhos/Guarda: ${filhosInfo}
 - Situação Mãe: ${situacaoAssistido}
@@ -329,30 +358,30 @@ Adapte o texto se o relato informal contradizer o modelo padrão (ex: pai já pa
     logger.info(
       `🤖 [IA] Gerando seção 'Dos Fatos' para ${
         normalized.requerente?.nome || "Desconhecido"
-      }...`
+      }...`,
     );
     const start = Date.now();
     const textoGerado = await generateLegalText(
       systemPrompt,
       userPrompt,
       0.3,
-      piiMap
+      piiMap,
     );
     logger.info(
       `✅ [IA] 'Dos Fatos' gerado em ${((Date.now() - start) / 1000).toFixed(
-        2
-      )}s`
+        2,
+      )}s`,
     );
     return sanitizeLegalAbbreviations(textoGerado.trim());
   } catch (error) {
     logger.error(
-      `❌ Erro ao gerar a seção 'Dos Fatos' com IA: ${error.message}`
+      `❌ Erro ao gerar a seção 'Dos Fatos' com IA: ${error.message}`,
     );
 
     // Melhor tratamento de erros com fallback automático
     if (error.message.includes("Timeout")) {
       logger.warn(
-        "⏱️  Geração dos Fatos atingiu timeout. Usando fallback local..."
+        "⏱️  Geração dos Fatos atingiu timeout. Usando fallback local...",
       );
       // Usa o fallback local em vez de falhar completamente
       return buildFallbackDosFatos(caseData);
