@@ -1042,8 +1042,15 @@ export const criarNovoCaso = async (req, res) => {
       // ... todos os outros campos mantidos ...
     } = dados_formulario;
 
-    const { valor_mensal_pensao } = dados_formulario;
-    const documentosInformadosArray = JSON.parse(documentos_informados || "[]");
+    // --- CORREÇÃO CODERABBIT: Try-Catch para JSON.parse ---
+    let documentosInformadosArray = [];
+    try {
+      documentosInformadosArray = JSON.parse(documentos_informados || "[]");
+    } catch (e) {
+      logger.warn("Falha ao analisar JSON de documentos_informados:", e.message);
+      documentosInformadosArray = []; // Fallback seguro
+    }
+    // -----------------------------------------------------
     const { protocolo, chaveAcesso } = generateCredentials(tipoAcao);
     const chaveAcessoHash = hashKeyWithSalt(chaveAcesso);
 
@@ -1773,7 +1780,15 @@ export const receberDocumentosComplementares = async (req, res) => {
     }
 
     // 3. Atualiza metadados de nomes (dados_formulario.document_names)
-    const nomesMap = JSON.parse(nomes_arquivos || "{}");
+    // --- CORREÇÃO CODERABBIT: Try-Catch para JSON.parse ---
+    let nomesMap = {};
+    try {
+      nomesMap = JSON.parse(nomes_arquivos || "{}");
+    } catch (e) {
+      logger.warn("[Upload Complementar] Falha ao analisar JSON de nomes_arquivos:", e.message);
+      nomesMap = {}; // Fallback seguro
+    }
+    // -----------------------------------------------------
     const currentNames = caso.dados_formulario?.document_names || {};
 
     const updatedNames = { ...currentNames, ...nomesMap };
