@@ -1130,7 +1130,7 @@ export const FormularioSubmissao = () => {
             Para garantir a análise do seu caso, será necessário:
           </p>
           <ul className="list-disc list-inside text-muted text-sm mt-2 space-y-1 font-medium">
-            <li>Anexar pelo menos esses <strong> 4 documentos</strong>;</li>
+            <li>Anexar pelo menos esses <strong>4 documentos</strong>;</li>
             
           </ul>
         </div>
