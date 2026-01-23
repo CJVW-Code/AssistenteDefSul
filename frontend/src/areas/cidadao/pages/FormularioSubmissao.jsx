@@ -1318,14 +1318,13 @@ export const FormularioSubmissao = () => {
                     value={formState.assistidoRgNumero}
                     onChange={handleRgChange("assistidoRgNumero")}
                     className="input"
-                    required
                   />
                   <select
                     name="assistidoRgOrgao"
                     value={formState.assistidoRgOrgao}
                     onChange={handleFieldChange}
                     className="input"
-                    required
+                    
                   >
                     {orgaoEmissorOptions.map((option) => (
                       <option key={option.value} value={option.value}>
@@ -1333,6 +1332,7 @@ export const FormularioSubmissao = () => {
                       </option>
                     ))}
                   </select>
+                  {!isRepresentacao && (
                   <input
                     type="text"
                     placeholder="Endereço Residencial Completo"
@@ -1342,6 +1342,7 @@ export const FormularioSubmissao = () => {
                     required
                     className="input"
                   />
+                  )}
                 </div>
                 {!isRepresentacao && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1664,14 +1665,12 @@ export const FormularioSubmissao = () => {
                       value={formState.representanteRgNumero}
                       onChange={handleRgChange("representanteRgNumero")}
                       className="input"
-                      required
                     />
                     <select
                       name="representanteRgOrgao"
                       value={formState.representanteRgOrgao}
                       onChange={handleFieldChange}
                       className="input"
-                      required
                     >
                       {orgaoEmissorOptions.map((option) => (
                         <option key={option.value} value={option.value}>
