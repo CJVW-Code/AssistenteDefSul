@@ -362,6 +362,33 @@ const currencyFields = new Set([
   "valorTotalDebitoExecucao",
 ]);
 
+const validateCpfAlgorithm = (cpf) => {
+  const cleanCpf = String(cpf).replace(/[^\d]+/g, "");
+  if (cleanCpf.length !== 11 || /^(\d)\1+$/.test(cleanCpf)) return false;
+
+  let soma = 0;
+  let resto;
+
+  for (let i = 1; i <= 9; i++) {
+    soma = soma + parseInt(cleanCpf.substring(i - 1, i)) * (11 - i);
+  }
+  resto = (soma * 10) % 11;
+
+  if (resto === 10 || resto === 11) resto = 0;
+  if (resto !== parseInt(cleanCpf.substring(9, 10))) return false;
+
+  soma = 0;
+  for (let i = 1; i <= 10; i++) {
+    soma = soma + parseInt(cleanCpf.substring(i - 1, i)) * (12 - i);
+  }
+  resto = (soma * 10) % 11;
+
+  if (resto === 10 || resto === 11) resto = 0;
+  if (resto !== parseInt(cleanCpf.substring(10, 11))) return false;
+
+  return true;
+};
+
 export const FormularioSubmissao = () => {
   const { toast } = useToast();
   const [formState, dispatch] = useReducer(formReducer, initialState);
@@ -374,6 +401,14 @@ export const FormularioSubmissao = () => {
   const [checklistWarningOpen, setChecklistWarningOpen] = useState(false);
   const [sugestoesCidades, setSugestoesCidades] = useState([]);
   const [mostrarSugestoes, setMostrarSugestoes] = useState(false);
+
+  // Helper para validação personalizada (substitui o required padrão)
+  const validar = (msg) => ({
+    required: true,
+    onInvalid: (e) =>
+      e.target.setCustomValidity(msg || "Por favor, preencha este campo."),
+    onInput: (e) => e.target.setCustomValidity(""),
+  });
 
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -469,7 +504,37 @@ export const FormularioSubmissao = () => {
     clearFieldError(field);
   };
 
-  const handleCpfChange = (field) => handleMaskedChange(formatCpf, field);
+  const handleCpfChangeAndValidate = (field) => (e) => {
+    const rawValue = e.target.value;
+    const formattedValue = formatCpf(rawValue);
+    dispatch({ type: "UPDATE_FIELD", field, value: formattedValue });
+
+    const cleanCpf = stripNonDigits(rawValue);
+    if (cleanCpf.length === 11) {
+      if (!validateCpfAlgorithm(cleanCpf)) {
+        setFormErrors((prev) => ({ ...prev, [field]: "O CPF informado é inválido." }));
+      } else {
+        // CPF is valid, clear the error for this field
+        setFormErrors((prev) => {
+          const updated = { ...prev };
+          if (updated[field] === "O CPF informado é inválido.") {
+            delete updated[field];
+          }
+          return updated;
+        });
+      }
+    } else {
+      // CPF is not yet complete, clear any existing "invalid" error
+      setFormErrors((prev) => {
+        const updated = { ...prev };
+        if (updated[field] === "O CPF informado é inválido.") {
+          delete updated[field];
+        }
+        return updated;
+      });
+    }
+  };
+
   const handlePhoneChange = (field) => handleMaskedChange(formatPhone, field);
   const handleRgChange = (field) => (event) => {
     dispatch({
@@ -648,6 +713,18 @@ export const FormularioSubmissao = () => {
     // 1. WhatsApp Obrigatório
     if (!stripNonDigits(formState.whatsappContato)) {
       validationErrors.whatsappContato = "O WhatsApp para reunião é obrigatório.";
+    }
+
+    // Validação CPF Matemático
+    if (formState.cpf && !validateCpfAlgorithm(formState.cpf)) {
+      validationErrors.cpf = "CPF inválido.";
+    }
+    if (
+      formState.assistidoEhIncapaz === "sim" &&
+      formState.representanteCpf &&
+      !validateCpfAlgorithm(formState.representanteCpf)
+    ) {
+      validationErrors.representanteCpf = "CPF inválido.";
     }
 
     // 2. Validação Relato vs Áudio
@@ -1123,12 +1200,14 @@ export const FormularioSubmissao = () => {
         <div>
           <h3 className="font-bold text-special text-lg">Antes de começar</h3>
           <p className="text-muted mt-1">
-            Tenha em mãos seus documentos (RG, CPF, Comprovantes). 
-            Para garantir a análise do seu caso, será necessário:
+            Tenha em mãos seus documentos (RG, Comprovante de renda, Comprovante
+            de Residência e Certidão de nascimento). Para garantir a análise do
+            seu caso, será necessário:
           </p>
           <ul className="list-disc list-inside text-muted text-sm mt-2 space-y-1 font-medium">
-            <li>Anexar pelo menos <strong>4 documentos</strong>;</li>
-            
+            <li>
+              Anexar pelo menos esses <strong>4 documentos</strong>;
+            </li>
           </ul>
         </div>
       </div>
@@ -1164,7 +1243,7 @@ export const FormularioSubmissao = () => {
                 value={formState.acaoEspecifica}
                 onChange={handleFieldChange}
                 name="acaoEspecifica"
-                required
+                {...validar("Selecione o tipo de ação.")}
                 className="input font-medium text-text"
               >
                 <option value="" disabled>
@@ -1229,23 +1308,32 @@ export const FormularioSubmissao = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <input
                     type="text"
-                    placeholder="Nome Completo"
+                    placeholder="Nome Completo *"
                     name="nome"
                     value={formState.nome}
                     onChange={handleFieldChange}
-                    required
+                    {...validar("Informe o nome completo.")}
                     className="input"
                   />
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    placeholder="CPF"
-                    name="cpf"
-                    value={formState.cpf}
-                    onChange={handleCpfChange("cpf")}
-                    required
-                    className="input"
-                  />
+                  <div>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="CPF *"
+                      name="cpf"
+                      value={formState.cpf}
+                      onChange={handleCpfChangeAndValidate("cpf")}
+                      {...validar("Informe o CPF.")}
+                      className={`input ${
+                        formErrors.cpf ? "border-error ring-1 ring-error" : ""
+                      }`}
+                    />
+                    {formErrors.cpf && (
+                      <span className="text-xs text-error mt-1 ml-1">
+                        {formErrors.cpf}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div
                   className={`grid grid-cols-1 ${isFixacaoDeAlimentos ? "md:grid-cols-2" : "md:grid-cols-3"} gap-4`}
@@ -1258,6 +1346,7 @@ export const FormularioSubmissao = () => {
                     onChange={handleFieldChange}
                     className="input"
                   />
+                  {!isRepresentacao && (
                   <select
                     name="assistidoNacionalidade"
                     value={formState.assistidoNacionalidade}
@@ -1270,6 +1359,7 @@ export const FormularioSubmissao = () => {
                       </option>
                     ))}
                   </select>
+                  )}
                   {!isRepresentacao && (
                     <select
                       name="assistidoEstadoCivil"
@@ -1310,19 +1400,17 @@ export const FormularioSubmissao = () => {
                   <input
                     type="text"
                     inputMode="numeric"
-                    placeholder="RG"
+                    placeholder="RG (Opcional)"
                     name="assistidoRgNumero"
                     value={formState.assistidoRgNumero}
                     onChange={handleRgChange("assistidoRgNumero")}
                     className="input"
-                    required
                   />
                   <select
                     name="assistidoRgOrgao"
                     value={formState.assistidoRgOrgao}
                     onChange={handleFieldChange}
                     className="input"
-                    required
                   >
                     {orgaoEmissorOptions.map((option) => (
                       <option key={option.value} value={option.value}>
@@ -1330,15 +1418,17 @@ export const FormularioSubmissao = () => {
                       </option>
                     ))}
                   </select>
-                  <input
+                  {!isRepresentacao && (
+                    <input
                     type="text"
-                    placeholder="Endereço Residencial Completo"
+                    placeholder="Endereço Residencial Completo *"
                     name="enderecoAssistido"
                     value={formState.enderecoAssistido}
                     onChange={handleFieldChange}
-                    required
+                    {...validar("Informe o endereço completo.")}
                     className="input"
-                  />
+                    />
+                  )}
                 </div>
                 {!isRepresentacao && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1358,11 +1448,11 @@ export const FormularioSubmissao = () => {
                       <input
                         type="text"
                         inputMode="tel"
-                        placeholder="Telefone/WhatsApp para contato"
+                        placeholder="Telefone/WhatsApp para contato *"
                         name="telefone"
                         value={formState.telefone}
                         onChange={handlePhoneChange("telefone")}
-                        required
+                        {...validar("Informe um telefone para contato.")}
                         className="input pl-10"
                       />
                     </div>
@@ -1376,7 +1466,7 @@ export const FormularioSubmissao = () => {
                   <input
                     type="text"
                     inputMode="tel"
-                    placeholder="WhatsApp para receber o link da reunião"
+                    placeholder="WhatsApp para receber o link da reunião *"
                     name="whatsappContato"
                     value={formState.whatsappContato}
                     onChange={handlePhoneChange("whatsappContato")}
@@ -1384,7 +1474,9 @@ export const FormularioSubmissao = () => {
                   />
                 </div>
                 {formErrors.whatsappContato && (
-                  <p className="text-xs text-red-500 font-medium">{formErrors.whatsappContato}</p>
+                  <p className="text-xs text-error font-medium">
+                    {formErrors.whatsappContato}
+                  </p>
                 )}
               </div>
 
@@ -1407,7 +1499,7 @@ export const FormularioSubmissao = () => {
                           onClick={() =>
                             dispatch({ type: "REMOVE_FILHO", index })
                           }
-                          className="text-red-500 hover:text-red-700 p-1"
+                          className="text-error hover:text-error p-1"
                           title="Remover"
                         >
                           <X size={18} />
@@ -1417,7 +1509,7 @@ export const FormularioSubmissao = () => {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <input
                           type="text"
-                          placeholder="Nome Completo"
+                          placeholder="Nome Completo *"
                           value={filho.nome}
                           onChange={(e) =>
                             dispatch({
@@ -1428,30 +1520,59 @@ export const FormularioSubmissao = () => {
                             })
                           }
                           className="input"
-                          required
+                          {...validar("Informe o nome do filho.")}
                         />
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          placeholder="CPF"
-                          value={filho.cpf}
-                          onChange={(e) => {
-                            const val = formatCpf(e.target.value);
-                            dispatch({
-                              type: "UPDATE_FILHO",
-                              index,
-                              field: "cpf",
-                              value: val,
-                            });
-                          }}
-                          className="input"
-                          required
-                        />
+                        <div>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            placeholder="CPF *"
+                            value={filho.cpf}
+                            onChange={(e) => {
+                              const rawValue = e.target.value;
+                              const formattedValue = formatCpf(rawValue);
+                              const fieldName = `filho_cpf_${index}`;
+
+                              dispatch({
+                                type: "UPDATE_FILHO",
+                                index,
+                                field: "cpf",
+                                value: formattedValue,
+                              });
+
+                              const cleanCpf = stripNonDigits(rawValue);
+                              if (cleanCpf.length === 11) {
+                                if (!validateCpfAlgorithm(cleanCpf)) {
+                                  setFormErrors((prev) => ({ ...prev, [fieldName]: "CPF inválido." }));
+                                } else {
+                                  setFormErrors((prev) => {
+                                    const updated = { ...prev };
+                                    delete updated[fieldName];
+                                    return updated;
+                                  });
+                                }
+                              } else {
+                                setFormErrors((prev) => {
+                                  const updated = { ...prev };
+                                  delete updated[fieldName];
+                                  return updated;
+                                });
+                              }
+                            }}
+                            className={`input ${formErrors[`filho_cpf_${index}`] ? "border-error ring-1 ring-error" : ""}`}
+                            {...validar("Informe o CPF do filho.")}
+                          />
+                          {formErrors[`filho_cpf_${index}`] && (
+                            <span className="text-xs text-error mt-1 ml-1">
+                              {formErrors[`filho_cpf_${index}`]}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                         <input
                           type="date"
-                          placeholder="Data de Nascimento"
+                          placeholder="Data de Nascimento *"
                           value={filho.dataNascimento}
                           onChange={(e) =>
                             dispatch({
@@ -1462,7 +1583,7 @@ export const FormularioSubmissao = () => {
                             })
                           }
                           className="input"
-                          required
+                          {...validar("Informe a data de nascimento.")}
                         />
                         <select
                           value={filho.nacionalidade}
@@ -1475,7 +1596,7 @@ export const FormularioSubmissao = () => {
                             })
                           }
                           className="input"
-                          required
+                          {...validar("Selecione a nacionalidade.")}
                         >
                           {nacionalidadeOptions.map((o) => (
                             <option
@@ -1491,7 +1612,7 @@ export const FormularioSubmissao = () => {
                         <input
                           type="text"
                           inputMode="numeric"
-                          placeholder="RG"
+                          placeholder="RG (Opcional)"
                           value={filho.rgNumero}
                           onChange={(e) =>
                             dispatch({
@@ -1541,8 +1662,8 @@ export const FormularioSubmissao = () => {
 
               {/* Dados do Representante (Condicional) */}
               {isRepresentacao && (
-                <div className="bg-surface-alt p-4 rounded-lg border-l-4 border-green-500 space-y-4 mt-4 bg-amber-500/5">
-                  <h3 className="heading-3 text-green-600">
+                <div className="bg-surface-alt p-4 rounded-lg border-l-4 border-primary space-y-4 mt-4 bg-amber-500/5">
+                  <h3 className="heading-3 text-primary">
                     Dados do Representante Legal (Você)
                   </h3>
                   <p className="text-sm text-muted mb-2">
@@ -1553,23 +1674,34 @@ export const FormularioSubmissao = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <input
                       type="text"
-                      placeholder="Seu Nome Completo"
+                      placeholder="Seu Nome Completo *"
                       name="representanteNome"
                       value={formState.representanteNome}
                       onChange={handleFieldChange}
                       className="input"
-                      required
+                      {...validar("Informe o nome do representante.")}
                     />
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      placeholder="Seu CPF"
-                      name="representanteCpf"
-                      value={formState.representanteCpf}
-                      onChange={handleCpfChange("representanteCpf")}
-                      className="input"
-                      required
-                    />
+                    <div>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="Seu CPF *"
+                        name="representanteCpf"
+                        value={formState.representanteCpf}
+                        onChange={handleCpfChangeAndValidate("representanteCpf")}
+                        className={`input ${
+                          formErrors.representanteCpf
+                            ? "border-error ring-1 ring-error"
+                            : ""
+                        }`}
+                        {...validar("Informe o CPF do representante.")}
+                      />
+                      {formErrors.representanteCpf && (
+                        <span className="text-xs text-error mt-1 ml-1">
+                          {formErrors.representanteCpf}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1618,7 +1750,7 @@ export const FormularioSubmissao = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <input
                       type="text"
-                      placeholder="Seu Endereço Residencial"
+                      placeholder="Seu Endereço Residencial *"
                       name="representanteEnderecoResidencial"
                       value={formState.representanteEnderecoResidencial}
                       onChange={handleFieldChange}
@@ -1656,19 +1788,17 @@ export const FormularioSubmissao = () => {
                     <input
                       type="text"
                       inputMode="numeric"
-                      placeholder="Seu RG"
+                      placeholder="Seu RG (Opcional)"
                       name="representanteRgNumero"
                       value={formState.representanteRgNumero}
                       onChange={handleRgChange("representanteRgNumero")}
                       className="input"
-                      required
                     />
                     <select
                       name="representanteRgOrgao"
                       value={formState.representanteRgOrgao}
                       onChange={handleFieldChange}
                       className="input"
-                      required
                     >
                       {orgaoEmissorOptions.map((option) => (
                         <option key={option.value} value={option.value}>
@@ -1701,7 +1831,7 @@ export const FormularioSubmissao = () => {
                   <div>
                     <input
                       type="text"
-                      placeholder="Nome Completo da outra parte"
+                      placeholder="Nome Completo da outra parte *"
                       name="nomeRequerido"
                       value={formState.nomeRequerido}
                       onChange={handleFieldChange}
@@ -1721,7 +1851,7 @@ export const FormularioSubmissao = () => {
                       placeholder="CPF (se souber)"
                       name="cpfRequerido"
                       value={formState.cpfRequerido}
-                      onChange={handleCpfChange("cpfRequerido")}
+                      onChange={handleCpfChangeAndValidate("cpfRequerido")}
                       className="input"
                     />
                   </div>
@@ -1730,7 +1860,7 @@ export const FormularioSubmissao = () => {
                 <div>
                   <input
                     type="text"
-                    placeholder="Endereço Residencial (se souber)"
+                    placeholder="Endereço Residencial (pelo menos um contato é obrigatório) *"
                     name="enderecoRequerido"
                     value={formState.enderecoRequerido}
                     onChange={handleFieldChange}
@@ -1744,7 +1874,7 @@ export const FormularioSubmissao = () => {
                     <input
                       type="text"
                       inputMode="tel"
-                      placeholder="Telefone (se souber)"
+                      placeholder="Telefone (pelo menos um contato é obrigatório) *"
                       name="requeridoTelefone"
                       value={formState.requeridoTelefone}
                       onChange={handlePhoneChange("requeridoTelefone")}
@@ -1755,7 +1885,7 @@ export const FormularioSubmissao = () => {
                   <div>
                     <input
                       type="email"
-                      placeholder="Email (se souber)"
+                      placeholder="Email (pelo menos um contato é obrigatório) *"
                       name="requeridoEmail"
                       value={formState.requeridoEmail}
                       onChange={handleFieldChange}
@@ -1938,7 +2068,7 @@ export const FormularioSubmissao = () => {
                           onChange={handleCurrencyChange("valorMensalPensao")}
                           placeholder="0,00"
                           className="input pl-12"
-                          required
+                          {...validar("Informe o valor da pensão.")}
                         />
                       </div>
                     </div>
@@ -2316,7 +2446,13 @@ export const FormularioSubmissao = () => {
                       type="checkbox"
                       name="prefersAudio"
                       checked={formState.prefersAudio}
-                      onChange={(e) => dispatch({ type: "UPDATE_FIELD", field: "prefersAudio", value: e.target.checked })}
+                      onChange={(e) =>
+                        dispatch({
+                          type: "UPDATE_FIELD",
+                          field: "prefersAudio",
+                          value: e.target.checked,
+                        })
+                      }
                       className="w-4 h-4 accent-primary"
                     />
                     <span className="text-primary font-medium flex items-center gap-1">
@@ -2325,22 +2461,30 @@ export const FormularioSubmissao = () => {
                   </label>
                 </div>
                 <textarea
-                  placeholder={formState.prefersAudio ? "Se desejar, faça um breve resumo aqui (opcional)..." : "Conte detalhadamente o que aconteceu, por que você precisa da justiça, como está a situação atual..."}
+                  placeholder={
+                    formState.prefersAudio
+                      ? "Se desejar, faça um breve resumo aqui (opcional)..."
+                      : "Conte detalhadamente o que aconteceu, por que você precisa da justiça, como está a situação atual..."
+                  }
                   value={formState.relato}
                   onChange={handleFieldChange}
                   name="relato"
                   rows="10"
                   className={`input w-full ${formErrors.relato ? "border-error ring-1 ring-error" : ""}`}
                 ></textarea>
-                
+
                 {/* Barra de Progresso */}
                 {!formState.prefersAudio && (
                   <div className="w-full h-2 bg-app rounded-full mt-2 overflow-hidden border border-soft">
-                    <div 
+                    <div
                       className={`h-full transition-all duration-500 ${
-                        (formState.relato || "").length >= 250 ? "bg-success" : "bg-error"
+                        (formState.relato || "").length >= 250
+                          ? "bg-success"
+                          : "bg-error"
                       }`}
-                      style={{ width: `${Math.min(((formState.relato || "").length / 250) * 100, 100)}%` }}
+                      style={{
+                        width: `${Math.min(((formState.relato || "").length / 250) * 100, 100)}%`,
+                      }}
                     />
                   </div>
                 )}
@@ -2350,7 +2494,9 @@ export const FormularioSubmissao = () => {
                     {formErrors.relato}
                   </span>
                   {!formState.prefersAudio && (
-                    <span className={`text-xs font-medium ${(formState.relato || "").length < 250 ? "text-error" : "text-success"}`}>
+                    <span
+                      className={`text-xs font-medium ${(formState.relato || "").length < 250 ? "text-error" : "text-success"}`}
+                    >
                       {(formState.relato || "").length} / 250 caracteres
                     </span>
                   )}
@@ -2358,9 +2504,17 @@ export const FormularioSubmissao = () => {
               </div>
 
               {/* Gravação de Áudio */}
-              <div className={`bg-surface p-4 rounded-lg border border-dashed ${formErrors.audio ? "border-error bg-red-50/10" : "border-soft"} flex flex-col items-center justify-center gap-3`}>
+              <div
+                className={`bg-surface p-4 rounded-lg border border-dashed ${formErrors.audio ? "border-error bg-red-50/10" : "border-soft"} flex flex-col items-center justify-center gap-3`}
+              >
                 <p className="text-sm text-muted">
-                  {formState.prefersAudio ? <strong className="text-primary">Grave seu relato aqui (Obrigatório)</strong> : "Prefere falar? Grave um áudio contando sua história."}
+                  {formState.prefersAudio ? (
+                    <strong className="text-primary">
+                      Grave seu relato aqui (Obrigatório)
+                    </strong>
+                  ) : (
+                    "Prefere falar? Grave um áudio contando sua história."
+                  )}
                 </p>
                 {!isRecording && !formState.audioBlob && (
                   <button
@@ -2398,7 +2552,9 @@ export const FormularioSubmissao = () => {
                 )}
               </div>
               {formErrors.audio && (
-                <p className="text-sm text-error font-bold text-center">{formErrors.audio}</p>
+                <p className="text-sm text-error font-bold text-center">
+                  {formErrors.audio}
+                </p>
               )}
 
               {/* Checklist e Upload */}
@@ -2426,7 +2582,9 @@ export const FormularioSubmissao = () => {
                 </div>
               )}
 
-              <div className={`bg-surface p-4 rounded-lg border border-dashed ${formErrors.documentos ? "border-error bg-red-50/10" : "border-soft"}`}>
+              <div
+                className={`bg-surface p-4 rounded-lg border border-dashed ${formErrors.documentos ? "border-error bg-red-50/10" : "border-soft"}`}
+              >
                 <input
                   type="file"
                   accept=".pdf,.jpg,.jpeg,.png"
@@ -2474,7 +2632,9 @@ export const FormularioSubmissao = () => {
                 )}
               </div>
               {formErrors.documentos && (
-                <p className="text-sm text-red-500 font-bold text-center">{formErrors.documentos}</p>
+                <p className="text-sm text-red-500 font-bold text-center">
+                  {formErrors.documentos}
+                </p>
               )}
             </section>
 
