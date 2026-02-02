@@ -14,7 +14,9 @@ import {
   gerarTermoDeclaracao,
   regerarMinuta,
   receberDocumentosComplementares,
-  reprocessarCaso, // <--- Importar aqui
+  reprocessarCaso,
+  renomearDocumento,
+  solicitarReagendamento,
 } from "../controllers/casosController.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { upload } from "../middleware/upload.js"; // Usa sua configuração personalizada
@@ -35,6 +37,7 @@ router.post(
   upload.fields([{ name: "documentos" }]),
   receberDocumentosComplementares,
 );
+router.post("/:id/reagendar", solicitarReagendamento);
 
 // Rotas Protegidas
 router.get("/", authMiddleware, listarCasos);
@@ -47,12 +50,13 @@ router.post(
   upload.single("capa"),
   finalizarCasoSolar
 );
-router.post("/:id/reverter-finalizacao", authMiddleware, reverterFinalizacao); // Adicionado
+router.post("/:id/reverter-finalizacao", authMiddleware, reverterFinalizacao);
 router.post("/:id/resetar-chave", authMiddleware, resetarChaveAcesso);
 router.patch("/:id/status", authMiddleware, atualizarStatusCaso);
 router.delete("/:id", authMiddleware, deletarCaso);
 router.patch("/:id/feedback", authMiddleware, salvarFeedback);
 router.patch("/:id/agendar", authMiddleware, agendarReuniao);
 router.post("/:id/regerar-minuta", authMiddleware, regerarMinuta);
-router.post("/:id/reprocessar", authMiddleware, reprocessarCaso); // <--- Nova rota
+router.post("/:id/reprocessar", authMiddleware, reprocessarCaso);
+router.patch("/:id/documento/renomear", authMiddleware, renomearDocumento);
 export default router;

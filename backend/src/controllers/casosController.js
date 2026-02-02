@@ -1,4 +1,4 @@
-﻿﻿﻿import { supabase } from "../config/supabase.js";
+﻿﻿﻿﻿﻿import { supabase } from "../config/supabase.js";
 import path from "path";
 import {
   generateCredentials,
@@ -19,7 +19,7 @@ import { Client } from "@upstash/qstash";
 
 // Tempo de expiração (em segundos) para URLs assinadas do Supabase
 const signedExpires = Number.parseInt(
-  process.env.SIGNED_URL_EXPIRES || "86400",
+  process.env.SIGNED_URL_EXPIRES || "2592000",
   10,
 );
 
@@ -171,7 +171,9 @@ const numeroParaExtenso = (valor) => {
 const calcularPercentualSalarioMinimo = (valorMensalPensao) => {
   if (!valorMensalPensao) return "";
   const valorNumerico = parseCurrencyToNumber(valorMensalPensao);
-  logger.info(`[Cálculo Percentual] Valor Pensão: ${valorMensalPensao} -> Numérico: ${valorNumerico} | Salário Mínimo: ${salarioMinimoAtual}`);
+  logger.info(
+    `[Cálculo Percentual] Valor Pensão: ${valorMensalPensao} -> Numérico: ${valorNumerico} | Salário Mínimo: ${salarioMinimoAtual}`,
+  );
   if (
     !salarioMinimoAtual ||
     Number.isNaN(valorNumerico) ||
@@ -473,7 +475,7 @@ const buildDocxTemplatePayload = (
         : "",
     ),
     nacionalidade: ensureText(
-      normalizeGenderTerm(baseData.assistido_nacionalidade),
+      normalizeGenderTerm(baseData.assistido_nacionalidade || "brasileiro(a)"),
     ),
   };
 
@@ -596,7 +598,7 @@ const buildDocxTemplatePayload = (
         : "",
     ),
     requerente_nacionalidade: ensureText(
-      normalizeGenderTerm(baseData.assistido_nacionalidade),
+      normalizeGenderTerm(baseData.assistido_nacionalidade || "brasileiro(a)"),
     ),
     requerente_estado_civil: ensureText(
       normalizeGenderTerm(baseData.assistido_estado_civil),
@@ -604,7 +606,10 @@ const buildDocxTemplatePayload = (
     requerente_ocupacao: ensureText(baseData.assistido_ocupacao),
     requerente_email: ensureText(baseData.email_assistido),
     requerente_telefone: ensureText(baseData.telefone_assistido),
-    requerente_endereco_residencial: ensureText(baseData.endereco_assistido),
+    requerente_endereco_residencial: ensureText(
+      baseData.endereco_assistido ||
+        baseData.representante_endereco_residencial,
+    ),
     requerente_representante: ensureText(requerente.representante),
     representante_nome: ensureText(baseData.representante_nome).toUpperCase(),
     representante_nacionalidade: ensureInlineValue(
@@ -658,8 +663,12 @@ const buildDocxTemplatePayload = (
     executado_email: ensureText(baseData.requerido_email),
     executado_telefone: ensureText(baseData.requerido_telefone),
     valor_pensao: ensureText(baseData.valor_pensao),
-    valor_pensao_solicitado: ensureText(baseData.valor_pensao_solicitado || baseData.valor_pensao),
-    valor_salario_minimo: ensureText(baseData.valor_salario_minimo || baseData.salario_minimo_formatado),
+    valor_pensao_solicitado: ensureText(
+      baseData.valor_pensao_solicitado || baseData.valor_pensao,
+    ),
+    valor_salario_minimo: ensureText(
+      baseData.valor_salario_minimo || baseData.salario_minimo_formatado,
+    ),
     percentual_definitivo_salario_min: ensureText(percentualDefinitivoBase),
     percentual_definitivo_extras: ensureText(
       baseData.percentual_definitivo_extras,
@@ -810,16 +819,28 @@ export async function processarCasoEmBackground(
           let textoExtraido = "";
           const lowerPath = docPath.toLowerCase();
           // Define o tipo correto para a IA (PDF ou Imagem)
-          let mimeType = lowerPath.endsWith(".pdf") ? "application/pdf" : (lowerPath.endsWith(".png") ? "image/png" : "image/jpeg");
+          let mimeType = lowerPath.endsWith(".pdf")
+            ? "application/pdf"
+            : lowerPath.endsWith(".png")
+              ? "image/png"
+              : "image/jpeg";
 
           try {
-            textoExtraido = await visionOCR(buffer, mimeType, "Transcreva todo o texto deste documento fielmente.");
+            textoExtraido = await visionOCR(
+              buffer,
+              mimeType,
+              "Transcreva todo o texto deste documento fielmente.",
+            );
             logger.info(`[OCR IA] Sucesso ao extrair texto de ${docPath}`);
           } catch (aiError) {
-            logger.warn(`[OCR IA] Falha ao processar ${docPath}: ${aiError.message}`);
+            logger.warn(
+              `[OCR IA] Falha ao processar ${docPath}: ${aiError.message}`,
+            );
             // Fallback: Tesseract (Apenas para imagens, pois Tesseract puro não lê PDF binário)
             if (mimeType !== "application/pdf") {
-              logger.info(`[OCR Fallback] Tentando Tesseract local para ${docPath}...`);
+              logger.info(
+                `[OCR Fallback] Tentando Tesseract local para ${docPath}...`,
+              );
               textoExtraido = await extractTextFromImage(buffer);
               logger.info(`[OCR Fallback] Sucesso com Tesseract.`);
             } else {
@@ -829,14 +850,18 @@ export async function processarCasoEmBackground(
 
           if (textoExtraido) {
             // Log do texto extraído (Preview) para conferência
-            logger.info(`[OCR CONTEÚDO] ${docPath} (Preview):\n${textoExtraido.substring(0, 500).replace(/\n/g, " ")}...`);
+            logger.info(
+              `[OCR CONTEÚDO] ${docPath} (Preview):\n${textoExtraido.substring(0, 500).replace(/\n/g, " ")}...`,
+            );
             textoCompleto += `\n\n--- TEXTO EXTRAÍDO (${docPath}) ---\n${textoExtraido}`;
           }
         } catch (ocrError) {
           logger.warn(`Falha no OCR para ${docPath}: ${ocrError.message}`);
         }
       } else {
-        logger.info(`[OCR] Pulando arquivo (formato não suportado): ${docPath}`);
+        logger.info(
+          `[OCR] Pulando arquivo (formato não suportado): ${docPath}`,
+        );
       }
     }
 
@@ -1074,7 +1099,10 @@ export const criarNovoCaso = async (req, res) => {
     try {
       documentosInformadosArray = JSON.parse(documentos_informados || "[]");
     } catch (e) {
-      logger.warn("Falha ao analisar JSON de documentos_informados:", e.message);
+      logger.warn(
+        "Falha ao analisar JSON de documentos_informados:",
+        e.message,
+      );
       documentosInformadosArray = []; // Fallback seguro
     }
     // -----------------------------------------------------
@@ -1302,7 +1330,19 @@ export const obterDetalhesCaso = async (req, res) => {
 
     // Garante compatibilidade com o frontend que espera camelCase (documentNames)
     if (!data.dados_formulario.documentNames) {
-      data.dados_formulario.documentNames = data.dados_formulario.document_names;
+      data.dados_formulario.documentNames =
+        data.dados_formulario.document_names;
+    }
+
+    // Busca o histórico de agendamentos
+    const { data: historico } = await supabase
+      .from("historico_agendamentos")
+      .select("*")
+      .eq("caso_id", id)
+      .order("created_at", { ascending: false });
+
+    if (historico) {
+      data.historico_agendamentos = historico;
     }
 
     const casoComUrls = await attachSignedUrls(data);
@@ -1315,18 +1355,36 @@ export const obterDetalhesCaso = async (req, res) => {
 
 export const atualizarStatusCaso = async (req, res) => {
   const { id } = req.params;
-  const { status, descricao_pendencia } = req.body;
+  const { status, descricao_pendencia, numero_solar } = req.body;
   try {
+    const updateData = {};
+    if (status !== undefined) updateData.status = status;
+    if (descricao_pendencia !== undefined) updateData.descricao_pendencia = descricao_pendencia;
+    if (numero_solar !== undefined) updateData.numero_solar = numero_solar;
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ error: "Nenhum dado enviado para atualização." });
+    }
+
     const { data, error = null } = await supabase
       .from("casos")
-      .update({ status, descricao_pendencia })
+      .update(updateData)
       .eq("id", id)
       .select()
       .single();
     if (error) throw error;
     res.status(200).json(data);
   } catch (error) {
-    res.status(500).json({ error: "Erro ao atualizar status." });
+    logger.error(`Erro ao atualizar caso ${id}: ${error.message}`);
+    
+    if (error.code === '23505') {
+      return res.status(409).json({ error: "Este número Solar já está vinculado a outro caso." });
+    }
+    if (error.code === '22P02') {
+      return res.status(400).json({ error: "Formato inválido. O número Solar deve conter apenas números." });
+    }
+    
+    res.status(500).json({ error: "Erro ao atualizar dados do caso." });
   }
 };
 
@@ -1518,7 +1576,8 @@ export const regerarMinuta = async (req, res) => {
     // 2. Prepara os dados do formulário com o percentual recalculado e salário mínimo correto
     const baseData = caso.dados_formulario || caso;
     const valorMensalPensao = baseData.valor_mensal_pensao;
-    const percentualSalarioMinimoCalculado = calcularPercentualSalarioMinimo(valorMensalPensao);
+    const percentualSalarioMinimoCalculado =
+      calcularPercentualSalarioMinimo(valorMensalPensao);
     const valorPensaoFormatado = formatCurrencyBr(valorMensalPensao);
 
     // Adiciona o percentual calculado e o salário mínimo correto aos dados do formulário
@@ -1851,7 +1910,10 @@ export const receberDocumentosComplementares = async (req, res) => {
     try {
       nomesMap = JSON.parse(nomes_arquivos || "{}");
     } catch (e) {
-      logger.warn("[Upload Complementar] Falha ao analisar JSON de nomes_arquivos:", e.message);
+      logger.warn(
+        "[Upload Complementar] Falha ao analisar JSON de nomes_arquivos:",
+        e.message,
+      );
       nomesMap = {}; // Fallback seguro
     }
     // -----------------------------------------------------
@@ -1864,15 +1926,21 @@ export const receberDocumentosComplementares = async (req, res) => {
       document_names: updatedNames,
     };
 
-    // 4. Atualiza o banco
+    // 4. Prepara e atualiza o banco
+    const updatePayload = {
+      urls_documentos: [...(caso.urls_documentos || []), ...novosUrls],
+      dados_formulario: updatedDadosFormulario,
+      status: "documentos_entregues", // Define o status correto para notificar o defensor
+      updated_at: new Date(),
+    };
+
+    logger.info(
+      `[Upload Complementar] Atualizando caso ${caso.id}. Novo status: ${updatePayload.status}`,
+    );
+
     const { error: updateError } = await supabase
       .from("casos")
-      .update({
-        urls_documentos: [...(caso.urls_documentos || []), ...novosUrls],
-        dados_formulario: updatedDadosFormulario,
-        status: "documentos_entregues", // Novo status
-        updated_at: new Date(),
-      })
+      .update(updatePayload)
       .eq("id", caso.id);
 
     if (updateError) throw updateError;
@@ -1999,5 +2067,104 @@ export const reprocessarCaso = async (req, res) => {
     logger.error(`Erro ao solicitar reprocessamento: ${error.message}`);
     if (!res.headersSent)
       res.status(500).json({ error: "Erro interno ao reprocessar." });
+  }
+};
+
+export const renomearDocumento = async (req, res) => {
+  const { id } = req.params;
+  const { fileUrl, newName } = req.body;
+
+  try {
+    const { data: caso, error } = await supabase
+      .from("casos")
+      .select("dados_formulario")
+      .eq("id", id)
+      .single();
+
+    if (error || !caso) throw new Error("Caso não encontrado");
+
+    const dados = caso.dados_formulario || {};
+    const docNames = dados.document_names || {};
+
+    // Usa o nome do arquivo (extraído da URL) como chave para salvar o novo nome
+    const fileName = fileUrl.split("/").pop().split("?")[0];
+    docNames[decodeURIComponent(fileName)] = newName;
+
+    dados.document_names = docNames;
+    dados.documentNames = docNames; // Compatibilidade
+
+    await supabase
+      .from("casos")
+      .update({ dados_formulario: dados })
+      .eq("id", id);
+
+    res.status(200).json({ message: "Documento renomeado com sucesso." });
+  } catch (e) {
+    res.status(500).json({ error: "Erro ao renomear documento." });
+  }
+};
+
+export const solicitarReagendamento = async (req, res) => {
+  const { id } = req.params;
+  const { motivo, data_sugerida, cpf, chave } = req.body;
+
+  try {
+    // 1. Busca o caso para validar credenciais
+    const { data: caso, error: fetchError } = await supabase
+      .from("casos")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (fetchError || !caso) {
+      return res.status(404).json({ error: "Caso não encontrado." });
+    }
+
+    // 2. Validação de Segurança (CPF e Chave)
+    // Remove caracteres não numéricos do CPF para comparação
+    const cpfLimpo = cpf.replace(/\D/g, "");
+    if (caso.cpf_assistido !== cpfLimpo) {
+      return res.status(403).json({ error: "CPF inválido para este caso." });
+    }
+
+    const chaveValida = verifyKey(chave, caso.chave_acesso_hash);
+    if (!chaveValida) {
+      return res.status(403).json({ error: "Chave de acesso inválida." });
+    }
+
+    // 3. Salvar histórico se houver agendamento anterior ativo
+    if (caso.agendamento_data) {
+      const tipoReuniao = caso.status.includes("presencial")
+        ? "presencial"
+        : "online";
+
+      await supabase.from("historico_agendamentos").insert({
+        caso_id: id,
+        data_agendamento: caso.agendamento_data,
+        link_ou_local: caso.agendamento_link,
+        tipo: tipoReuniao,
+        status: "reagendado",
+      });
+    }
+
+    // 4. Atualiza o status e salva nas colunas específicas
+    const { error: updateError } = await supabase
+      .from("casos")
+      .update({
+        status: "reagendamento_solicitado",
+        motivo_reagendamento: motivo,
+        data_sugerida_reagendamento: data_sugerida,
+        agendamento_data: null, // Libera a agenda
+        agendamento_link: null,
+        updated_at: new Date(),
+      })
+      .eq("id", id);
+
+    if (updateError) throw updateError;
+
+    res.status(200).json({ message: "Solicitação enviada com sucesso." });
+  } catch (error) {
+    logger.error(`Erro ao solicitar reagendamento: ${error.message}`);
+    res.status(500).json({ error: "Erro ao processar solicitação." });
   }
 };

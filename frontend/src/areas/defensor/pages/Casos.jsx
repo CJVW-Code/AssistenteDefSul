@@ -11,6 +11,7 @@ const statusStyles = {
   em_analise: "bg-sky-100 text-sky-800 border-sky-200",
   aguardando_docs: "bg-purple-100 text-purple-800 border-purple-200",
   reuniao_agendada: "bg-purple-100 text-purple-800 border-purple-200",
+  reuniao_online_agendada: "bg-blue-100 text-blue-800 border-blue-200",
   encaminhado_solar: "bg-emerald-100 text-emerald-800 border-emerald-200",
   default: "bg-slate-100 text-slate-700 border-slate-200",
 };
@@ -55,7 +56,8 @@ export const Casos = () => {
     return (
       caso.nome_assistido?.toLowerCase().includes(termo) ||
       caso.protocolo?.toLowerCase().includes(termo) ||
-      caso.cpf_assistido?.includes(termo)
+      caso.cpf_assistido?.includes(termo) ||
+      (caso.numero_solar && String(caso.numero_solar).includes(termo))
     );
   });
 
@@ -105,7 +107,7 @@ export const Casos = () => {
             />
             <input
               type="text"
-              placeholder="Buscar nome, CPF ou protocolo..."
+              placeholder="Buscar nome, CPF, protocolo ou Solar..."
               className="input pl-10 py-2 text-sm"
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
@@ -144,7 +146,12 @@ export const Casos = () => {
                       className="border-t border-soft hover:bg-slate-100 dark:hover:bg-slate-400/60 transition"
                     >
                       <td className="p-4 font-mono text-xs text-muted">
-                        {caso.protocolo}
+                        <div>{caso.protocolo}</div>
+                        {caso.numero_solar && (
+                          <div className="text-primary font-semibold mt-1">
+                            Solar: {caso.numero_solar}
+                          </div>
+                        )}
                       </td>
                       <td className="p-4 font-medium">{caso.nome_assistido}</td>
                       <td className="p-4 text-muted">

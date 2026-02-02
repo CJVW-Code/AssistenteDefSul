@@ -1,4 +1,4 @@
-﻿﻿import React, { useState, useRef } from "react";
+﻿﻿﻿import React, { useState, useRef } from "react";
 import { motion } from "framer-motion";
 import {
   Search,
@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   Upload,
   X,
+  CalendarX,
 } from "lucide-react";
 import { API_BASE } from "../../../utils/apiBase";
 import { useToast } from "../../../contexts/ToastContext";
@@ -28,6 +29,45 @@ export const ConsultaStatus = () => {
   const [files, setFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
+
+  // Estados para Reagendamento
+  const [isReagendando, setIsReagendando] = useState(false);
+  const [motivoReagendamento, setMotivoReagendamento] = useState("");
+  const [dataSugerida, setDataSugerida] = useState("");
+  const [enviandoReagendamento, setEnviandoReagendamento] = useState(false);
+
+  const handleSolicitarReagendamento = async () => {
+    if (!motivoReagendamento.trim()) {
+      toast.error("Por favor, informe o motivo ou uma data sugerida.");
+      return;
+    }
+
+    setEnviandoReagendamento(true);
+    try {
+      const response = await fetch(`${API_BASE}/casos/${caso.id}/reagendar`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          motivo: motivoReagendamento,
+          data_sugerida: dataSugerida,
+          cpf: cpf,
+          chave: chave,
+        }),
+      });
+
+      if (!response.ok) throw new Error("Erro ao enviar solicitação.");
+
+      toast.success("Solicitação enviada! Aguarde nosso contato.");
+      setIsReagendando(false);
+      handleConsulta({ preventDefault: () => {} }); // Recarrega status
+    } catch (error) {
+      toast.error("Falha ao solicitar reagendamento.");
+    } finally {
+      setEnviandoReagendamento(false);
+    }
+  };
 
   const handleConsulta = async (e) => {
     e.preventDefault();
@@ -181,8 +221,9 @@ export const ConsultaStatus = () => {
 
       {caso && (
         <>
-          {/* CARD DE AGENDAMENTO ONLINE - PRIORIDADE MÁXIMA */}
-          {caso.agendamento_link && (
+          {/* CARD DE AGENDAMENTO ONLINE */}
+          {(caso.status === "reuniao online" ||
+            (caso.status === "reuniao agendada" && caso.agendamento_link)) && (
             <div className="bg-surface/20 border border-border/50 rounded-xl p-6 mt-6 mb-4 ">
               <h3 className="text-xl font-bold text-primary flex items-center gap-2">
                 <Video size={20} /> Atendimento Online Agendado
@@ -191,7 +232,8 @@ export const ConsultaStatus = () => {
                 <p className="text-muted mt-2">
                   Data:{" "}
                   <strong className="text-lg">
-                    {new Date(caso.agendamento_data).toLocaleString("pt-BR")}
+                    {caso.agendamento_data_formatada ||
+                      new Date(caso.agendamento_data).toLocaleString("pt-BR")}
                   </strong>
                 </p>
               )}
@@ -203,6 +245,136 @@ export const ConsultaStatus = () => {
               >
                 ENTRAR NA REUNIÃO AGORA
               </a>
+
+              {!isReagendando ? (
+                <button
+                  onClick={() => setIsReagendando(true)}
+                  className="w-full mt-3 text-sm text-muted hover:text-red-500 underline flex items-center justify-center gap-1"
+                >
+                  <CalendarX size={14} /> Não posso comparecer neste dia/horário
+                </button>
+              ) : (
+                <div className="mt-4 bg-surface p-4 rounded border border-soft animate-fade-in">
+                  <label className="text-sm font-bold text-muted mb-2 block">
+                    Motivo do reagendamento:
+                  </label>
+                  <textarea
+                    className="w-full p-2 border border-soft rounded bg-app text-sm mb-2"
+                    rows="2"
+                    placeholder="Ex: Tenho médico neste horário..."
+                    value={motivoReagendamento}
+                    onChange={(e) => setMotivoReagendamento(e.target.value)}
+                  />
+
+                  <label className="text-sm font-bold text-muted mb-2 block">
+                    Sugestão de nova data/horário (Opcional):
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full p-2 border border-soft rounded bg-app text-sm mb-4"
+                    placeholder="Ex: Próxima terça à tarde ou Quarta pela manhã"
+                    value={dataSugerida}
+                    onChange={(e) => setDataSugerida(e.target.value)}
+                  />
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleSolicitarReagendamento}
+                      disabled={enviandoReagendamento}
+                      className="btn btn-primary btn-sm flex-1"
+                    >
+                      {enviandoReagendamento
+                        ? "Enviando..."
+                        : "Enviar Solicitação"}
+                    </button>
+                    <button
+                      onClick={() => setIsReagendando(false)}
+                      className="btn btn-ghost btn-sm"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* CARD DE AGENDAMENTO PRESENCIAL */}
+          {caso.status === "reuniao presencial" && (
+            <div className="bg-surface/20 border border-border/50 rounded-xl p-6 mt-6 mb-4 ">
+              <h3 className="text-xl font-bold text-primary flex items-center gap-2">
+                <Clock size={20} /> Atendimento Presencial Agendado
+              </h3>
+              {caso.agendamento_data && (
+                <p className="text-muted mt-2">
+                  Data:{" "}
+                  <strong className="text-lg">
+                    {caso.agendamento_data_formatada ||
+                      new Date(caso.agendamento_data).toLocaleString("pt-BR")}
+                  </strong>
+                </p>
+              )}
+              {caso.agendamento_link && (
+                <div className="mt-4 p-4 bg-surface rounded border border-soft">
+                  <p className="text-sm font-bold text-muted uppercase">
+                    Local / Instruções
+                  </p>
+                  <p className="text-text whitespace-pre-wrap">
+                    {caso.agendamento_link}
+                  </p>
+                </div>
+              )}
+
+              {!isReagendando ? (
+                <button
+                  onClick={() => setIsReagendando(true)}
+                  className="w-full mt-3 text-sm text-muted hover:text-red-500 underline flex items-center justify-center gap-1"
+                >
+                  <CalendarX size={14} /> Não posso comparecer neste dia/horário
+                </button>
+              ) : (
+                <div className="mt-4 bg-surface p-4 rounded border border-soft animate-fade-in">
+                  <label className="text-sm font-bold text-muted mb-2 block">
+                    Motivo do reagendamento:
+                  </label>
+                  <textarea
+                    className="w-full p-2 border border-soft rounded bg-app text-sm mb-2"
+                    rows="2"
+                    placeholder="Ex: Trabalho neste horário..."
+                    value={motivoReagendamento}
+                    onChange={(e) => setMotivoReagendamento(e.target.value)}
+                  />
+
+                  <label className="text-sm font-bold text-muted mb-2 block">
+                    Sugestão de nova data/horário (Opcional):
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full p-2 border border-soft rounded bg-app text-sm mb-4"
+                    placeholder="Ex: Preferência por atendimento matutino"
+                    value={dataSugerida}
+                    onChange={(e) => setDataSugerida(e.target.value)}
+                  />
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleSolicitarReagendamento}
+                      disabled={enviandoReagendamento}
+                      className="btn btn-primary btn-sm flex-1"
+                    >
+                      {enviandoReagendamento
+                        ? "Enviando..."
+                        : "Enviar Solicitação"}
+                    </button>
+                    <button
+                      onClick={() => setIsReagendando(false)}
+                      className="btn btn-ghost btn-sm"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -363,8 +535,8 @@ export const ConsultaStatus = () => {
                 </span>
               </div>
               <p className="text-sm text-muted mt-4">
-                Estamos analisando suas informações. Por favor, aguarde e
-                verifique novamente em breve.
+                {caso.descricao ||
+                  "Estamos analisando suas informações. Por favor, aguarde e verifique novamente em breve."}
               </p>
             </div>
           )}
