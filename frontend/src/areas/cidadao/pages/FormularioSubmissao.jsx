@@ -119,7 +119,7 @@ const initialState = {
   alimentosParaExConjuge: "",
 
   // Processual Geral
-  cidadeAssinatura: "",
+  cidadeAssinatura: "Teixeira de Freitas",
 
   // Narrativa e Arquivos
   relato: "",
@@ -2390,6 +2390,7 @@ export const FormularioSubmissao = () => {
             </section>
 
             {/* --- DADOS PROCESSUAIS GERAIS --- */}
+            {/*
             <section className="card space-y-4 border-l-4 border-l-purple-500">
               <div className="flex items-center gap-2 mb-2">
                 <DollarSign className="text-purple-400" />
@@ -2426,6 +2427,7 @@ export const FormularioSubmissao = () => {
                 </div>
               </div>
             </section>
+            */}
 
             {/* --- ETAPA 5: RELATO E DOCUMENTOS --- */}
             <section className="card space-y-6 border-l-4 border-l-indigo-500">
