@@ -17,10 +17,11 @@ import {
   reprocessarCaso,
   renomearDocumento,
   solicitarReagendamento,
+  alternarArquivamento,
+  salvarFeedback,
 } from "../controllers/casosController.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { upload } from "../middleware/upload.js"; // Usa sua configuração personalizada
-import { salvarFeedback } from "../controllers/casosController.js";
 const router = express.Router();
 
 // Configuração para upload de múltiplos arquivos (Criação)
@@ -48,7 +49,7 @@ router.post(
   "/:id/finalizar",
   authMiddleware,
   upload.single("capa"),
-  finalizarCasoSolar
+  finalizarCasoSolar,
 );
 router.post("/:id/reverter-finalizacao", authMiddleware, reverterFinalizacao);
 router.post("/:id/resetar-chave", authMiddleware, resetarChaveAcesso);
@@ -59,4 +60,5 @@ router.patch("/:id/agendar", authMiddleware, agendarReuniao);
 router.post("/:id/regerar-minuta", authMiddleware, regerarMinuta);
 router.post("/:id/reprocessar", authMiddleware, reprocessarCaso);
 router.patch("/:id/documento/renomear", authMiddleware, renomearDocumento);
+router.patch("/:id/arquivar", authMiddleware, alternarArquivamento);
 export default router;

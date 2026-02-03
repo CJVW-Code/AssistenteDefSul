@@ -312,11 +312,29 @@ const buildFallbackDosFatos = (caseData = {}) => {
   const safe = (value) =>
     typeof value === "string" ? value.trim() : (value ?? "");
   const paragraphs = [];
-  const assistidoNome =
+  
+  // --- LÓGICA MULTI-FILHOS ---
+  let outrosFilhos = [];
+  try {
+      if (caseData.outros_filhos_detalhes) {
+          outrosFilhos = typeof caseData.outros_filhos_detalhes === 'string' 
+            ? JSON.parse(caseData.outros_filhos_detalhes) 
+            : caseData.outros_filhos_detalhes;
+      }
+  } catch(e) {}
+
+  const assistidoPrincipal =
     safe(caseData.nome_assistido) ||
     safe(caseData.requerente_nome) ||
     safe(caseData.nome) ||
     "";
+  const nomesAssistidos = [assistidoPrincipal];
+  if (Array.isArray(outrosFilhos)) {
+      outrosFilhos.forEach(f => { if(f.nome) nomesAssistidos.push(safe(f.nome)); });
+  }
+  const assistidoNome = nomesAssistidos.filter(Boolean).join(", ");
+  const isPlural = nomesAssistidos.filter(Boolean).length > 1;
+
   const representanteNome = safe(caseData.representante_nome);
   const requeridoNome =
     safe(caseData.nome_requerido) ||
@@ -335,7 +353,7 @@ const buildFallbackDosFatos = (caseData = {}) => {
       ? `relata que ${requeridoNome} não contribui de forma regular para o custeio das despesas básicas`
       : "relata a ausência de contribuição regular da outra parte para o custeio das despesas básicas";
     paragraphs.push(
-      `${sujeito} ${complemento}, razão pela qual busca a tutela jurisdicional para garantir a subsistência da criança.`,
+      `${sujeito} ${complemento}, razão pela qual busca a tutela jurisdicional para garantir a subsistência da${isPlural ? 's crianças' : ' criança'}.`,
     );
   }
   if (safe(caseData.descricao_guarda)) {
@@ -875,9 +893,11 @@ export async function processarCasoEmBackground(
     }
 
     // Formatação de Dados
-    const formattedAssistidoNascimento = formatDateBr(
-      dados_formulario.assistido_data_nascimento,
-    );
+    // Garante que a data de nascimento não seja formatada se estiver vazia ou inválida
+    const formattedAssistidoNascimento = dados_formulario.assistido_data_nascimento
+      ? formatDateBr(dados_formulario.assistido_data_nascimento)
+      : "";
+
     const formattedDataInicioRelacao = formatDateBr(
       dados_formulario.data_inicio_relacao,
     );
@@ -1274,8 +1294,12 @@ export const criarNovoCaso = async (req, res) => {
 
 export const listarCasos = async (req, res) => {
   try {
-    const { cpf } = req.query;
+    const { cpf, arquivado } = req.query;
     let query = supabase.from("casos").select("*");
+
+    // Filtra por arquivado (padrão false se não especificado)
+    const statusFiltro = arquivado === 'true';
+    query = query.eq('arquivado', statusFiltro);
 
     // Se o CPF for fornecido na query, filtra por ele
     if (cpf) {
@@ -1311,14 +1335,31 @@ export const listarCasos = async (req, res) => {
 
 export const obterDetalhesCaso = async (req, res) => {
   const { id } = req.params;
+
+  // Validação: Se o ID não for número nem UUID (ex: "arquivados"), retorna 400 e evita erro 500 no banco
+  const isValidId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) || /^\d+$/.test(id);
+  if (!isValidId) {
+    return res.status(400).json({ error: "ID do caso inválido." });
+  }
+
   try {
     let { data, error } = await supabase
       .from("casos")
       .select("*")
       .eq("id", id)
       .single();
-    if (error) throw error;
-    if (!data) return res.status(404).json({ error: "Caso não encontrado." });
+    
+    if (error) {
+      // Tratamento específico para "Nenhum resultado encontrado" no Supabase
+      if (error.code === 'PGRST116') {
+        return res.status(404).json({ error: "Caso não encontrado." });
+      }
+      // Tratamento para ID inválido (ex: texto onde deveria ser número/uuid)
+      if (error.code === '22P02') {
+        return res.status(400).json({ error: "ID do caso inválido." });
+      }
+      throw error;
+    }
 
     // Garante que dados_formulario e sua propriedade document_names sejam sempre objetos
     if (!data.dados_formulario) {
@@ -1335,13 +1376,13 @@ export const obterDetalhesCaso = async (req, res) => {
     }
 
     // Busca o histórico de agendamentos
-    const { data: historico } = await supabase
+    const { data: historico, error: histError } = await supabase
       .from("historico_agendamentos")
       .select("*")
       .eq("caso_id", id)
       .order("created_at", { ascending: false });
 
-    if (historico) {
+    if (!histError && historico) {
       data.historico_agendamentos = historico;
     }
 
@@ -1945,6 +1986,13 @@ export const receberDocumentosComplementares = async (req, res) => {
 
     if (updateError) throw updateError;
 
+    // [NOTIFICAÇÃO] Alerta o defensor sobre novos documentos
+    await supabase.from("notificacoes").insert({
+      caso_id: caso.id,
+      mensagem: `Novos documentos entregues por ${caso.nome_assistido || "Assistido"}.`,
+      tipo: 'upload'
+    });
+
     res.status(200).json({ message: "Documentos enviados com sucesso!" });
   } catch (error) {
     logger.error(`Erro upload complementar: ${error.message}`);
@@ -2162,9 +2210,80 @@ export const solicitarReagendamento = async (req, res) => {
 
     if (updateError) throw updateError;
 
+    // [NOTIFICAÇÃO] Alerta o defensor sobre solicitação de reagendamento
+    await supabase.from("notificacoes").insert({
+      caso_id: id,
+      mensagem: `Solicitação de reagendamento para o caso ${caso.nome_assistido || "Assistido"}.`,
+      tipo: 'reagendamento'
+    });
+
     res.status(200).json({ message: "Solicitação enviada com sucesso." });
   } catch (error) {
     logger.error(`Erro ao solicitar reagendamento: ${error.message}`);
     res.status(500).json({ error: "Erro ao processar solicitação." });
+  }
+};
+
+export const alternarArquivamento = async (req, res) => {
+  const { id } = req.params;
+  const { arquivado, motivo } = req.body; // espera true ou false
+
+  // Validação: Motivo obrigatório ao arquivar
+  if (arquivado === true && (!motivo || motivo.trim().length < 5)) {
+    return res.status(400).json({ error: "Motivo de arquivamento é obrigatório (mín. 5 caracteres)." });
+  }
+
+  try {
+    const updateData = { arquivado };
+    if (arquivado) {
+      updateData.motivo_arquivamento = motivo;
+    } else {
+      updateData.motivo_arquivamento = null; // Limpa o motivo ao restaurar
+    }
+
+    const { data, error } = await supabase
+      .from('casos')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao processar arquivamento' });
+  }
+};
+
+// --- CONTROLLERS DE NOTIFICAÇÃO ---
+
+export const listarNotificacoes = async (req, res) => {
+  try {
+    // Busca notificações recentes
+    const { data, error } = await supabase
+      .from("notificacoes")
+      .select("*, casos(nome_assistido, protocolo)")
+      .order("created_at", { ascending: false })
+      .limit(20);
+
+    if (error) throw error;
+    res.status(200).json(data);
+  } catch (error) {
+    logger.error(`Erro ao listar notificações: ${error.message}`);
+    res.status(500).json({ error: "Erro ao buscar notificações." });
+  }
+};
+
+export const marcarNotificacaoLida = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const { error } = await supabase
+      .from("notificacoes")
+      .update({ lida: true })
+      .eq("id", id);
+    if (error) throw error;
+    res.status(200).json({ message: "Lida" });
+  } catch (error) {
+    res.status(500).json({ error: "Erro ao atualizar" });
   }
 };

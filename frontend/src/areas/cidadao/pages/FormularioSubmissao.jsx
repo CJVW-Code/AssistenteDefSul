@@ -402,6 +402,8 @@ export const FormularioSubmissao = () => {
   const [sugestoesCidades, setSugestoesCidades] = useState([]);
   const [mostrarSugestoes, setMostrarSugestoes] = useState(false);
 
+  const today = new Date().toISOString().split("T")[0];
+
   // Helper para validação personalizada (substitui o required padrão)
   const validar = (msg) => ({
     required: true,
@@ -713,6 +715,13 @@ export const FormularioSubmissao = () => {
     // 1. WhatsApp Obrigatório
     if (!stripNonDigits(formState.whatsappContato)) {
       validationErrors.whatsappContato = "O WhatsApp para reunião é obrigatório.";
+    }
+
+    // Validação Data de Nascimento (Não pode ser futura)
+    if (!formState.dataNascimentoAssistido) {
+      validationErrors.dataNascimentoAssistido = "A data de nascimento é obrigatória.";
+    } else if (formState.dataNascimentoAssistido > today) {
+      validationErrors.dataNascimentoAssistido = "A data de nascimento não pode ser futura.";
     }
 
     // Validação CPF Matemático
@@ -1338,14 +1347,21 @@ export const FormularioSubmissao = () => {
                 <div
                   className={`grid grid-cols-1 ${isFixacaoDeAlimentos ? "md:grid-cols-2" : "md:grid-cols-3"} gap-4`}
                 >
-                  <input
-                    type="date"
-                    placeholder="Data de Nascimento"
-                    name="dataNascimentoAssistido"
-                    value={formState.dataNascimentoAssistido}
-                    onChange={handleFieldChange}
-                    className="input"
-                  />
+                  <div>
+                    <input
+                      type="date"
+                      placeholder="Data de Nascimento"
+                      name="dataNascimentoAssistido"
+                      value={formState.dataNascimentoAssistido}
+                      onChange={handleFieldChange}
+                      className={`input ${formErrors.dataNascimentoAssistido ? "border-error ring-1 ring-error" : ""}`}
+                      max={today}
+                      {...validar("Informe a data de nascimento.")}
+                    />
+                    {formErrors.dataNascimentoAssistido && (
+                      <span className="text-xs text-error mt-1 ml-1">{formErrors.dataNascimentoAssistido}</span>
+                    )}
+                  </div>
                   {!isRepresentacao && (
                   <select
                     name="assistidoNacionalidade"
@@ -1583,6 +1599,7 @@ export const FormularioSubmissao = () => {
                             })
                           }
                           className="input"
+                          max={today}
                           {...validar("Informe a data de nascimento.")}
                         />
                         <select
@@ -1712,6 +1729,7 @@ export const FormularioSubmissao = () => {
                       value={formState.representanteDataNascimento}
                       onChange={handleFieldChange}
                       className="input"
+                      max={today}
                     />
                     <select
                       name="representanteNacionalidade"
@@ -2006,6 +2024,7 @@ export const FormularioSubmissao = () => {
                                   value={formState[item.field]}
                                   onChange={handleFieldChange}
                                   className="input"
+                                  max={today}
                                 />
                               )}
                               {item.renderType === "text" && (

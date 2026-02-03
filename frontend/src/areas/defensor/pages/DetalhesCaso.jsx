@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import {
   ChevronLeft,
@@ -25,6 +25,8 @@ import {
   AlertTriangle,
   History,
   Copy,
+  Archive,
+  ArchiveRestore,
 } from "lucide-react";
 import { API_BASE } from "../../../utils/apiBase";
 import { useToast } from "../../../contexts/ToastContext";
@@ -110,6 +112,14 @@ const formatValue = (value) => {
   return String(value);
 };
 
+// Função auxiliar para formatar data na visualização
+const formatDateDisplay = (dateString) => {
+  if (!dateString) return "Não informado";
+  const [year, month, day] = dateString.split("-");
+  if (!year || !month || !day) return dateString;
+  return `${day}/${month}/${year}`;
+};
+
 const CollapsibleText = ({
   text,
   maxLength = 350,
@@ -154,6 +164,7 @@ const CollapsibleText = ({
 export const DetalhesCaso = () => {
   const { id } = useParams();
   const { token, user } = useAuth();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const { confirm } = useConfirm();
   const [caso, setCaso] = useState(null);
@@ -181,14 +192,27 @@ export const DetalhesCaso = () => {
   const [editingFile, setEditingFile] = useState({ url: null, name: "" });
   const [isRenaming, setIsRenaming] = useState(false);
   const [showStatusHelp, setShowStatusHelp] = useState(false);
+  const [archiveModalOpen, setArchiveModalOpen] = useState(false);
+  const [archiveReason, setArchiveReason] = useState("");
 
   const fetchDetalhes = useCallback(
     async (silent = false) => {
+      if (!id || id === 'undefined') return;
+      
+      // Proteção: Se a rota capturou "arquivados" como ID, não faz a requisição
+      if (id === 'arquivados') {
+        setLoading(false);
+        return;
+      }
+
       try {
         const response = await fetch(`${API_BASE}/casos/${id}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        if (!response.ok) throw new Error("Falha ao carregar o caso.");
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || "Falha ao carregar o caso.");
+        }
         const data = await response.json();
         if (data.agendamento_data) {
           // Converte a data UTC do banco para o formato local esperado pelo input datetime-local
@@ -636,6 +660,51 @@ export const DetalhesCaso = () => {
     }
   };
 
+  const handleArquivarClick = async () => {
+    if (caso.arquivado) {
+      // Se já está arquivado, é uma ação de RESTAURAR
+      if (await confirm("Deseja mover este caso de volta para os Ativos?", "Restaurar Caso")) {
+        await processarArquivamento(false, null);
+      }
+    } else {
+      // Se não está arquivado, abre o modal para pedir MOTIVO
+      setArchiveReason("");
+      setArchiveModalOpen(true);
+    }
+  };
+
+  const confirmArchive = async () => {
+    if (archiveReason.trim().length < 5) {
+      toast.error("Por favor, informe um motivo válido (mín. 5 caracteres).");
+      return;
+    }
+    await processarArquivamento(true, archiveReason);
+    setArchiveModalOpen(false);
+  };
+
+  const processarArquivamento = async (novoEstado, motivo) => {
+    try {
+      const response = await fetch(`${API_BASE}/casos/${id}/arquivar`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ arquivado: novoEstado, motivo }),
+      });
+      
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Erro ao alterar status.");
+      }
+
+      toast.success(novoEstado ? "Caso arquivado!" : "Caso restaurado!");
+      navigate(novoEstado ? "/painel/casos" : "/painel/casos");
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
   const handleSaveRename = async () => {
     if (!editingFile.url || !editingFile.name.trim()) return;
     setIsRenaming(true);
@@ -709,6 +778,19 @@ export const DetalhesCaso = () => {
         </div>
       </div>
 
+      {/* NOTIFICAÇÃO DE ARQUIVAMENTO */}
+      {caso.arquivado && (
+        <div className="alert flex items-start gap-3 mb-6 animate-fade-in">
+          <Archive className="text-muted shrink-0 mt-1" size={24} />
+          <div>
+            <h3 className="font-bold">Caso Arquivado</h3>
+            <p className="text-muted mt-1">
+              <strong>Motivo:</strong> {caso.motivo_arquivamento || "Não informado."}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* NOTIFICAÇÃO DE DOCUMENTOS ENTREGUES */}
       {caso.status === "documentos_entregues" && (
         <div className="bg-highlight/10 border-l-4 border-highlight p-4 rounded-r shadow-sm flex items-start gap-3 animate-fade-in mb-6">
@@ -726,6 +808,25 @@ export const DetalhesCaso = () => {
       )}
 
       <div className="grid gap-6 lg:grid-cols-3">
+        {/* BOTÕES DE AÇÃO RÁPIDA (ARQUIVAR) */}
+        <div className="lg:col-span-3 flex justify-end">
+          <button
+            onClick={handleArquivarClick}
+            className={`btn ${
+              caso.arquivado
+                ? "btn-primary"
+                : "bg-slate-500 hover:bg-slate-600 text-white border-slate-500"
+            }`}
+          >
+            {caso.arquivado ? (
+              <ArchiveRestore size={18} />
+            ) : (
+              <Archive size={18} />
+            )}
+            {caso.arquivado ? "Restaurar Caso" : "Arquivar Caso"}
+          </button>
+        </div>
+
         <section className="space-y-6 lg:col-span-2">
           <div className="card space-y-4">
             <h2 className="heading-2">Dados do assistido</h2>
@@ -779,7 +880,7 @@ export const DetalhesCaso = () => {
                           {renderDataField("CPF", dados.cpf)}
                           {renderDataField(
                             "Data de Nascimento",
-                            dados.assistido_data_nascimento,
+                            formatDateDisplay(dados.assistido_data_nascimento),
                           )}
                           {renderDataField(
                             "Nacionalidade",
@@ -1803,6 +1904,40 @@ export const DetalhesCaso = () => {
           </div>
         </section>
       </div>
+
+      {/* MODAL DE MOTIVO DE ARQUIVAMENTO */}
+      {archiveModalOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 px-4 animate-fade-in">
+          <div className="bg-surface border border-soft p-6 rounded-2xl shadow-xl max-w-md w-full space-y-4">
+            <div className="flex items-center gap-3 text-amber-500">
+              <Archive size={24} />
+              <h3 className="text-xl font-bold text-main">Arquivar Caso</h3>
+            </div>
+            
+            <p className="text-muted text-sm">
+              O caso será movido para o "Arquivo Morto" e sairá da lista principal. 
+              Justifique esta ação:
+            </p>
+
+            <textarea
+              className="input min-h-[100px] resize-none"
+              placeholder="Ex: Dados inconsistentes, assistido desistiu, duplicidade..."
+              value={archiveReason}
+              onChange={(e) => setArchiveReason(e.target.value)}
+              autoFocus
+            />
+
+            <div className="flex gap-3 pt-2">
+              <button onClick={() => setArchiveModalOpen(false)} className="btn btn-ghost flex-1 border border-soft">
+                Cancelar
+              </button>
+              <button onClick={confirmArchive} className="btn btn-secondary flex-1 bg-amber-500 hover:bg-amber-600 text-white border-amber-500">
+                Confirmar Arquivamento
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
