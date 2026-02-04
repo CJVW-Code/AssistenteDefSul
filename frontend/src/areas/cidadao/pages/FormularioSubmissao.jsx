@@ -861,6 +861,27 @@ export const FormularioSubmissao = () => {
 
     if (Object.keys(validationErrors).length > 0) {
       setFormErrors(validationErrors);
+      toast.error("Existem campos obrigatórios não preenchidos ou inválidos. Verifique o formulário.");
+
+      const firstErrorKey = Object.keys(validationErrors)[0];
+      let targetElement = document.getElementsByName(firstErrorKey)[0];
+
+      if (!targetElement) {
+        if (firstErrorKey === "requeridoContato") {
+          targetElement = document.getElementsByName("enderecoRequerido")[0];
+        } else if (firstErrorKey === "audio") {
+          targetElement = document.getElementById("audio-recording-section");
+        } else if (firstErrorKey === "documentos") {
+          targetElement = document.getElementById("documents-upload-section");
+        }
+      }
+
+      if (targetElement) {
+        targetElement.scrollIntoView({ behavior: "smooth", block: "center" });
+        if (["INPUT", "TEXTAREA", "SELECT"].includes(targetElement.tagName)) {
+          targetElement.focus();
+        }
+      }
       return;
     }
 
@@ -2547,24 +2568,6 @@ export const FormularioSubmissao = () => {
                   <label className="label font-bold mb-0">
                     Relato dos Fatos (O que aconteceu?)
                   </label>
-                  <label className="flex items-center gap-2 text-sm cursor-pointer bg-surface p-2 rounded-lg border border-soft hover:border-primary transition select-none">
-                    <input
-                      type="checkbox"
-                      name="prefersAudio"
-                      checked={formState.prefersAudio}
-                      onChange={(e) =>
-                        dispatch({
-                          type: "UPDATE_FIELD",
-                          field: "prefersAudio",
-                          value: e.target.checked,
-                        })
-                      }
-                      className="w-4 h-4 accent-primary"
-                    />
-                    <span className="text-primary font-medium flex items-center gap-1">
-                      <Mic size={14} /> Prefiro enviar áudio
-                    </span>
-                  </label>
                 </div>
                 <textarea
                   placeholder={
@@ -2611,6 +2614,7 @@ export const FormularioSubmissao = () => {
 
               {/* Gravação de Áudio */}
               <div
+                id="audio-recording-section"
                 className={`bg-surface p-4 rounded-lg border border-dashed ${formErrors.audio ? "border-error bg-red-50/10" : "border-soft"} flex flex-col items-center justify-center gap-3`}
               >
                 <p className="text-sm text-muted">
@@ -2689,6 +2693,7 @@ export const FormularioSubmissao = () => {
               )}
 
               <div
+                id="documents-upload-section"
                 className={`bg-surface p-4 rounded-lg border border-dashed ${formErrors.documentos ? "border-error bg-red-50/10" : "border-soft"}`}
               >
                 <input
