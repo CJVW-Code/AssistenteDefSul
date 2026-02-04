@@ -285,7 +285,7 @@ export const generateDosFatos = async (caseData = {}) => {
     });
 
     const listaAutoresTexto = todosAutores
-      .map((a) => `${cleanText(a.nome)} (CPF: ${cleanText(a.cpf)})`)
+      .map((a) => cleanText(a.nome))
       .join(", ");
 
     const isPlural = todosAutores.length > 1;
@@ -305,12 +305,13 @@ export const generateDosFatos = async (caseData = {}) => {
     }
 
     // Preparação dos textos descritivos
-    let situacaoAssistido = cleanText(caseData.dados_adicionais_requerente, "");
+    let situacaoAssistido = "";
     if (caseData.situacao_financeira_genitora) {
-      situacaoAssistido += `\nSituação Financeira: ${caseData.situacao_financeira_genitora}`;
+      situacaoAssistido = `Situação Financeira: ${caseData.situacao_financeira_genitora}`;
     }
     if (!situacaoAssistido)
-      situacaoAssistido = "Sem detalhes adicionais sobre o assistido.";
+      situacaoAssistido =
+        "Sem detalhes adicionais sobre a situação financeira.";
 
     let situacaoRequerido = cleanText(caseData.dados_adicionais_requerido, "");
     if (caseData.requerido_tem_emprego_formal) {
@@ -372,6 +373,7 @@ export const generateDosFatos = async (caseData = {}) => {
 Seu estilo de escrita é extremamente formal, culto e padronizado (juridiquês clássico).
 Você DEVE utilizar os conectivos: "Insta salientar", "Ocorre que, no caso em tela", "Como é sabido", "aduzir".
 REGRA CRÍTICA: NUNCA use o termo "menor" para se referir a uma criança ou adolescente. Em vez disso, use "criança", "adolescente" ou "filho(a)".
+REGRA DE OURO: NÃO cite números de documentos (CPF, RG) ou datas de nascimento no texto narrativo, pois estes dados já constam na qualificação das partes.
 Não use listas ou tópicos na resposta final. Escreva apenas parágrafos coesos.`;
 
     // No userPrompt, instruímos a IA a usar os placeholders que ela vai receber

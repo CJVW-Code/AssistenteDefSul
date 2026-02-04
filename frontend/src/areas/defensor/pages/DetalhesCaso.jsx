@@ -851,6 +851,9 @@ export const DetalhesCaso = () => {
                 (() => {
                   const dados = caso.dados_formulario || {};
                   const isRepresentacao = dados.assistido_eh_incapaz === "sim";
+                  const isFixacaoAlimentos = (caso.tipo_acao || "")
+                    .toLowerCase()
+                    .includes("fixação de pensão alimentícia");
                   let outrosFilhos = [];
                   try {
                     if (dados.outros_filhos_detalhes) {
@@ -882,19 +885,22 @@ export const DetalhesCaso = () => {
                             "Data de Nascimento",
                             formatDateDisplay(dados.assistido_data_nascimento),
                           )}
-                          {renderDataField(
-                            "Nacionalidade",
-                            dados.assistido_nacionalidade,
-                          )}
+                          {!isFixacaoAlimentos &&
+                            renderDataField(
+                              "Nacionalidade",
+                              dados.assistido_nacionalidade,
+                            )}
                           {renderDataField(
                             "Estado Civil",
                             dados.assistido_estado_civil,
                           )}
-                          {renderDataField(
-                            "Endereço Residencial",
-                            dados.endereco_assistido,
-                          )}
-                          {renderDataField("Email", dados.email_assistido)}
+                          {!isFixacaoAlimentos &&
+                            renderDataField(
+                              "Endereço Residencial",
+                              dados.endereco_assistido,
+                            )}
+                          {!isFixacaoAlimentos &&
+                            renderDataField("Email", dados.email_assistido)}
                           {renderDataField(
                             "Telefone de Contato",
                             dados.telefone,

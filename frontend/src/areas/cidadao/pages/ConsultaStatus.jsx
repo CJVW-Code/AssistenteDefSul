@@ -78,7 +78,7 @@ export const ConsultaStatus = () => {
     const cpfLimpo = cpf.replace(/\D/g, "");
     try {
       const response = await fetch(
-        `${API_BASE}/status?cpf=${cpfLimpo}&chave=${chave}`,
+        `${API_BASE}/status?cpf=${cpfLimpo}&chave=${encodeURIComponent(chave.trim())}`,
       );
       const data = await response.json();
 
@@ -94,11 +94,17 @@ export const ConsultaStatus = () => {
     }
   };
   const handleFileSelect = (e) => {
-    const selected = Array.from(e.target.files).map((file) => ({
+    const newFiles = Array.from(e.target.files);
+    // Filtra duplicatas baseadas no nome do arquivo
+    const uniqueFiles = newFiles.filter(
+      (newFile) =>
+        !files.some((existing) => existing.file.name === newFile.name),
+    );
+    const mappedFiles = uniqueFiles.map((file) => ({
       file,
-      customName: file.name, // Nome inicial
+      customName: file.name,
     }));
-    setFiles([...files, ...selected]);
+    setFiles([...files, ...mappedFiles]);
   };
 
   const handleNameChange = (index, newName) => {

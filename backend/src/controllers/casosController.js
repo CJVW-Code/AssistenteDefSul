@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿import { supabase } from "../config/supabase.js";
+﻿﻿﻿﻿﻿﻿﻿import { supabase } from "../config/supabase.js";
 import path from "path";
 import {
   generateCredentials,
@@ -465,11 +465,17 @@ const buildDocxTemplatePayload = (
 
   // 2. Unifica todos os filhos (principal + outros) em uma única lista
   const rawDetails = baseData.outros_filhos_detalhes; // Corrigido: baseData já contém os campos do formulário diretamente
-  const outrosFilhosRaw = rawDetails
-    ? typeof rawDetails === "string"
-      ? JSON.parse(rawDetails)
-      : rawDetails
-    : [];
+  let outrosFilhosRaw = [];
+  try {
+    outrosFilhosRaw = rawDetails
+      ? typeof rawDetails === "string"
+        ? JSON.parse(rawDetails)
+        : rawDetails
+      : [];
+  } catch (e) {
+    logger.warn("Erro ao fazer parse de outros_filhos_detalhes em buildDocxTemplatePayload", e.message);
+    outrosFilhosRaw = [];
+  }
 
   const filhoPrincipal = {
     nome: ensureText(
@@ -921,9 +927,13 @@ export async function processarCasoEmBackground(
       dados_formulario.valor_mensal_pensao,
     );
 
-    const documentosInformadosArray = JSON.parse(
-      dados_formulario.documentos_informados || "[]",
-    );
+    let documentosInformadosArray = [];
+    try {
+      documentosInformadosArray = typeof dados_formulario.documentos_informados === 'string'
+        ? JSON.parse(dados_formulario.documentos_informados || "[]")
+        : (dados_formulario.documentos_informados || []);
+    } catch (e) { documentosInformadosArray = []; }
+
     const varaMapeada = getVaraByTipoAcao(dados_formulario.tipoAcao);
     const varaAutomatica =
       varaMapeada && !varaMapeada.includes("NÃO ESPECIFICADA")
@@ -1116,14 +1126,18 @@ export const criarNovoCaso = async (req, res) => {
 
     // --- CORREÇÃO CODERABBIT: Try-Catch para JSON.parse ---
     let documentosInformadosArray = [];
-    try {
-      documentosInformadosArray = JSON.parse(documentos_informados || "[]");
-    } catch (e) {
-      logger.warn(
-        "Falha ao analisar JSON de documentos_informados:",
-        e.message,
-      );
-      documentosInformadosArray = []; // Fallback seguro
+    if (typeof documentos_informados === 'object' && documentos_informados !== null) {
+      documentosInformadosArray = documentos_informados;
+    } else {
+      try {
+        documentosInformadosArray = JSON.parse(documentos_informados || "[]");
+      } catch (e) {
+        logger.warn(
+          "Falha ao analisar JSON de documentos_informados:",
+          e.message,
+        );
+        documentosInformadosArray = []; // Fallback seguro
+      }
     }
     // -----------------------------------------------------
     const { protocolo, chaveAcesso } = generateCredentials(tipoAcao);
@@ -1188,9 +1202,21 @@ export const criarNovoCaso = async (req, res) => {
     }
 
     // Mescla os nomes dos documentos nos dados do formulário
+    let documentNamesObj = {};
+    if (typeof documentos_nomes === 'object' && documentos_nomes !== null) {
+      documentNamesObj = documentos_nomes;
+    } else {
+      try {
+        documentNamesObj = JSON.parse(documentos_nomes || "{}");
+      } catch (e) {
+        logger.warn("Falha ao analisar JSON de documentos_nomes:", e.message);
+        documentNamesObj = {};
+      }
+    }
+
     const dadosFormularioFinal = {
       ...dados_formulario,
-      document_names: JSON.parse(documentos_nomes || "{}"),
+      document_names: documentNamesObj,
     };
 
     // Salvar no Banco (Resposta Rápida)
@@ -1478,12 +1504,20 @@ export const regenerarDosFatos = async (req, res) => {
     if (!dados.relato_texto && caso.relato_texto)
       dados.relato_texto = caso.relato_texto;
     const dosFatosTexto = await generateDosFatos(dados);
-    const { error: updateError } = await supabase
+    
+    // CORREÇÃO: Retornar o objeto completo atualizado, não apenas o texto
+    const { data: casoAtualizado, error: updateError } = await supabase
       .from("casos")
       .update({ peticao_inicial_rascunho: `DOS FATOS\n\n${dosFatosTexto}` })
-      .eq("id", id);
+      .eq("id", id)
+      .select()
+      .single();
+
     if (updateError) throw updateError;
-    res.json({ message: "Texto regenerado", texto: dosFatosTexto });
+
+    // Reanexa URLs assinadas para que links de download/áudio não quebrem na tela
+    const casoComUrls = await attachSignedUrls(casoAtualizado);
+    res.status(200).json(casoComUrls);
   } catch (error) {
     res.status(500).json({ error: "Falha ao regenerar texto." });
   }
@@ -1948,14 +1982,18 @@ export const receberDocumentosComplementares = async (req, res) => {
     // 3. Atualiza metadados de nomes (dados_formulario.document_names)
     // --- CORREÇÃO CODERABBIT: Try-Catch para JSON.parse ---
     let nomesMap = {};
-    try {
-      nomesMap = JSON.parse(nomes_arquivos || "{}");
-    } catch (e) {
-      logger.warn(
-        "[Upload Complementar] Falha ao analisar JSON de nomes_arquivos:",
-        e.message,
-      );
-      nomesMap = {}; // Fallback seguro
+    if (typeof nomes_arquivos === 'object' && nomes_arquivos !== null) {
+      nomesMap = nomes_arquivos;
+    } else {
+      try {
+        nomesMap = JSON.parse(nomes_arquivos || "{}");
+      } catch (e) {
+        logger.warn(
+          "[Upload Complementar] Falha ao analisar JSON de nomes_arquivos:",
+          e.message,
+        );
+        nomesMap = {}; // Fallback seguro
+      }
     }
     // -----------------------------------------------------
     const currentDadosFormulario = caso.dados_formulario || {}; // Garante que dados_formulario é um objeto

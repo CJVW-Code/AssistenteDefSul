@@ -13,7 +13,7 @@ export const consultarStatus = async (req, res) => {
       .json({ error: "CPF e chave de acesso são obrigatórios para consulta." });
   }
 
-  const cpfLimpo = cpf.replace(/\D/g, "");
+  const cpfLimpo = String(cpf).replace(/\D/g, "");
 
   logger.debug(`Consultando status para CPF: ${cpfLimpo}`);
 

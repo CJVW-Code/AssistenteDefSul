@@ -19,7 +19,9 @@ import {
   Scale,
   Plus,
   Info,
+  Loader2,
 } from "lucide-react";
+import heic2any from "heic2any";
 import { documentosPorAcao } from "../../../data/documentos.js";
 import { API_BASE } from "../../../utils/apiBase";
 import { useToast } from "../../../contexts/ToastContext";
@@ -396,6 +398,7 @@ export const FormularioSubmissao = () => {
   const [statusMessage, setStatusMessage] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isProcessingImages, setIsProcessingImages] = useState(false);
   const [generatedCredentials, setGeneratedCredentials] = useState(null);
   const [formErrors, setFormErrors] = useState({});
   const [checklistWarningOpen, setChecklistWarningOpen] = useState(false);
@@ -634,13 +637,116 @@ export const FormularioSubmissao = () => {
   };
 
   // --- LÓGICA DE ARQUIVOS ---
-  const handleDocumentChange = (e) => {
-    const novosArquivos = Array.from(e.target.files);
+  const processImage = async (file) => {
+    // Pequena pausa para não travar a UI em loops longos
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    let fileToProcess = file;
+
+    // 1. Conversão de HEIC (iPhone) para JPG
+    if (
+      file.name.toLowerCase().endsWith(".heic") ||
+      file.type === "image/heic"
+    ) {
+      try {
+        const convertedBlob = await heic2any({
+          blob: file,
+          toType: "image/jpeg",
+          quality: 0.8,
+        });
+        const blob = Array.isArray(convertedBlob)
+          ? convertedBlob[0]
+          : convertedBlob;
+        fileToProcess = new File(
+          [blob],
+          file.name.replace(/\.heic$/i, ".jpg"),
+          { type: "image/jpeg" }
+        );
+      } catch (e) {
+        console.warn("Erro ao converter HEIC:", e);
+      }
+    }
+
+    // 2. Redimensionamento/Compressão (Canvas)
+    if (fileToProcess.type.startsWith("image/")) {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const img = new Image();
+          img.onload = () => {
+            try {
+              const canvas = document.createElement("canvas");
+              let width = img.width;
+              let height = img.height;
+              const MAX_DIM = 1920;
+
+              if (width > height) {
+                if (width > MAX_DIM) {
+                  height *= MAX_DIM / width;
+                  width = MAX_DIM;
+                }
+              } else {
+                if (height > MAX_DIM) {
+                  width *= MAX_DIM / height;
+                  height = MAX_DIM;
+                }
+              }
+
+              canvas.width = width;
+              canvas.height = height;
+              const ctx = canvas.getContext("2d");
+              ctx.drawImage(img, 0, 0, width, height);
+
+              canvas.toBlob(
+                (blob) => {
+                  if (blob) {
+                    const newFile = new File([blob], fileToProcess.name, {
+                      type: "image/jpeg",
+                      lastModified: Date.now(),
+                    });
+                    resolve(newFile);
+                  } else {
+                    resolve(fileToProcess);
+                  }
+                },
+                "image/jpeg",
+                0.8
+              );
+            } catch (err) {
+              console.warn("Memória insuficiente para otimizar imagem, enviando original:", err);
+              resolve(fileToProcess); // Fallback de segurança: envia o original
+            }
+          };
+          img.onerror = () => resolve(fileToProcess);
+          img.src = event.target.result;
+        };
+        reader.onerror = () => resolve(fileToProcess);
+        reader.readAsDataURL(fileToProcess);
+      });
+    }
+
+    return fileToProcess;
+  };
+
+  const handleDocumentChange = async (e) => {
+    const rawFiles = Array.from(e.target.files);
+    if (rawFiles.length === 0) return;
+
+    setIsProcessingImages(true);
+
+    const processedFiles = [];
+    for (const file of rawFiles) {
+      const processed = await processImage(file);
+      processedFiles.push(processed);
+    }
+
     dispatch({
       type: "UPDATE_FIELD",
       field: "documentFiles",
-      value: [...formState.documentFiles, ...novosArquivos],
+      value: [...formState.documentFiles, ...processedFiles],
     });
+    setIsProcessingImages(false);
+    if (documentInputRef.current) documentInputRef.current.value = "";
   };
 
   const handleDocumentNameChange = (fileName, newName) => {
@@ -681,7 +787,7 @@ export const FormularioSubmissao = () => {
     }
   };
 
-  // --- LÓGICA DE SUBMISSÃO ---fffff
+  // --- LÓGICA DE SUBMISSÃO ---
   const processSubmission = async ({
     bypassChecklist = false,
     isAlvaraContext = false,
@@ -1057,7 +1163,8 @@ export const FormularioSubmissao = () => {
       // Sanitiza o nome do arquivo (remove acentos) para evitar erros de encoding no servidor
       const safeName = file.name
         .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "");
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/\s+/g, "_"); // Substitui espaços por underline para maior segurança
       formData.append("documentos", file, safeName);
     });
 
@@ -1602,28 +1709,6 @@ export const FormularioSubmissao = () => {
                           max={today}
                           {...validar("Informe a data de nascimento.")}
                         />
-                        <select
-                          value={filho.nacionalidade}
-                          onChange={(e) =>
-                            dispatch({
-                              type: "UPDATE_FILHO",
-                              index,
-                              field: "nacionalidade",
-                              value: e.target.value,
-                            })
-                          }
-                          className="input"
-                          {...validar("Selecione a nacionalidade.")}
-                        >
-                          {nacionalidadeOptions.map((o) => (
-                            <option
-                              key={`filho-nac-${index}-${o.value}`}
-                              value={o.value}
-                            >
-                              {o.label}
-                            </option>
-                          ))}
-                        </select>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                         <input
@@ -2608,7 +2693,7 @@ export const FormularioSubmissao = () => {
               >
                 <input
                   type="file"
-                  accept=".pdf,.jpg,.jpeg,.png"
+                  accept=".pdf,.jpg,.jpeg,.png,.heic"
                   ref={documentInputRef}
                   onChange={handleDocumentChange}
                   className="hidden"
@@ -2617,10 +2702,25 @@ export const FormularioSubmissao = () => {
                 <button
                   type="button"
                   onClick={() => documentInputRef.current.click()}
-                  className="btn btn-ghost w-full border border-soft border-dashed h-24 flex flex-col gap-2 text-muted hover:text-primary hover:border-primary"
+                  disabled={isProcessingImages}
+                  className="btn btn-ghost w-full border border-soft border-dashed h-24 flex flex-col gap-2 text-muted hover:text-primary hover:border-primary disabled:opacity-50 disabled:cursor-wait"
                 >
-                  <Paperclip size={24} className="mx-auto" />
-                  <span>Clique para anexar fotos ou PDFs dos documentos</span>
+                  {isProcessingImages ? (
+                    <>
+                      <Loader2
+                        size={24}
+                        className="mx-auto animate-spin text-primary"
+                      />
+                      <span>Otimizando imagens para envio rápido...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Paperclip size={24} className="mx-auto" />
+                      <span>
+                        Clique para anexar fotos ou PDFs dos documentos
+                      </span>
+                    </>
+                  )}
                 </button>
 
                 {formState.documentFiles.length > 0 && (
