@@ -418,7 +418,9 @@ export const FormularioSubmissao = () => {
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const documentInputRef = useRef(null);
-
+  useEffect(() => {
+    fetch(`${API_BASE}/health`).catch(() => {});
+  }, []);
   const acaoNorm = (formState.acaoEspecifica || "").toLowerCase();
   const isFixacaoDeAlimentos = acaoNorm.includes(
     "fixação de pensão alimentícia"
@@ -965,6 +967,7 @@ export const FormularioSubmissao = () => {
       dataNascimentoAssistido: "assistido_data_nascimento",
       assistidoRgNumero: "assistido_rg_numero",
       assistidoRgOrgao: "assistido_rg_orgao",
+      assistidoEnderecoProfissional: "assistido_endereco_profissional",
 
       // Representante
       representanteNome: "representante_nome",
@@ -2797,7 +2800,6 @@ export const FormularioSubmissao = () => {
               <AlertTriangle className="text-secondary" />
               <h3 className="text-lg font-semibold">Documentos obrigatórios</h3>
             </div>
-            7
             <p className="text-sm text-muted">
               Você está enviando o caso sem marcar nenhum documento obrigatório
               para esta ação. Confirme que está ciente para continuar ou volte

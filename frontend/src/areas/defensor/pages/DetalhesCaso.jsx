@@ -1180,6 +1180,7 @@ export const DetalhesCaso = () => {
             />
             <div className="flex justify-end">
               <button
+                type="button"
                 onClick={handleSaveFeedback}
                 disabled={savingFeedback}
                 className="btn btn-primary flex items-center gap-2"
@@ -1806,6 +1807,7 @@ export const DetalhesCaso = () => {
                   </div>
                   {user?.cargo === "admin" && (
                     <button
+                      type="button"
                       onClick={handleReverterFinalizacao}
                       disabled={isReverting}
                       className="btn btn-danger btn-sm flex items-center gap-2"
