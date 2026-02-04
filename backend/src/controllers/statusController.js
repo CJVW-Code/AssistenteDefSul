@@ -105,6 +105,7 @@ export const consultarStatus = async (req, res) => {
     if (casoEncontrado.agendamento_data) {
       const dataObj = new Date(casoEncontrado.agendamento_data);
       agendamentoFormatado = dataObj.toLocaleString("pt-BR", {
+        timeZone: "America/Sao_Paulo",
         day: "2-digit",
         month: "2-digit",
         year: "numeric",

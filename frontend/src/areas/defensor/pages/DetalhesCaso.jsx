@@ -751,11 +751,12 @@ export const DetalhesCaso = () => {
               Protocolo {caso.protocolo} • {caso.tipo_acao}
             </p>
             <div className="flex items-center gap-2 bg-surface border border-soft rounded-md px-3 py-1.5 shadow-sm">
-              <span className="text-xs font-bold text-muted uppercase tracking-wider">
+              <label htmlFor="numeroSolar" className="text-xs font-bold text-muted uppercase tracking-wider">
                 Solar:
-              </span>
+              </label>
               <input
                 type="text"
+                id="numeroSolar"
                 value={numSolar}
                 onChange={(e) => {
                   // Permite apenas números enquanto digita
@@ -1598,6 +1599,7 @@ export const DetalhesCaso = () => {
                           `Olá, Sr(a). ${caso.nome_assistido}. A Defensoria Pública agendou seu atendimento online para ${new Date(
                             caso.agendamento_data,
                           ).toLocaleString("pt-BR", {
+                            timeZone: "America/Sao_Paulo",
                             day: "2-digit",
                             month: "2-digit",
                             year: "numeric",
@@ -1665,6 +1667,7 @@ export const DetalhesCaso = () => {
                           `Olá, Sr(a). ${caso.nome_assistido}. A Defensoria Pública agendou seu atendimento presencial para ${new Date(
                             caso.agendamento_data,
                           ).toLocaleString("pt-BR", {
+                            timeZone: "America/Sao_Paulo",
                             day: "2-digit",
                             month: "2-digit",
                             year: "numeric",
@@ -1702,6 +1705,7 @@ export const DetalhesCaso = () => {
                         <p className="font-semibold text-gray-800">
                           {new Date(hist.data_agendamento).toLocaleString(
                             "pt-BR",
+                            { timeZone: "America/Sao_Paulo" }
                           )}{" "}
                           <span className="text-xs font-normal text-muted uppercase ml-1 bg-gray-200 px-1 rounded">
                             {hist.tipo}

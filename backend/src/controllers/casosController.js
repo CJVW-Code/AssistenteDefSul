@@ -19,7 +19,7 @@ import { Client } from "@upstash/qstash";
 
 // Tempo de expiração (em segundos) para URLs assinadas do Supabase
 const signedExpires = Number.parseInt(
-  process.env.SIGNED_URL_EXPIRES || "2592000",
+  process.env.SIGNED_URL_EXPIRES || "3600",
   10,
 );
 
@@ -32,6 +32,21 @@ const storageBuckets = {
 const salarioMinimoAtual = Number.parseFloat(
   process.env.SALARIO_MINIMO_ATUAL || "1621",
 );
+
+// --- VALIDAÇÃO DE CPF ---
+const validarCPF = (cpf) => {
+  if (!cpf) return false;
+  const strCPF = String(cpf).replace(/[^\d]/g, '');
+  if (strCPF.length !== 11) return false;
+  if (/^(\d)\1+$/.test(strCPF)) return false;
+  let soma = 0, resto;
+  for (let i = 1; i <= 9; i++) soma += parseInt(strCPF.substring(i - 1, i)) * (11 - i);
+  resto = (soma * 10) % 11; if (resto === 10 || resto === 11) resto = 0;
+  if (resto !== parseInt(strCPF.substring(9, 10))) return false;
+  soma = 0; for (let i = 1; i <= 10; i++) soma += parseInt(strCPF.substring(i - 1, i)) * (12 - i);
+  resto = (soma * 10) % 11; if (resto === 10 || resto === 11) resto = 0;
+  return resto === parseInt(strCPF.substring(10, 11));
+};
 
 // --- UTILS DE FORMATAÇÃO E PARSE ---
 const parseCurrencyToNumber = (value) => {
@@ -792,7 +807,7 @@ const gerarTextoCompletoPeticao = (payload) => {
   texto += `Dá-se à causa o valor de ${valor_causa || "R$ 0,00"}.\n\n`;
   texto += `Nestes termos,\n`;
   texto += `Pede Deferimento.\n\n`;
-  texto += `${comarca || "[Cidade]"}, ${new Date().toLocaleDateString("pt-BR")}.`;
+  texto += `${comarca || "[Cidade]"}, ${new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}.`;
 
   return texto;
 };
@@ -855,16 +870,14 @@ export async function processarCasoEmBackground(
               mimeType,
               "Transcreva todo o texto deste documento fielmente.",
             );
-            logger.info(`[OCR IA] Sucesso ao extrair texto de ${docPath}`);
+            
           } catch (aiError) {
             logger.warn(
               `[OCR IA] Falha ao processar ${docPath}: ${aiError.message}`,
             );
             // Fallback: Tesseract (Apenas para imagens, pois Tesseract puro não lê PDF binário)
             if (mimeType !== "application/pdf") {
-              logger.info(
-                `[OCR Fallback] Tentando Tesseract local para ${docPath}...`,
-              );
+              
               textoExtraido = await extractTextFromImage(buffer);
               logger.info(`[OCR Fallback] Sucesso com Tesseract.`);
             } else {
@@ -874,9 +887,7 @@ export async function processarCasoEmBackground(
 
           if (textoExtraido) {
             // Log do texto extraído (Preview) para conferência
-            logger.info(
-              `[OCR CONTEÚDO] ${docPath} (Preview):\n${textoExtraido.substring(0, 500).replace(/\n/g, " ")}...`,
-            );
+            
             textoCompleto += `\n\n--- TEXTO EXTRAÍDO (${docPath}) ---\n${textoExtraido}`;
           }
         } catch (ocrError) {
@@ -1117,6 +1128,8 @@ export const criarNovoCaso = async (req, res) => {
       nome,
       cpf,
       telefone,
+      cpf_requerido,
+      outros_filhos_detalhes,
       tipoAcao,
       relato,
       documentos_informados,
@@ -1140,6 +1153,27 @@ export const criarNovoCaso = async (req, res) => {
       }
     }
     // -----------------------------------------------------
+
+    // --- VALIDAÇÃO DE CPFs (CRÍTICO) ---
+    if (!validarCPF(cpf)) {
+      return res.status(400).json({ error: "CPF do assistido inválido." });
+    }
+    if (cpf_requerido && !validarCPF(cpf_requerido)) {
+      avisos.push("Alerta: O CPF informado para a parte contrária (Requerido) parece inválido.");
+    }
+    // Validação de filhos
+    if (outros_filhos_detalhes) {
+      let filhos = [];
+      try {
+        filhos = typeof outros_filhos_detalhes === 'string' ? JSON.parse(outros_filhos_detalhes) : outros_filhos_detalhes;
+      } catch (e) {}
+      if (Array.isArray(filhos)) {
+        filhos.forEach((f, i) => {
+          if (f.cpf && !validarCPF(f.cpf)) avisos.push(`Alerta: O CPF do filho(a) ${f.nome || i+1} parece inválido.`);
+        });
+      }
+    }
+
     const { protocolo, chaveAcesso } = generateCredentials(tipoAcao);
     const chaveAcessoHash = hashKeyWithSalt(chaveAcesso);
 
@@ -1822,7 +1856,7 @@ export const reverterFinalizacao = async (req, res) => {
       const filePath = extractObjectPath(caso.url_capa_processual);
       if (filePath) {
         logger.info(
-          `Revertendo finalização: Excluindo capa processual '${filePath}' do caso ${id}`,
+          `Revertendo finalização: Excluindo capa processual do caso ${id}`,
         );
         const { error: deleteError } = await supabase.storage
           .from(storageBuckets.documentos)
@@ -1893,7 +1927,7 @@ export const receberDocumentosComplementares = async (req, res) => {
 
   try {
     logger.info(
-      `[Upload Complementar] Iniciando. ID: ${id}, CPF recebido: ${!!cpf}, Chave recebida: ${!!chave}`,
+      `[Upload Complementar] Iniciando. ID: ${id}, CPF recebido: ${!!cpf} `,
     );
 
     let caso = null;
@@ -2025,11 +2059,15 @@ export const receberDocumentosComplementares = async (req, res) => {
     if (updateError) throw updateError;
 
     // [NOTIFICAÇÃO] Alerta o defensor sobre novos documentos
-    await supabase.from("notificacoes").insert({
-      caso_id: caso.id,
-      mensagem: `Novos documentos entregues por ${caso.nome_assistido || "Assistido"}.`,
-      tipo: 'upload'
-    });
+    try {
+      await supabase.from("notificacoes").insert({
+        caso_id: caso.id,
+        mensagem: `Novos documentos entregues por ${caso.nome_assistido || "Assistido"}.`,
+        tipo: 'upload'
+      });
+    } catch (notifError) {
+      logger.warn(`Falha ao criar notificação de upload: ${notifError.message}`);
+    }
 
     res.status(200).json({ message: "Documentos enviados com sucesso!" });
   } catch (error) {
@@ -2208,7 +2246,7 @@ export const solicitarReagendamento = async (req, res) => {
 
     // 2. Validação de Segurança (CPF e Chave)
     // Remove caracteres não numéricos do CPF para comparação
-    const cpfLimpo = cpf.replace(/\D/g, "");
+    const cpfLimpo = (cpf || "").replace(/\D/g, "");
     if (caso.cpf_assistido !== cpfLimpo) {
       return res.status(403).json({ error: "CPF inválido para este caso." });
     }

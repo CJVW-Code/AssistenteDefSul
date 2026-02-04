@@ -4,16 +4,30 @@ import { supabase } from "../config/supabase.js";
 
 export const processJob = async (req, res) => {
   try {
+    // Sanitização de logs para evitar vazamento de PII (LGPD)
+    const logBody = { ...req.body };
+    if (logBody.dados_formulario) logBody.dados_formulario = "[REDACTED - PII]";
+    if (logBody.urls_documentos)
+      logBody.urls_documentos = `[${logBody.urls_documentos?.length || 0} files]`;
+
     logger.info("📩 Job recebido do QStash:", {
-      body: req.body,
+      body: logBody,
       headers: req.headers,
     });
 
     // Validação do payload
-    if (typeof req.body !== 'object' || req.body === null || !req.body.protocolo) {
-      logger.warn("⚠️ Payload inválido: corpo da requisição não é um objeto ou protocolo está ausente", { body: req.body });
+    if (
+      typeof req.body !== "object" ||
+      req.body === null ||
+      !req.body.protocolo
+    ) {
+      logger.warn(
+        "⚠️ Payload inválido: corpo da requisição não é um objeto ou protocolo está ausente",
+        { body: req.body },
+      );
       return res.status(400).json({
-        error: "Payload inválido: o corpo da requisição deve ser um objeto JSON com a propriedade 'protocolo'.",
+        error:
+          "Payload inválido: o corpo da requisição deve ser um objeto JSON com a propriedade 'protocolo'.",
         success: false,
       });
     }
@@ -67,7 +81,7 @@ export const processJob = async (req, res) => {
       .eq("protocolo", protocolo);
 
     logger.info(
-      `🔄 Iniciando processamento do caso ${protocolo} via QStash (Background)`
+      `🔄 Iniciando processamento do caso ${protocolo} via QStash (Background)`,
     );
 
     // Responde IMEDIATAMENTE ao QStash para evitar timeout (Erro 500)
@@ -81,7 +95,7 @@ export const processJob = async (req, res) => {
     setImmediate(async () => {
       const startTime = Date.now();
       logger.info(
-        `🚀 [Background] Iniciando processamento pesado para o caso ${protocolo}...`
+        `🚀 [Background] Iniciando processamento pesado para o caso ${protocolo}...`,
       );
       try {
         await processarCasoEmBackground(
@@ -89,16 +103,16 @@ export const processJob = async (req, res) => {
           caso.dados_formulario,
           caso.urls_documentos || [],
           caso.url_audio,
-          caso.url_peticao
+          caso.url_peticao,
         );
         const duration = ((Date.now() - startTime) / 1000).toFixed(2);
         logger.info(
-          `✅ [Background] Processamento concluído com sucesso para ${protocolo} em ${duration}s`
+          `✅ [Background] Processamento concluído com sucesso para ${protocolo} em ${duration}s`,
         );
       } catch (err) {
         const duration = ((Date.now() - startTime) / 1000).toFixed(2);
         logger.error(
-          `❌ [Background] Erro crítico após ${duration}s no caso ${protocolo}: ${err.message}`
+          `❌ [Background] Erro crítico após ${duration}s no caso ${protocolo}: ${err.message}`,
         );
       }
     });
@@ -120,7 +134,7 @@ export const processJob = async (req, res) => {
           .eq("protocolo", req.body.protocolo);
       } catch (updateError) {
         logger.error(
-          `❌ Falha ao atualizar status de erro: ${updateError.message}`
+          `❌ Falha ao atualizar status de erro: ${updateError.message}`,
         );
       }
     }

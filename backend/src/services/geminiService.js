@@ -361,6 +361,7 @@ export const generateDosFatos = async (caseData = {}) => {
       const num = index + 1;
       addToPii(autor.nome, `[NOME_AUTOR_${num}]`);
       addToPii(autor.cpf, `[CPF_AUTOR_${num}]`);
+      addToPii(autor.nascimento, `[NASC_AUTOR_${num}]`);
     });
 
     addToPii(normalized.requerido?.nome, "[NOME_REU]");
