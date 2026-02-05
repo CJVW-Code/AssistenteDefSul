@@ -1,11 +1,10 @@
-import React, { useState, useRef, useReducer, useEffect } from "react";
+import React, { useState, useRef, useReducer, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   User,
   FileText,
   Mic,
   Upload,
-  Paperclip,
   X,
   Phone,
   AlertTriangle,
@@ -19,12 +18,11 @@ import {
   Scale,
   Plus,
   Info,
-  Loader2,
 } from "lucide-react";
-import heic2any from "heic2any";
 import { documentosPorAcao } from "../../../data/documentos.js";
 import { API_BASE } from "../../../utils/apiBase";
 import { useToast } from "../../../contexts/ToastContext";
+import { DocumentUpload } from "../../../components/DocumentUpload";
 
 // 1. Estado Inicial Consolidado
 const initialState = {
@@ -417,10 +415,6 @@ export const FormularioSubmissao = () => {
 
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
-  const documentInputRef = useRef(null);
-  useEffect(() => {
-    fetch(`${API_BASE}/health`).catch(() => {});
-  }, []);
   const acaoNorm = (formState.acaoEspecifica || "").toLowerCase();
   const isFixacaoDeAlimentos = acaoNorm.includes(
     "fixação de pensão alimentícia"
@@ -638,157 +632,6 @@ export const FormularioSubmissao = () => {
     dispatch({ type: "UPDATE_FIELD", field: "audioBlob", value: null });
   };
 
-  // --- LÓGICA DE ARQUIVOS ---
-  const processImage = async (file) => {
-    // Pequena pausa para não travar a UI em loops longos
-    await new Promise((resolve) => setTimeout(resolve, 10));
-
-    let fileToProcess = file;
-
-    // 1. Conversão de HEIC (iPhone) para JPG
-    if (
-      file.name.toLowerCase().endsWith(".heic") ||
-      file.type === "image/heic"
-    ) {
-      try {
-        const convertedBlob = await heic2any({
-          blob: file,
-          toType: "image/jpeg",
-          quality: 0.8,
-        });
-        const blob = Array.isArray(convertedBlob)
-          ? convertedBlob[0]
-          : convertedBlob;
-        fileToProcess = new File(
-          [blob],
-          file.name.replace(/\.heic$/i, ".jpg"),
-          { type: "image/jpeg" }
-        );
-      } catch (e) {
-        console.warn("Erro ao converter HEIC:", e);
-      }
-    }
-
-    // 2. Redimensionamento/Compressão (Canvas)
-    if (fileToProcess.type.startsWith("image/")) {
-      return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          const img = new Image();
-          img.onload = () => {
-            try {
-              const canvas = document.createElement("canvas");
-              let width = img.width;
-              let height = img.height;
-              const MAX_DIM = 1920;
-
-              if (width > height) {
-                if (width > MAX_DIM) {
-                  height *= MAX_DIM / width;
-                  width = MAX_DIM;
-                }
-              } else {
-                if (height > MAX_DIM) {
-                  width *= MAX_DIM / height;
-                  height = MAX_DIM;
-                }
-              }
-
-              canvas.width = width;
-              canvas.height = height;
-              const ctx = canvas.getContext("2d");
-              ctx.drawImage(img, 0, 0, width, height);
-
-              canvas.toBlob(
-                (blob) => {
-                  if (blob) {
-                    const newFile = new File([blob], fileToProcess.name, {
-                      type: "image/jpeg",
-                      lastModified: Date.now(),
-                    });
-                    resolve(newFile);
-                  } else {
-                    resolve(fileToProcess);
-                  }
-                },
-                "image/jpeg",
-                0.8
-              );
-            } catch (err) {
-              console.warn("Memória insuficiente para otimizar imagem, enviando original:", err);
-              resolve(fileToProcess); // Fallback de segurança: envia o original
-            }
-          };
-          img.onerror = () => resolve(fileToProcess);
-          img.src = event.target.result;
-        };
-        reader.onerror = () => resolve(fileToProcess);
-        reader.readAsDataURL(fileToProcess);
-      });
-    }
-
-    return fileToProcess;
-  };
-
-  const handleDocumentChange = async (e) => {
-    const rawFiles = Array.from(e.target.files);
-    if (rawFiles.length === 0) return;
-
-    setIsProcessingImages(true);
-
-    const processedFiles = [];
-    for (const file of rawFiles) {
-      const processed = await processImage(file);
-      processedFiles.push(processed);
-    }
-
-    dispatch({
-      type: "UPDATE_FIELD",
-      field: "documentFiles",
-      value: [...formState.documentFiles, ...processedFiles],
-    });
-    setIsProcessingImages(false);
-    if (documentInputRef.current) documentInputRef.current.value = "";
-  };
-
-  const handleDocumentNameChange = (fileName, newName) => {
-    const currentNames = formState.documentNames || {};
-    const updatedNames = { ...currentNames, [fileName]: newName };
-    dispatch({
-      type: "UPDATE_FIELD",
-      field: "documentNames",
-      value: updatedNames,
-    });
-  };
-
-  const removeDocument = (fileName) => {
-    const updatedFiles = formState.documentFiles.filter(
-      (file) => file.name !== fileName
-    );
-    dispatch({
-      type: "UPDATE_FIELD",
-      field: "documentFiles",
-      value: updatedFiles,
-    });
-  };
-
-  const handleCheckboxChange = (e) => {
-    const { name, checked } = e.target;
-    if (checked) {
-      dispatch({
-        type: "UPDATE_FIELD",
-        field: "documentosMarcados",
-        value: [...formState.documentosMarcados, name],
-      });
-    } else {
-      dispatch({
-        type: "UPDATE_FIELD",
-        field: "documentosMarcados",
-        value: formState.documentosMarcados.filter((doc) => doc !== name),
-      });
-    }
-  };
-
   // --- LÓGICA DE SUBMISSÃO ---
   const processSubmission = async ({
     bypassChecklist = false,
@@ -842,6 +685,20 @@ export const FormularioSubmissao = () => {
       !validateCpfAlgorithm(formState.representanteCpf)
     ) {
       validationErrors.representanteCpf = "CPF inválido.";
+    }
+    
+    // Validação CPF Requerido (Se preenchido, deve ser válido)
+    if (formState.cpfRequerido && !validateCpfAlgorithm(formState.cpfRequerido)) {
+      validationErrors.cpfRequerido = "O CPF da outra parte é inválido.";
+    }
+
+    // Validação CPF Outros Filhos
+    if (formState.outrosFilhos && formState.outrosFilhos.length > 0) {
+      formState.outrosFilhos.forEach((filho, index) => {
+        if (filho.cpf && !validateCpfAlgorithm(filho.cpf)) {
+          validationErrors[`filho_cpf_${index}`] = `O CPF do Filho(a) ${index + 2} é inválido.`;
+        }
+      });
     }
 
     // 2. Validação Relato vs Áudio
@@ -1270,6 +1127,25 @@ export const FormularioSubmissao = () => {
   const handleChecklistReview = () => {
     setChecklistWarningOpen(false);
   };
+
+  // Callback memorizado para evitar loop infinito de re-renderização
+  const handleFilesChange = useCallback((files, namesMap) => {
+    dispatch({
+      type: "UPDATE_FIELD",
+      field: "documentFiles",
+      value: files,
+    });
+    dispatch({
+      type: "UPDATE_FIELD",
+      field: "documentNames",
+      value: namesMap,
+    });
+    dispatch({
+      type: "UPDATE_FIELD",
+      field: "documentosMarcados",
+      value: Object.values(namesMap),
+    });
+  }, []);
 
   if (generatedCredentials) {
     return (
@@ -2670,95 +2546,21 @@ export const FormularioSubmissao = () => {
                 </p>
               )}
 
-              {/* Checklist e Upload */}
-              {listaDeDocumentos.length > 0 && (
-                <div className="bg-surface p-4 rounded-lg border border-soft">
-                  <h3 className="heading-3 mb-3">
-                    Lista de Documentos Necessários
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
-                    {listaDeDocumentos.map((doc) => (
-                      <label
-                        key={doc}
-                        className="flex items-start gap-2 p-2 rounded-md cursor-pointer text-sm transition-colors hover:bg-primary/5 select-none"
-                      >
-                        <input
-                          type="checkbox"
-                          name={doc}
-                          onChange={handleCheckboxChange}
-                          className="mt-1 w-4 h-4 accent-primary"
-                        />
-                        <span className="text-muted">{doc}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
-
+              {/* --- NOVO COMPONENTE DE UPLOAD --- */}
               <div
                 id="documents-upload-section"
-                className={`bg-surface p-4 rounded-lg border border-dashed ${formErrors.documentos ? "border-error bg-red-50/10" : "border-soft"}`}
+                className={`${formErrors.documentos ? "border border-error rounded-xl p-1" : ""}`}
               >
-                <input
-                  type="file"
-                  accept=".pdf,.jpg,.jpeg,.png,.heic"
-                  ref={documentInputRef}
-                  onChange={handleDocumentChange}
-                  className="hidden"
-                  multiple
+                <DocumentUpload
+                  isRepresentacao={isRepresentacao}
+                  outrosFilhos={formState.outrosFilhos}
+                  nomes={{
+                    assistido: formState.nome,
+                    responsavel: formState.representanteNome,
+                    crianca: isRepresentacao ? formState.nome : null,
+                  }}
+                  onFilesChange={handleFilesChange}
                 />
-                <button
-                  type="button"
-                  onClick={() => documentInputRef.current.click()}
-                  disabled={isProcessingImages}
-                  className="btn btn-ghost w-full border border-soft border-dashed h-24 flex flex-col gap-2 text-muted hover:text-primary hover:border-primary disabled:opacity-50 disabled:cursor-wait"
-                >
-                  {isProcessingImages ? (
-                    <>
-                      <Loader2
-                        size={24}
-                        className="mx-auto animate-spin text-primary"
-                      />
-                      <span>Otimizando imagens para envio rápido...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Paperclip size={24} className="mx-auto" />
-                      <span>
-                        Clique para anexar fotos ou PDFs dos documentos
-                      </span>
-                    </>
-                  )}
-                </button>
-
-                {formState.documentFiles.length > 0 && (
-                  <div className="mt-4 space-y-2">
-                    {formState.documentFiles.map((file, idx) => (
-                      <div
-                        key={`${file.name}-${idx}`}
-                        className="flex items-center justify-between bg-slate-100 dark:bg-slate-700 p-2 rounded text-sm"
-                      >
-                        <span className="truncate max-w-xs">{file.name}</span>
-                        <input
-                          type="text"
-                          placeholder="Nomeie este documento (ex: RG, Comprovante)"
-                          className="input py-1 px-2 text-sm flex-1 h-8"
-                          value={formState.documentNames?.[file.name] || ""}
-                          onChange={(e) =>
-                            handleDocumentNameChange(file.name, e.target.value)
-                          }
-                        />
-                        <button
-                          type="button"
-                          onClick={() => removeDocument(file.name)}
-                          className="text-red-500 hover:text-red-700"
-                        >
-                          <X size={16} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
               {formErrors.documentos && (
                 <p className="text-sm text-red-500 font-bold text-center">

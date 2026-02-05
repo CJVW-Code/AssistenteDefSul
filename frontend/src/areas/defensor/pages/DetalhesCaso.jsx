@@ -265,6 +265,11 @@ export const DetalhesCaso = () => {
   }, [caso, feedbackInitialized]);
 
   const handleSalvarPendencia = async () => {
+    if (!pendenciaTexto || !pendenciaTexto.trim()) {
+      toast.warning("Por favor, descreva quais documentos estão pendentes.");
+      return;
+    }
+
     setIsUpdating(true);
     try {
       const response = await fetch(`${API_BASE}/casos/${id}/status`, {
@@ -1733,6 +1738,7 @@ export const DetalhesCaso = () => {
               <div className="p-4 bg-bg border border-border rounded-lg space-y-2 animate-fade-in">
                 <label className="text-sm font-bold text">
                   Descreva os documentos pendentes:
+                  Descreva os documentos pendentes: <span className="text-red-500">*</span>
                 </label>
                 <textarea
                   className="input w-full min-h-[100px] text-sm"
