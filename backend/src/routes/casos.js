@@ -19,6 +19,8 @@ import {
   solicitarReagendamento,
   alternarArquivamento,
   salvarFeedback,
+  listarNotificacoes,
+  marcarNotificacaoLida,
 } from "../controllers/casosController.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { upload } from "../middleware/upload.js"; // Usa sua configuração personalizada
@@ -42,6 +44,11 @@ router.post("/:id/reagendar", solicitarReagendamento);
 
 // Rotas Protegidas
 router.get("/", authMiddleware, listarCasos);
+
+// [IMPORTANTE] Notificações devem vir ANTES de /:id para não serem confundidas com um ID de caso
+router.get("/notificacoes", authMiddleware, listarNotificacoes);
+router.patch("/notificacoes/:id/lida", authMiddleware, marcarNotificacaoLida);
+
 router.get("/:id", authMiddleware, obterDetalhesCaso);
 router.post("/:id/gerar-fatos", authMiddleware, regenerarDosFatos);
 router.post("/:id/gerar-termo", authMiddleware, gerarTermoDeclaracao);

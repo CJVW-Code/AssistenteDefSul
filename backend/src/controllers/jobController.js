@@ -5,25 +5,29 @@ import { supabase } from "../config/supabase.js";
 export const processJob = async (req, res) => {
   try {
     // Sanitização de logs para evitar vazamento de PII (LGPD)
-    const logBody = { ...req.body };
+    const isBodyObject = req.body !== null && typeof req.body === "object";
+    const logBody = isBodyObject ? { ...req.body } : { bodyType: typeof req.body };
+
     if (logBody.dados_formulario) logBody.dados_formulario = "[REDACTED - PII]";
     if (logBody.urls_documentos)
       logBody.urls_documentos = `[${logBody.urls_documentos?.length || 0} files]`;
 
+    // Redação de cabeçalhos sensíveis
+    const logHeaders = { ...req.headers };
+    if (logHeaders.authorization) logHeaders.authorization = "[REDACTED]";
+    if (logHeaders.cookie) logHeaders.cookie = "[REDACTED]";
+    if (logHeaders["x-api-key"]) logHeaders["x-api-key"] = "[REDACTED]";
+
     logger.info("📩 Job recebido do QStash:", {
       body: logBody,
-      headers: req.headers,
+      headers: logHeaders,
     });
 
     // Validação do payload
-    if (
-      typeof req.body !== "object" ||
-      req.body === null ||
-      !req.body.protocolo
-    ) {
+    if (!isBodyObject || !req.body?.protocolo) {
       logger.warn(
         "⚠️ Payload inválido: corpo da requisição não é um objeto ou protocolo está ausente",
-        { body: req.body },
+        { body: logBody },
       );
       return res.status(400).json({
         error:

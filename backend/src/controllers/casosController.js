@@ -2059,14 +2059,16 @@ export const receberDocumentosComplementares = async (req, res) => {
     if (updateError) throw updateError;
 
     // [NOTIFICAÇÃO] Alerta o defensor sobre novos documentos
-    try {
-      await supabase.from("notificacoes").insert({
-        caso_id: caso.id,
-        mensagem: `Novos documentos entregues por ${caso.nome_assistido || "Assistido"}.`,
-        tipo: 'upload'
-      });
-    } catch (notifError) {
-      logger.warn(`Falha ao criar notificação de upload: ${notifError.message}`);
+    const { error: notifError } = await supabase.from("notificacoes").insert({
+      caso_id: caso.id,
+      mensagem: `Novos documentos entregues por ${caso.nome_assistido || "Assistido"}.`,
+      tipo: 'upload',
+      lida: false,
+      created_at: new Date().toISOString()
+    });
+
+    if (notifError) {
+      logger.error(`Falha ao criar notificação de upload: ${notifError.message}`, { error: notifError });
     }
 
     res.status(200).json({ message: "Documentos enviados com sucesso!" });
@@ -2287,11 +2289,17 @@ export const solicitarReagendamento = async (req, res) => {
     if (updateError) throw updateError;
 
     // [NOTIFICAÇÃO] Alerta o defensor sobre solicitação de reagendamento
-    await supabase.from("notificacoes").insert({
+    const { error: notifError } = await supabase.from("notificacoes").insert({
       caso_id: id,
       mensagem: `Solicitação de reagendamento para o caso ${caso.nome_assistido || "Assistido"}.`,
-      tipo: 'reagendamento'
+      tipo: 'reagendamento',
+      lida: false,
+      created_at: new Date().toISOString()
     });
+
+    if (notifError) {
+      logger.error(`Falha ao criar notificação de reagendamento: ${notifError.message}`, { error: notifError });
+    }
 
     res.status(200).json({ message: "Solicitação enviada com sucesso." });
   } catch (error) {
@@ -2338,12 +2346,12 @@ export const listarNotificacoes = async (req, res) => {
     // Busca notificações recentes
     const { data, error } = await supabase
       .from("notificacoes")
-      .select("*, casos(nome_assistido, protocolo)")
+      .select("*")
       .order("created_at", { ascending: false })
       .limit(20);
 
     if (error) throw error;
-    res.status(200).json(data);
+    res.status(200).json(data || []);
   } catch (error) {
     logger.error(`Erro ao listar notificações: ${error.message}`);
     res.status(500).json({ error: "Erro ao buscar notificações." });

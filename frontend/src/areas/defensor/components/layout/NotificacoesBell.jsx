@@ -5,7 +5,7 @@ import { API_BASE } from "../../../../utils/apiBase";
 import { useAuth } from "../../contexts/AuthContext";
 
 export const NotificacoesBell = () => {
-  const { token } = useAuth();
+  const { token, logout } = useAuth();
   const [notificacoes, setNotificacoes] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -15,9 +15,13 @@ export const NotificacoesBell = () => {
     const fetchNotificacoes = async () => {
       if (!token) return;
       try {
-        const response = await fetch(`${API_BASE}/notificacoes`, {
+        const response = await fetch(`${API_BASE}/casos/notificacoes`, {
           headers: { Authorization: `Bearer ${token}` },
         });
+        if (response.status === 401) {
+          logout();
+          return;
+        }
         if (response.ok) {
           const data = await response.json();
           setNotificacoes(data);
@@ -42,11 +46,11 @@ export const NotificacoesBell = () => {
       clearInterval(interval);
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [token]);
+  }, [token, logout]);
 
   const marcarComoLida = async (id) => {
     try {
-      await fetch(`${API_BASE}/notificacoes/${id}/lida`, {
+      await fetch(`${API_BASE}/casos/notificacoes/${id}/lida`, {
         method: "PATCH",
         headers: { Authorization: `Bearer ${token}` },
       });

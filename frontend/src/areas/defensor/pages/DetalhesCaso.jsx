@@ -163,7 +163,7 @@ const CollapsibleText = ({
 
 export const DetalhesCaso = () => {
   const { id } = useParams();
-  const { token, user } = useAuth();
+  const { token, user, logout } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { confirm } = useConfirm();
@@ -209,6 +209,11 @@ export const DetalhesCaso = () => {
         const response = await fetch(`${API_BASE}/casos/${id}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
+        // Se o token expirou (401), faz logout forçado para ir à tela de login
+        if (response.status === 401) {
+          logout();
+          return;
+        }
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
           throw new Error(errorData.error || "Falha ao carregar o caso.");
@@ -231,7 +236,7 @@ export const DetalhesCaso = () => {
         if (!silent) setLoading(false);
       }
     },
-    [id, token],
+    [id, token, logout],
   );
 
   useEffect(() => {
