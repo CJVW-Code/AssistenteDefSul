@@ -4,6 +4,9 @@ import { ThemeToggle } from "../../../components/ThemeToggle";
 import { motion } from "framer-motion";
 
 import { LogIn } from "lucide-react";
+import { ConfirmModal } from "../../../components/ui/ConfirmModal";
+import { ToastContainer } from "../../../components/ui/ToastContainer";
+
 export const LayoutCidadao = () => {
   return (
     <div className="min-h-screen flex flex-col bg-app relative">
@@ -67,6 +70,8 @@ export const LayoutCidadao = () => {
           Teixeira de Freitas
         </p>
       </footer>
+      <ConfirmModal />
+      <ToastContainer />
     </div>
   );
 };

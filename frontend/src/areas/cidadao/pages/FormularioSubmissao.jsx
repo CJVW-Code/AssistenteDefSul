@@ -22,6 +22,7 @@ import {
 import { documentosPorAcao } from "../../../data/documentos.js";
 import { API_BASE } from "../../../utils/apiBase";
 import { useToast } from "../../../contexts/ToastContext";
+import { useConfirm } from "../../../contexts/ConfirmContext";
 import { DocumentUpload } from "../../../components/DocumentUpload";
 
 // 1. Estado Inicial Consolidado
@@ -391,6 +392,7 @@ const validateCpfAlgorithm = (cpf) => {
 
 export const FormularioSubmissao = () => {
   const { toast } = useToast();
+  const { confirm } = useConfirm();
   const [formState, dispatch] = useReducer(formReducer, initialState);
   useEffect( () => {fetch(`${API_BASE}/health`).catch(()=>{});},[]);
   const [statusMessage, setStatusMessage] = useState("");
@@ -399,7 +401,6 @@ export const FormularioSubmissao = () => {
   const [isProcessingImages, setIsProcessingImages] = useState(false);
   const [generatedCredentials, setGeneratedCredentials] = useState(null);
   const [formErrors, setFormErrors] = useState({});
-  const [checklistWarningOpen, setChecklistWarningOpen] = useState(false);
   const [sugestoesCidades, setSugestoesCidades] = useState([]);
   const [mostrarSugestoes, setMostrarSugestoes] = useState(false);
 
@@ -634,9 +635,7 @@ export const FormularioSubmissao = () => {
 
   // --- LÓGICA DE SUBMISSÃO ---
   const processSubmission = async ({
-    bypassChecklist = false,
     isAlvaraContext = false,
-    requiredDocs = [],
   } = {}) => {
     const validationErrors = {};
     const nomeRequeridoTrim = (formState.nomeRequerido || "").trim();
@@ -744,16 +743,6 @@ export const FormularioSubmissao = () => {
       return;
     }
 
-    if (
-      requiredDocs.length > 0 &&
-      formState.documentosMarcados.length === 0 &&
-      !bypassChecklist
-    ) {
-      setChecklistWarningOpen(true);
-      return;
-    }
-
-    setChecklistWarningOpen(false);
     setFormErrors({});
     setLoading(true);
     setGeneratedCredentials(null);
@@ -1109,23 +1098,18 @@ export const FormularioSubmissao = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    const isConfirmed = await confirm({
+      title: "Confirmar envio",
+      message:
+        "Você conferiu se as fotos dos documentos estão legíveis? O envio de documentos com baixa qualidade pode atrasar seu atendimento. Deseja continuar?",
+    });
+
+    if (!isConfirmed) return;
+
     await processSubmission({
       isAlvaraContext: isAlvara,
-      requiredDocs: listaDeDocumentos,
     });
-  };
-
-  const handleChecklistConfirm = async () => {
-    setChecklistWarningOpen(false);
-    await processSubmission({
-      bypassChecklist: true,
-      isAlvaraContext: isAlvara,
-      requiredDocs: listaDeDocumentos,
-    });
-  };
-
-  const handleChecklistReview = () => {
-    setChecklistWarningOpen(false);
   };
 
   // Callback memorizado para evitar loop infinito de re-renderização
@@ -2595,37 +2579,6 @@ export const FormularioSubmissao = () => {
           </>
         )}
       </form>
-      {checklistWarningOpen && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 px-4">
-          <div className="bg-surface max-w-md w-full rounded-2xl p-6 border border-soft shadow-xl space-y-4">
-            <div className="flex items-center gap-3">
-              <AlertTriangle className="text-secondary" />
-              <h3 className="text-lg font-semibold">Documentos obrigatórios</h3>
-            </div>
-            <p className="text-sm text-muted">
-              Você está enviando o caso sem marcar nenhum documento obrigatório
-              para esta ação. Confirme que está ciente para continuar ou volte
-              para revisar a lista.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <button
-                type="button"
-                onClick={handleChecklistReview}
-                className="btn btn-ghost border border-soft flex-1"
-              >
-                Revisar checklist
-              </button>
-              <button
-                type="button"
-                onClick={handleChecklistConfirm}
-                className="btn btn-primary flex-1"
-              >
-                OK, enviar assim mesmo
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </motion.div>
   );
 };
