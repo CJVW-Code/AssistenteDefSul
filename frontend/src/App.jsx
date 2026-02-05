@@ -21,6 +21,7 @@ import { Cadastro } from "./areas/defensor/pages/Cadastro";
 import { Dashboard } from "./areas/defensor/pages/Dashboard";
 import { Casos } from "./areas/defensor/pages/Casos";
 import { DetalhesCaso } from "./areas/defensor/pages/DetalhesCaso";
+import { CasosArquivados } from "./areas/defensor/pages/CasosArquivados";
 import { PainelRecepcao } from "./areas/defensor/pages/PainelRecepcao";
 import { GerenciarEquipe } from "./areas/defensor/pages/GerenciarEquipe";
 
@@ -130,6 +131,14 @@ function App() {
                   element={
                     <DefensorRoute>
                       <Casos />
+                    </DefensorRoute>
+                  }
+                />
+                <Route
+                  path="casos/arquivados"
+                  element={
+                    <DefensorRoute>
+                      <CasosArquivados />
                     </DefensorRoute>
                   }
                 />

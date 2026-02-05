@@ -11,16 +11,22 @@ import {
   PieChart,
   Bell,
   Calendar,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { jwtDecode } from "jwt-decode";
 import { API_BASE } from "../../../utils/apiBase";
 
 const statusStyles = {
   recebido: "bg-slate-100 text-slate-700 border-slate-200",
+  processado: "bg-indigo-100 text-indigo-800 border-indigo-200",
   em_analise: "bg-blue-100 text-blue-800 border-blue-200",
   aguardando_docs: "bg-amber-100 text-amber-800 border-amber-200",
   documentos_entregues: "bg-highlight/15 text-highlight border-highlight/30",
   reuniao_agendada: "bg-purple-100 text-purple-800 border-purple-200",
+  reuniao_online_agendada: "bg-blue-100 text-blue-800 border-blue-200",
+  reuniao_presencial_agendada:
+    "bg-purple-100 text-purple-800 border-purple-200",
   encaminhado_solar: "bg-emerald-100 text-emerald-800 border-emerald-200",
   default: "bg-slate-100 text-slate-700 border-slate-200",
 };
@@ -28,19 +34,23 @@ const statusStyles = {
 const normalizeStatus = (status) => (status || "recebido").toLowerCase().trim();
 
 const summaryFilters = {
-  ativos: (caso) => normalizeStatus(caso.status) !== "encaminhado_solar",
+  processado: (caso) => normalizeStatus(caso.status) === "processado",
   em_analise: (caso) => normalizeStatus(caso.status) === "em_analise",
   aguardando_docs: (caso) => normalizeStatus(caso.status) === "aguardando_docs",
   documentos_entregues: (caso) =>
     normalizeStatus(caso.status) === "documentos_entregues",
   reuniao_agendada: (caso) =>
-    normalizeStatus(caso.status) === "reuniao_agendada",
+    [
+      "reuniao_agendada",
+      "reuniao_online_agendada",
+      "reuniao_presencial_agendada",
+    ].includes(normalizeStatus(caso.status)),
   encaminhado_solar: (caso) =>
     normalizeStatus(caso.status) === "encaminhado_solar",
 };
 
 const summaryFilterLabels = {
-  ativos: "casos ativos",
+  processado: "casos processados",
   em_analise: "casos em análise",
   aguardando_docs: "casos aguardando documentos",
   documentos_entregues: "casos com documentos entregues",
@@ -55,6 +65,8 @@ export const Dashboard = () => {
   const { token } = useAuth();
   const [defensor, setDefensor] = useState(null);
   const [statusFilter, setStatusFilter] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   useEffect(() => {
     if (token) {
@@ -62,6 +74,10 @@ export const Dashboard = () => {
       setDefensor(decoded);
     }
   }, [token]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter]);
 
   useEffect(() => {
     const fetchCasos = async () => {
@@ -97,8 +113,15 @@ export const Dashboard = () => {
     const documentosEntregues = casos.filter(
       (caso) => normalizeStatus(caso.status) === "documentos_entregues",
     ).length;
-    const reuniaoAgendada = casos.filter(
-      (caso) => normalizeStatus(caso.status) === "reuniao_agendada",
+    const reuniaoAgendada = casos.filter((caso) =>
+      [
+        "reuniao_agendada",
+        "reuniao_online_agendada",
+        "reuniao_presencial_agendada",
+      ].includes(normalizeStatus(caso.status)),
+    ).length;
+    const processado = casos.filter(
+      (caso) => normalizeStatus(caso.status) === "processado",
     ).length;
     const ativos = total - encaminhadosSolar;
     return {
@@ -107,6 +130,7 @@ export const Dashboard = () => {
       aguardandoDocs,
       emAnalise,
       ativos,
+      processado,
       documentosEntregues,
       reuniaoAgendada,
     };
@@ -146,10 +170,18 @@ export const Dashboard = () => {
     return casos.filter(summaryFilters[statusFilter]);
   }, [casos, statusFilter]);
 
-  const casosRecentes = useMemo(
-    () => filteredCasos.slice(0, 6),
-    [filteredCasos],
-  );
+  const casosRecentes = useMemo(() => {
+    if (!statusFilter) {
+      return filteredCasos.slice(0, 6);
+    }
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredCasos.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredCasos, statusFilter, currentPage]);
+
+  const totalPages = statusFilter
+    ? Math.ceil(filteredCasos.length / itemsPerPage)
+    : 0;
+
   const ultimaAtualizacao = casos[0]?.created_at
     ? new Date(casos[0].created_at).toLocaleString("pt-BR", {
         day: "2-digit",
@@ -220,10 +252,10 @@ export const Dashboard = () => {
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {[
           {
-            key: "ativos",
-            label: "Casos ativos",
-            value: resumo.ativos,
-            helper: `${resumo.total} recebidos no total.`,
+            key: "processado",
+            label: "Novos (Processados)",
+            value: resumo.processado,
+            helper: "Prontos para análise.",
             icon: Inbox,
             accent: "text-primary",
           },
@@ -419,6 +451,11 @@ export const Dashboard = () => {
                           <p className="heading-3 ">{caso.nome_assistido}</p>
                           <p className="text-sm text-muted">
                             Protocolo: {caso.protocolo}
+                            {caso.numero_solar && (
+                              <span className="text-primary font-medium border-l border-soft pl-2 ml-2">
+                                Solar: {caso.numero_solar}
+                              </span>
+                            )}
                           </p>
                         </div>
                       </div>
@@ -443,6 +480,28 @@ export const Dashboard = () => {
               );
             })}
           </ul>
+        )}
+
+        {statusFilter && totalPages > 1 && (
+          <div className="flex justify-center items-center gap-4 py-4 border-t border-soft">
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="btn btn-ghost btn-sm"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span className="text-sm text-muted">
+              Página {currentPage} de {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="btn btn-ghost btn-sm"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
         )}
       </section>
     </div>

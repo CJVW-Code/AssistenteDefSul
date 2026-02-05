@@ -163,7 +163,6 @@ const valueOrPlaceholder = (value, fallback = PLACEHOLDER_FIELD) => {
 };
 
 const cleanText = (value, fallback = "") => {
-
   if (value === undefined || value === null) return fallback;
   const text = String(value).trim();
   return text.length ? text : fallback;
@@ -252,18 +251,67 @@ export const generateDosFatos = async (caseData = {}) => {
 
     const documentosList = formatDocumentList(caseData.documentos_informados);
 
-    const filhosInfo = cleanText(
+    // --- LÓGICA PARA MÚLTIPLOS FILHOS ---
+    let outrosFilhos = [];
+    try {
+      if (caseData.outros_filhos_detalhes) {
+        outrosFilhos =
+          typeof caseData.outros_filhos_detalhes === "string"
+            ? JSON.parse(caseData.outros_filhos_detalhes)
+            : caseData.outros_filhos_detalhes;
+      }
+    } catch (e) {
+      logger.warn("Erro ao fazer parse de outros_filhos_detalhes", e);
+    }
+
+    if (!Array.isArray(outrosFilhos)) outrosFilhos = [];
+
+    const todosAutores = [
+      {
+        nome: normalized.requerente?.nome,
+        cpf: normalized.requerente?.cpf,
+        nascimento: normalized.requerente?.dataNascimento,
+      },
+    ];
+
+    outrosFilhos.forEach((f) => {
+      if (f.nome) {
+        todosAutores.push({
+          nome: formatName(f.nome),
+          cpf: f.cpf,
+          nascimento: f.dataNascimento,
+        });
+      }
+    });
+
+    const listaAutoresTexto = todosAutores
+      .map((a) => cleanText(a.nome))
+      .join(", ");
+
+    const isPlural = todosAutores.length > 1;
+    const termoAutor = isPlural ? "Os autores" : "O autor";
+    const termoFilho = isPlural ? "são filhos" : "é filho";
+
+    let filhosInfo = cleanText(
       caseData.filhos_info || caseData.filhosInfo || caseData.descricao_guarda,
       "Informações sobre filhos não foram apresentadas.",
     );
 
+    if (todosAutores.length > 0) {
+      const detalhes = todosAutores
+        .map((a) => `${a.nome} (Nasc: ${a.nascimento || "?"})`)
+        .join("; ");
+      filhosInfo = `${filhosInfo}. Detalhes: ${detalhes}`;
+    }
+
     // Preparação dos textos descritivos
-    let situacaoAssistido = cleanText(caseData.dados_adicionais_requerente, "");
+    let situacaoAssistido = "";
     if (caseData.situacao_financeira_genitora) {
-      situacaoAssistido += `\nSituação Financeira: ${caseData.situacao_financeira_genitora}`;
+      situacaoAssistido = `Situação Financeira: ${caseData.situacao_financeira_genitora}`;
     }
     if (!situacaoAssistido)
-      situacaoAssistido = "Sem detalhes adicionais sobre o assistido.";
+      situacaoAssistido =
+        "Sem detalhes adicionais sobre a situação financeira.";
 
     let situacaoRequerido = cleanText(caseData.dados_adicionais_requerido, "");
     if (caseData.requerido_tem_emprego_formal) {
@@ -309,8 +357,13 @@ export const generateDosFatos = async (caseData = {}) => {
       }
     };
 
-    addToPii(normalized.requerente?.nome, "[NOME_AUTOR]");
-    addToPii(normalized.requerente?.cpf, "[CPF_AUTOR]");
+    todosAutores.forEach((autor, index) => {
+      const num = index + 1;
+      addToPii(autor.nome, `[NOME_AUTOR_${num}]`);
+      addToPii(autor.cpf, `[CPF_AUTOR_${num}]`);
+      addToPii(autor.nascimento, `[NASC_AUTOR_${num}]`);
+    });
+
     addToPii(normalized.requerido?.nome, "[NOME_REU]");
     addToPii(normalized.requerido?.cpf, "[CPF_REU]");
     // Se quiser, adicione mais campos aqui (ex: nome da criança se tiver separado)
@@ -321,6 +374,7 @@ export const generateDosFatos = async (caseData = {}) => {
 Seu estilo de escrita é extremamente formal, culto e padronizado (juridiquês clássico).
 Você DEVE utilizar os conectivos: "Insta salientar", "Ocorre que, no caso em tela", "Como é sabido", "aduzir".
 REGRA CRÍTICA: NUNCA use o termo "menor" para se referir a uma criança ou adolescente. Em vez disso, use "criança", "adolescente" ou "filho(a)".
+REGRA DE OURO: NÃO cite números de documentos (CPF, RG) ou datas de nascimento no texto narrativo, pois estes dados já constam na qualificação das partes.
 Não use listas ou tópicos na resposta final. Escreva apenas parágrafos coesos.`;
 
     // No userPrompt, instruímos a IA a usar os placeholders que ela vai receber
@@ -332,15 +386,13 @@ Não use listas ou tópicos na resposta final. Escreva apenas parágrafos coesos
 ATENÇÃO: NÃO inclua o título "DOS FATOS", "DOS FATOS E FUNDAMENTOS" ou qualquer cabeçalho. Comece diretamente pelo texto.
 
 Estrutura Lógica Obrigatória:
-1. **Vínculo:** "O autor ([NOME_AUTOR]) é filho do requerido ([NOME_REU]), conforme é possível aduzir..."
+1. **Vínculo:** "${termoAutor} (${listaAutoresTexto}) ${termoFilho} do requerido ([NOME_REU]), conforme é possível aduzir..."
 2. **Necessidade:** "Ocorre que, no caso em tela..."
 3. **Dever:** "Como é sabido..."
 4. **Conflito:** "Insta salientar..."
 
 DADOS DO CASO:
-- Assistido: ${cleanText(normalized.requerente?.nome)} (CPF: ${cleanText(
-      normalized.requerente?.cpf,
-    )})
+- Assistidos (Autores): ${listaAutoresTexto}
 - Requerido: ${cleanText(normalized.requerido?.nome)} (CPF: ${cleanText(
       normalized.requerido?.cpf,
     )})

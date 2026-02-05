@@ -7,6 +7,7 @@ import {
   UserPlus,
   LogOut,
   Search,
+  Archive,
 } from "lucide-react";
 
 export const Sidebar = () => {
@@ -89,6 +90,14 @@ export const Sidebar = () => {
             <Link to="/painel/casos" className={navLinkClass("/painel/casos")}>
               <FolderKanban size={20} />
               Casos e Triagem
+            </Link>
+          )}
+
+          {/* ARQUIVO MORTO (Jurídico) */}
+          {isJuridico && (
+            <Link to="/painel/casos/arquivados" className={navLinkClass("/painel/casos/arquivados")}>
+              <Archive size={20} />
+              Arquivo Morto
             </Link>
           )}
 

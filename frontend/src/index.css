@@ -48,9 +48,9 @@
   --color-secondary: #1fa97c;
   --color-secondary-600: #178963;
   --color-special: #5cb8f5; /* azul */
-  --color-bg: #0b1520; /* azul-petróleo escuro */
-  --color-surface: #142433; /* cards/painéis */
-  --color-border: #1e3a4a;
+  --color-bg: #202023; /* azul-petróleo escuro */
+  --color-surface: #303335; /* cards/painéis */
+  --color-border: #45494d;
   --color-text: #ffffff;
   --color-text-muted: #c9d1d9;
 

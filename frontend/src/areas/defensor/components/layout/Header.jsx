@@ -4,6 +4,7 @@ import { jwtDecode } from "jwt-decode";
 import { Link } from "react-router-dom";
 import { ExternalLink } from "lucide-react";
 import { ThemeToggle } from "../../../../components/ThemeToggle";
+import { NotificacoesBell } from "./NotificacoesBell";
 
 export const Header = () => {
   const { token, logout } = useAuth();
@@ -38,6 +39,7 @@ export const Header = () => {
             <ExternalLink size={16} />
             Portal do Cidadão
           </Link>
+          <NotificacoesBell />
           <ThemeToggle />
           <button
             type="button"

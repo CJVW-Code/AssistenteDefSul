@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import {
   ChevronLeft,
@@ -19,17 +19,27 @@ import {
   Video,
   Calendar,
   Bell,
+  Pencil,
+  X,
+  Check,
+  AlertTriangle,
+  History,
+  Copy,
+  Archive,
+  ArchiveRestore,
 } from "lucide-react";
 import { API_BASE } from "../../../utils/apiBase";
 import { useToast } from "../../../contexts/ToastContext";
 import { useConfirm } from "../../../contexts/ConfirmContext";
 
-const statusOptions = [
-  { value: "recebido", label: "Recebido" },
+const manualStatusOptions = [
   { value: "em_analise", label: "Em análise" },
   { value: "aguardando_docs", label: "Pendentes de documentos" },
-  { value: "documentos_entregues", label: "Documentos Entregues (Novo)" },
-  { value: "reuniao_agendada", label: "Reunião Agendada" },
+  {
+    value: "reuniao_presencial_agendada",
+    label: "Reunião Presencial Agendada",
+  },
+  { value: "reuniao_online_agendada", label: "Reunião Online Agendada" },
 ];
 
 const statusBadges = {
@@ -37,6 +47,10 @@ const statusBadges = {
   em_analise: "bg-special/10 text-special border-special/20",
   documentos_entregues: "bg-highlight/15 text-highlight border-highlight/30",
   reuniao_agendada: "bg-purple-100 text-purple-800 border-purple-200",
+  reuniao_online_agendada: "bg-blue-100 text-blue-800 border-blue-200",
+  reuniao_presencial_agendada:
+    "bg-purple-100 text-purple-800 border-purple-200",
+  reagendamento_solicitado: "bg-error/10 text-error border-error/20",
   aguardando_docs: "bg-orange-100 text-orange-800 border-orange-200",
   processando: "bg-indigo-100 text-indigo-800 border-indigo-200",
   processado: "bg-green-100 text-green-800 border-green-200",
@@ -58,7 +72,14 @@ const statusDescriptions = {
     "O processo está pausado, aguardando o envio de documentos adicionais pelo cidadão.",
   documentos_entregues:
     "O cidadão enviou novos documentos. Verifique os anexos.",
-  reuniao_agendada: "O atendimento com o defensor foi agendado. Aguarde a data prevista.",
+  reuniao_agendada:
+    "O atendimento com o defensor foi agendado. Aguarde a data prevista.",
+  reuniao_online_agendada:
+    "O atendimento online foi agendado. Configure o link e a data abaixo.",
+  reuniao_presencial_agendada:
+    "O atendimento presencial foi agendado. Informe o local e data abaixo.",
+  reagendamento_solicitado:
+    "O cidadão informou que não pode comparecer. Verifique o motivo em 'Anotações/Feedback'.",
   encaminhado_solar:
     "O caso foi finalizado e encaminhado para o sistema Solar da defensoria.",
   finalizado: "O caso foi concluído.",
@@ -89,6 +110,14 @@ const formatValue = (value) => {
   }
 
   return String(value);
+};
+
+// Função auxiliar para formatar data na visualização
+const formatDateDisplay = (dateString) => {
+  if (!dateString) return "Não informado";
+  const [year, month, day] = dateString.split("-");
+  if (!year || !month || !day) return dateString;
+  return `${day}/${month}/${year}`;
 };
 
 const CollapsibleText = ({
@@ -134,7 +163,8 @@ const CollapsibleText = ({
 
 export const DetalhesCaso = () => {
   const { id } = useParams();
-  const { token, user } = useAuth();
+  const { token, user, logout } = useAuth();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const { confirm } = useConfirm();
   const [caso, setCaso] = useState(null);
@@ -159,14 +189,35 @@ export const DetalhesCaso = () => {
   const [isAgendando, setIsAgendando] = useState(false);
   const [isReprocessing, setIsReprocessing] = useState(false);
   const [pendenciaTexto, setPendenciaTexto] = useState("");
+  const [editingFile, setEditingFile] = useState({ url: null, name: "" });
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [showStatusHelp, setShowStatusHelp] = useState(false);
+  const [archiveModalOpen, setArchiveModalOpen] = useState(false);
+  const [archiveReason, setArchiveReason] = useState("");
 
   const fetchDetalhes = useCallback(
     async (silent = false) => {
+      if (!id || id === 'undefined') return;
+      
+      // Proteção: Se a rota capturou "arquivados" como ID, não faz a requisição
+      if (id === 'arquivados') {
+        setLoading(false);
+        return;
+      }
+
       try {
         const response = await fetch(`${API_BASE}/casos/${id}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        if (!response.ok) throw new Error("Falha ao carregar o caso.");
+        // Se o token expirou (401), faz logout forçado para ir à tela de login
+        if (response.status === 401) {
+          logout();
+          return;
+        }
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || "Falha ao carregar o caso.");
+        }
         const data = await response.json();
         if (data.agendamento_data) {
           // Converte a data UTC do banco para o formato local esperado pelo input datetime-local
@@ -185,7 +236,7 @@ export const DetalhesCaso = () => {
         if (!silent) setLoading(false);
       }
     },
-    [id, token],
+    [id, token, logout],
   );
 
   useEffect(() => {
@@ -208,6 +259,7 @@ export const DetalhesCaso = () => {
     if (caso && !feedbackInitialized) {
       setFeedback(caso.feedback || "");
       setPendenciaTexto(caso.descricao_pendencia || "");
+      setNumSolar(caso.numero_solar || "");
       setFeedbackInitialized(true);
     }
   }, [caso, feedbackInitialized]);
@@ -271,6 +323,45 @@ export const DetalhesCaso = () => {
     } finally {
       setIsUpdating(false);
     }
+  };
+
+  const handleSalvarSolar = async () => {
+    // Remove tudo que não for número para evitar erro 500 no backend (tipo integer)
+    const solarLimpo = numSolar.replace(/\D/g, "");
+    const valorParaSalvar = solarLimpo === "" ? null : solarLimpo;
+    const valorAtual = caso.numero_solar || null;
+
+    if (valorParaSalvar === valorAtual) return;
+
+    try {
+      const response = await fetch(`${API_BASE}/casos/${id}/status`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          numero_solar: valorParaSalvar,
+        }),
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || "Erro ao salvar dados.");
+      }
+
+      setCaso((prev) => ({ ...prev, numero_solar: valorParaSalvar }));
+      toast.success("Número Solar salvo!");
+    } catch (error) {
+      console.error(error);
+      toast.error(error.message);
+    }
+  };
+
+  const handleCopySolar = () => {
+    if (!numSolar) return;
+    navigator.clipboard.writeText(numSolar);
+    toast.success("Número Solar copiado!");
   };
 
   if (loading) {
@@ -548,7 +639,12 @@ export const DetalhesCaso = () => {
   };
 
   const handleReprocessar = async () => {
-    if (!await confirm("Isso irá reiniciar todo o processo de leitura de documentos (OCR) e geração de texto pela IA. Deseja continuar?", "Reprocessar Caso")) {
+    if (
+      !(await confirm(
+        "Isso irá reiniciar todo o processo de leitura de documentos (OCR) e geração de texto pela IA. Deseja continuar?",
+        "Reprocessar Caso",
+      ))
+    ) {
       return;
     }
 
@@ -559,13 +655,87 @@ export const DetalhesCaso = () => {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!response.ok) throw new Error("Erro ao solicitar reprocessamento.");
-      
+
       toast.success("Processamento reiniciado! Aguarde alguns instantes.");
       fetchDetalhes(true); // Atualiza para ver o status mudando para 'processando'
     } catch (error) {
       toast.error(error.message);
     } finally {
       setIsReprocessing(false);
+    }
+  };
+
+  const handleArquivarClick = async () => {
+    if (caso.arquivado) {
+      // Se já está arquivado, é uma ação de RESTAURAR
+      if (await confirm("Deseja mover este caso de volta para os Ativos?", "Restaurar Caso")) {
+        await processarArquivamento(false, null);
+      }
+    } else {
+      // Se não está arquivado, abre o modal para pedir MOTIVO
+      setArchiveReason("");
+      setArchiveModalOpen(true);
+    }
+  };
+
+  const confirmArchive = async () => {
+    if (archiveReason.trim().length < 5) {
+      toast.error("Por favor, informe um motivo válido (mín. 5 caracteres).");
+      return;
+    }
+    await processarArquivamento(true, archiveReason);
+    setArchiveModalOpen(false);
+  };
+
+  const processarArquivamento = async (novoEstado, motivo) => {
+    try {
+      const response = await fetch(`${API_BASE}/casos/${id}/arquivar`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ arquivado: novoEstado, motivo }),
+      });
+      
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Erro ao alterar status.");
+      }
+
+      toast.success(novoEstado ? "Caso arquivado!" : "Caso restaurado!");
+      navigate(novoEstado ? "/painel/casos" : "/painel/casos");
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
+  const handleSaveRename = async () => {
+    if (!editingFile.url || !editingFile.name.trim()) return;
+    setIsRenaming(true);
+    try {
+      const response = await fetch(
+        `${API_BASE}/casos/${id}/documento/renomear`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            fileUrl: editingFile.url,
+            newName: editingFile.name,
+          }),
+        },
+      );
+      if (!response.ok) throw new Error("Falha ao renomear arquivo.");
+      toast.success("Arquivo renomeado com sucesso!");
+      setEditingFile({ url: null, name: "" });
+      fetchDetalhes(true);
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setIsRenaming(false);
     }
   };
 
@@ -581,11 +751,51 @@ export const DetalhesCaso = () => {
             Voltar para o dashboard
           </Link>
           <h1 className="heading-1 mt-3">{caso.nome_assistido}</h1>
-          <p className="text-muted text-sm">
-            Protocolo {caso.protocolo} • {caso.tipo_acao}
-          </p>
+          <div className="flex flex-wrap items-center gap-4 mt-2">
+            <p className="text-muted text-sm">
+              Protocolo {caso.protocolo} • {caso.tipo_acao}
+            </p>
+            <div className="flex items-center gap-2 bg-surface border border-soft rounded-md px-3 py-1.5 shadow-sm">
+              <label htmlFor="numeroSolar" className="text-xs font-bold text-muted uppercase tracking-wider">
+                Solar:
+              </label>
+              <input
+                type="text"
+                id="numeroSolar"
+                value={numSolar}
+                onChange={(e) => {
+                  // Permite apenas números enquanto digita
+                  setNumSolar(e.target.value.replace(/\D/g, ""));
+                }}
+                onBlur={handleSalvarSolar}
+                className="bg-transparent border-none outline-none text-sm font-mono w-32 text-primary font-bold placeholder:text-muted/50"
+                placeholder="---"
+                title="Número do Atendimento Solar"
+              />
+              <button
+                onClick={handleCopySolar}
+                className="text-muted hover:text-primary transition-colors"
+                title="Copiar número"
+              >
+                <Copy size={14} />
+              </button>
+            </div>
+          </div>
         </div>
       </div>
+
+      {/* NOTIFICAÇÃO DE ARQUIVAMENTO */}
+      {caso.arquivado && (
+        <div className="alert flex items-start gap-3 mb-6 animate-fade-in">
+          <Archive className="text-muted shrink-0 mt-1" size={24} />
+          <div>
+            <h3 className="font-bold">Caso Arquivado</h3>
+            <p className="text-muted mt-1">
+              <strong>Motivo:</strong> {caso.motivo_arquivamento || "Não informado."}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* NOTIFICAÇÃO DE DOCUMENTOS ENTREGUES */}
       {caso.status === "documentos_entregues" && (
@@ -604,6 +814,25 @@ export const DetalhesCaso = () => {
       )}
 
       <div className="grid gap-6 lg:grid-cols-3">
+        {/* BOTÕES DE AÇÃO RÁPIDA (ARQUIVAR) */}
+        <div className="lg:col-span-3 flex justify-end">
+          <button
+            onClick={handleArquivarClick}
+            className={`btn ${
+              caso.arquivado
+                ? "btn-primary"
+                : "bg-slate-500 hover:bg-slate-600 text-white border-slate-500"
+            }`}
+          >
+            {caso.arquivado ? (
+              <ArchiveRestore size={18} />
+            ) : (
+              <Archive size={18} />
+            )}
+            {caso.arquivado ? "Restaurar Caso" : "Arquivar Caso"}
+          </button>
+        </div>
+
         <section className="space-y-6 lg:col-span-2">
           <div className="card space-y-4">
             <h2 className="heading-2">Dados do assistido</h2>
@@ -628,6 +857,9 @@ export const DetalhesCaso = () => {
                 (() => {
                   const dados = caso.dados_formulario || {};
                   const isRepresentacao = dados.assistido_eh_incapaz === "sim";
+                  const isFixacaoAlimentos = (caso.tipo_acao || "")
+                    .toLowerCase()
+                    .includes("fixação de pensão alimentícia");
                   let outrosFilhos = [];
                   try {
                     if (dados.outros_filhos_detalhes) {
@@ -657,21 +889,24 @@ export const DetalhesCaso = () => {
                           {renderDataField("CPF", dados.cpf)}
                           {renderDataField(
                             "Data de Nascimento",
-                            dados.assistido_data_nascimento,
+                            formatDateDisplay(dados.assistido_data_nascimento),
                           )}
-                          {renderDataField(
-                            "Nacionalidade",
-                            dados.assistido_nacionalidade,
-                          )}
+                          {!isFixacaoAlimentos &&
+                            renderDataField(
+                              "Nacionalidade",
+                              dados.assistido_nacionalidade,
+                            )}
                           {renderDataField(
                             "Estado Civil",
                             dados.assistido_estado_civil,
                           )}
-                          {renderDataField(
-                            "Endereço Residencial",
-                            dados.endereco_assistido,
-                          )}
-                          {renderDataField("Email", dados.email_assistido)}
+                          {!isFixacaoAlimentos &&
+                            renderDataField(
+                              "Endereço Residencial",
+                              dados.endereco_assistido,
+                            )}
+                          {!isFixacaoAlimentos &&
+                            renderDataField("Email", dados.email_assistido)}
                           {renderDataField(
                             "Telefone de Contato",
                             dados.telefone,
@@ -1076,8 +1311,9 @@ export const DetalhesCaso = () => {
               {caso.urls_documentos?.length > 0 ? (
                 caso.urls_documentos.map((url, index) => {
                   // Tenta extrair o nome original do arquivo da URL ou usa o mapa de nomes
-                  let fileName = url.split("/").pop().split("?")[0];
-                  fileName = decodeURIComponent(fileName);
+                  let rawFileName = url.split("/").pop().split("?")[0];
+                  rawFileName = decodeURIComponent(rawFileName);
+                  let fileName = rawFileName;
 
                   // Limpeza visual do nome: remove prefixos "complementar_" e timestamps numéricos (hífen ou underscore)
                   fileName = fileName
@@ -1088,61 +1324,136 @@ export const DetalhesCaso = () => {
 
                   // Tenta recuperar o nome personalizado definido no formulário
                   const docNames = caso.dados_formulario?.documentNames || {};
-                  let customName = null;
+                  // 1. Tenta busca exata pela chave (prioridade para arquivos renomeados)
+                  let customName = docNames[rawFileName];
 
-                  Object.keys(docNames).forEach((originalKey) => {
-                    // Sanitiza a chave original (remove acentos) para comparar com o nome do arquivo salvo
-                    const safeKey = originalKey.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-                    
-                    // Normalização agressiva: remove acentos e tudo que não for letra ou número (incluindo pontos e traços)
-                    const fileNameNorm = fileName
-                      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-                      .replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+                  // 2. Se não achar, tenta a lógica legada de matching aproximado
+                  if (!customName) {
+                    Object.keys(docNames).forEach((originalKey) => {
+                      // Sanitiza a chave original (remove acentos) para comparar com o nome do arquivo salvo
+                      const safeKey = originalKey
+                        .normalize("NFD")
+                        .replace(/[\u0300-\u036f]/g, "");
 
-                    const safeKeyNorm = safeKey.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+                      // Normalização agressiva: remove acentos e tudo que não for letra ou número (incluindo pontos e traços)
+                      const fileNameNorm = fileName
+                        .normalize("NFD")
+                        .replace(/[\u0300-\u036f]/g, "")
+                        .replace(/[^a-zA-Z0-9]/g, "")
+                        .toLowerCase();
 
-                    // 1. Comparação exata ou flexível
-                    if (safeKey === fileName || fileNameNorm === safeKeyNorm) {
-                      customName = docNames[originalKey];
-                    } 
-                    // 2. Comparação por sufixo (salva casos onde o timestamp não foi removido corretamente)
-                    // Verifica se o nome do arquivo (do URL) termina com o nome original (do formulário)
-                    else if (!customName && fileNameNorm.endsWith(safeKeyNorm) && safeKeyNorm.length > 3) {
-                      customName = docNames[originalKey];
-                    }
-                  });
+                      const safeKeyNorm = safeKey
+                        .replace(/[^a-zA-Z0-9]/g, "")
+                        .toLowerCase();
+
+                      // 1. Comparação exata ou flexível
+                      if (
+                        safeKey === fileName ||
+                        fileNameNorm === safeKeyNorm
+                      ) {
+                        customName = docNames[originalKey];
+                      }
+                      // 2. Comparação por sufixo (salva casos onde o timestamp não foi removido corretamente)
+                      // Verifica se o nome do arquivo (do URL) termina com o nome original (do formulário)
+                      else if (
+                        !customName &&
+                        fileNameNorm.endsWith(safeKeyNorm) &&
+                        safeKeyNorm.length > 3
+                      ) {
+                        customName = docNames[originalKey];
+                      }
+                    });
+                  }
 
                   const displayName = customName || fileName;
 
-                  return (
-                    <a
-                      key={url}
-                      href={url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={`btn btn-ghost border w-full justify-start text-left break-all group ${
-                        isComplementar
-                          ? "border-highlight/30 bg-highlight/5 hover:bg-highlight/10"
-                          : "border-soft"
-                      }`}
-                    >
-                      <FileText
-                        size={18}
-                        className={`shrink-0 ${isComplementar ? "text-highlight" : ""}`}
-                      />
-                      <span
-                        className={
-                          isComplementar ? "font-medium text-highlight" : ""
-                        }
+                  const isEditing = editingFile.url === url;
+
+                  if (isEditing) {
+                    return (
+                      <div
+                        key={url}
+                        className="flex items-center gap-2 w-full p-1 bg-surface border border-primary/30 rounded-lg animate-fade-in"
                       >
-                        {displayName}
-                      </span>
-                      {isComplementar && (
-                        <span className="ml-auto text-[10px] uppercase font-bold bg-highlight/20 text-highlight px-2 py-0.5 rounded-full">
-                          Novo
+                        <input
+                          type="text"
+                          value={editingFile.name}
+                          onChange={(e) =>
+                            setEditingFile({
+                              ...editingFile,
+                              name: e.target.value,
+                            })
+                          }
+                          className="input input-sm flex-1 h-8 text-sm"
+                          autoFocus
+                          placeholder="Novo nome do arquivo..."
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleSaveRename();
+                            if (e.key === "Escape")
+                              setEditingFile({ url: null, name: "" });
+                          }}
+                        />
+                        <button
+                          onClick={handleSaveRename}
+                          disabled={isRenaming}
+                          className="btn btn-primary btn-xs h-8 px-3 flex items-center gap-1"
+                          title="Salvar"
+                        >
+                          <Check size={14} /> Salvar
+                        </button>
+                        <button
+                          onClick={() =>
+                            setEditingFile({ url: null, name: "" })
+                          }
+                          className="btn btn-ghost btn-xs h-8 px-3 flex items-center gap-1"
+                          title="Cancelar"
+                        >
+                          <X size={14} /> Cancelar
+                        </button>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div key={url} className="group flex items-center gap-2">
+                      <a
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`btn btn-ghost border w-full justify-start text-left break-all ${
+                          isComplementar
+                            ? "border-highlight/30 bg-highlight/5 hover:bg-highlight/10"
+                            : "border-soft"
+                        }`}
+                      >
+                        <FileText
+                          size={18}
+                          className={`shrink-0 ${isComplementar ? "text-highlight" : ""}`}
+                        />
+                        <span
+                          className={
+                            isComplementar ? "font-medium text-highlight" : ""
+                          }
+                        >
+                          {displayName}
                         </span>
-                      )}
-                    </a>
+                        {isComplementar && (
+                          <span className="ml-auto text-[10px] uppercase font-bold bg-highlight/20 text-highlight px-2 py-0.5 rounded-full">
+                            Novo
+                          </span>
+                        )}
+                      </a>
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setEditingFile({ url, name: displayName });
+                        }}
+                        className="btn btn-ghost btn-sm btn-square opacity-0 group-hover:opacity-100 transition-opacity text-muted hover:text-primary"
+                        title="Renomear arquivo"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                    </div>
                   );
                 })
               ) : (
@@ -1155,7 +1466,7 @@ export const DetalhesCaso = () => {
           <div className="card space-y-2">
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted">Status atual</p>
-              <div className="relative flex items-center gap-2 group z-10">
+              <div className="relative flex items-center gap-2 z-10">
                 <button
                   onClick={() => fetchDetalhes(true)}
                   className="text-muted hover:text-primary transition-colors p-1"
@@ -1171,9 +1482,14 @@ export const DetalhesCaso = () => {
                 <span className={`badge capitalize ${badgeClass}`}>
                   {statusKey.replace(/_/g, " ")}
                 </span>
-                <HelpCircle size={16} className="text-muted cursor-help" />
+                <button
+                  onClick={() => setShowStatusHelp(!showStatusHelp)}
+                  className="text-muted hover:text-primary transition-colors focus:outline-none"
+                >
+                  <HelpCircle size={16} className="cursor-help" />
+                </button>
                 <div
-                  className="absolute bottom-full right-0 mb-2 w-72 origin-bottom scale-95 transform-gpu opacity-0 transition-all duration-200 ease-in-out group-hover:scale-100 group-hover:opacity-100"
+                  className={`absolute bottom-full right-0 mb-2 w-72 origin-bottom transform-gpu transition-all duration-200 ease-in-out ${showStatusHelp ? "scale-100 opacity-100" : "scale-95 opacity-0 pointer-events-none"}`}
                   role="tooltip"
                 >
                   <div className="rounded-md border border-soft bg-surface p-3 text-sm shadow-lg">
@@ -1205,66 +1521,212 @@ export const DetalhesCaso = () => {
               </button>
             )}
 
-            {/* SEÇÃO DE AGENDAMENTO ONLINE */}
-            <div className="card space-y-4 border-t-4 border-t-blue-500">
-              <h2 className="heading-2 flex items-center gap-2">
-                <Video size={20} className="text-blue-500" />
-                Agendamento Online
-              </h2>
-              <div className="space-y-3">
-                <div>
-                  <label className="text-xs text-muted uppercase font-bold">
-                    Data e Hora
-                  </label>
-                  <input
-                    type="datetime-local"
-                    className="input mt-1"
-                    value={dataAgendamento}
-                    onChange={(e) => setDataAgendamento(e.target.value)}
-                  />
+            {/* ALERTA DE REAGENDAMENTO */}
+            {statusKey === "reagendamento_solicitado" && (
+              <div className="alert alert-error space-y-3 animate-fade-in mt-4">
+                <div className="flex items-center gap-2 text-error font-bold">
+                  <AlertTriangle size={20} />
+                  <h3>Solicitação de Reagendamento</h3>
                 </div>
-                <div>
-                  <label className="text-xs text-muted uppercase font-bold">
-                    Link da Reunião
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Google Meet, Teams, etc."
-                    className="input mt-1"
-                    value={linkAgendamento}
-                    onChange={(e) => setLinkAgendamento(e.target.value)}
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={handleAgendarReuniao}
-                  disabled={isAgendando}
-                  className="btn btn-primary w-full"
-                >
-                  {isAgendando ? "Salvando..." : "Salvar Agendamento"}
-                </button>
 
-                {caso.agendamento_link && (
-                  <div className="pt-2">
-                    <a
-                      href={`https://wa.me/55${(caso.whatsapp_contato || caso.telefone_assistido)?.replace(/\D/g, "")}?text=${encodeURIComponent(
-                        `Olá, Sr(a). ${caso.nome_assistido}. A Defensoria Pública agendou seu atendimento online para ${new Date(
-                          caso.agendamento_data,
-                        ).toLocaleString(
-                          "pt-BR",
-                        )}. Acesse pelo link: ${caso.agendamento_link}. Favor confirmar.`,
-                      )}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="btn btn-secondary w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white border-none"
-                    >
-                      <MessageSquare size={18} />
-                      Notificar via WhatsApp
-                    </a>
+                <div className="space-y-2">
+                  <div>
+                    <p className="text-xs text-error/80 uppercase font-bold">
+                      Motivo informado pelo cidadão
+                    </p>
+                    <p className="text-sm bg-surface/50 p-2 rounded border border-error/20">
+                      {caso.motivo_reagendamento || "Não informado."}
+                    </p>
                   </div>
-                )}
+
+                  {caso.data_sugerida_reagendamento && (
+                    <div>
+                      <p className="text-xs text-error/80 uppercase font-bold">
+                        Sugestão de nova data
+                      </p>
+                      <p className="text-sm bg-surface/50 p-2 rounded border border-error/20">
+                        {caso.data_sugerida_reagendamento}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <p className="text-xs text-error/90 italic">
+                  Para reagendar, selecione "Reunião Online" ou "Presencial"
+                  abaixo e defina a nova data.
+                </p>
               </div>
-            </div>
+            )}
+
+            {/* SEÇÃO DE AGENDAMENTO ONLINE */}
+            {statusKey === "reuniao_online_agendada" && (
+              <div className="card space-y-4 border-t-4 border-t-blue-500 animate-fade-in mt-4 bg-blue-50/50">
+                <h2 className="heading-2 flex items-center gap-2 text-blue-700">
+                  <Video size={20} className="text-blue-500" />
+                  Agendamento Online
+                </h2>
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-xs text-muted uppercase font-bold">
+                      Data e Hora
+                    </label>
+                    <input
+                      type="datetime-local"
+                      className="input mt-1"
+                      value={dataAgendamento}
+                      onChange={(e) => setDataAgendamento(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted uppercase font-bold">
+                      Link da Reunião
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Google Meet, Teams, etc."
+                      className="input mt-1"
+                      value={linkAgendamento}
+                      onChange={(e) => setLinkAgendamento(e.target.value)}
+                    />
+                  </div>
+                  <button
+                    onClick={handleAgendarReuniao}
+                    disabled={isAgendando}
+                    className="btn btn-primary w-full"
+                  >
+                    {isAgendando ? "Salvando..." : "Salvar Agendamento"}
+                  </button>
+
+                  {caso.agendamento_link && (
+                    <div className="pt-2">
+                      <a
+                        href={`https://wa.me/55${(caso.whatsapp_contato || caso.telefone_assistido)?.replace(/\D/g, "")}?text=${encodeURIComponent(
+                          `Olá, Sr(a). ${caso.nome_assistido}. A Defensoria Pública agendou seu atendimento online para ${new Date(
+                            caso.agendamento_data,
+                          ).toLocaleString("pt-BR", {
+                            timeZone: "America/Sao_Paulo",
+                            day: "2-digit",
+                            month: "2-digit",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}. Acesse pelo link: ${caso.agendamento_link}. Favor confirmar.`,
+                        )}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn btn-secondary w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white border-none"
+                      >
+                        <MessageSquare size={18} />
+                        Notificar via WhatsApp
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* SEÇÃO DE AGENDAMENTO PRESENCIAL */}
+            {statusKey === "reuniao_presencial_agendada" && (
+              <div className="card space-y-4 border-t-4 border-t-purple-500 animate-fade-in mt-4 bg-purple-50/50">
+                <h2 className="heading-2 flex items-center gap-2 text-purple-700">
+                  <Calendar size={20} className="text-purple-500" />
+                  Agendamento Presencial
+                </h2>
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-xs text-muted uppercase font-bold">
+                      Data e Hora
+                    </label>
+                    <input
+                      type="datetime-local"
+                      className="input mt-1"
+                      value={dataAgendamento}
+                      onChange={(e) => setDataAgendamento(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted uppercase font-bold">
+                      Local / Instruções
+                    </label>
+                    <textarea
+                      className="input mt-1 min-h-[80px]"
+                      placeholder="Ex: Sede da Defensoria, Sala 104. Trazer documentos originais."
+                      value={linkAgendamento}
+                      onChange={(e) => setLinkAgendamento(e.target.value)}
+                    />
+                  </div>
+                  <button
+                    onClick={handleAgendarReuniao}
+                    disabled={isAgendando}
+                    className="btn btn-primary w-full"
+                  >
+                    {isAgendando
+                      ? "Salvando..."
+                      : "Salvar Agendamento Presencial"}
+                  </button>
+
+                  {caso.agendamento_data && (
+                    <div className="pt-2">
+                      <a
+                        href={`https://wa.me/55${(caso.whatsapp_contato || caso.telefone_assistido)?.replace(/\D/g, "")}?text=${encodeURIComponent(
+                          `Olá, Sr(a). ${caso.nome_assistido}. A Defensoria Pública agendou seu atendimento presencial para ${new Date(
+                            caso.agendamento_data,
+                          ).toLocaleString("pt-BR", {
+                            timeZone: "America/Sao_Paulo",
+                            day: "2-digit",
+                            month: "2-digit",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}. Local/Instruções: ${caso.agendamento_link || "Sede da Defensoria"}. Favor confirmar.`,
+                        )}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn btn-secondary w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white border-none"
+                      >
+                        <MessageSquare size={18} />
+                        Notificar via WhatsApp
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* HISTÓRICO DE AGENDAMENTOS */}
+            {caso.historico_agendamentos &&
+              caso.historico_agendamentos.length > 0 && (
+                <div className="card space-y-4 mt-4 bg-gray-50 border border-gray-200">
+                  <h2 className="heading-3 flex items-center gap-2 text-gray-700">
+                    <History size={18} />
+                    Histórico de Agendamentos
+                  </h2>
+                  <div className="space-y-3">
+                    {caso.historico_agendamentos.map((hist) => (
+                      <div
+                        key={hist.id}
+                        className="text-sm border-l-2 border-gray-300 pl-3 py-1"
+                      >
+                        <p className="font-semibold text-gray-800">
+                          {new Date(hist.data_agendamento).toLocaleString(
+                            "pt-BR",
+                            { timeZone: "America/Sao_Paulo" }
+                          )}{" "}
+                          <span className="text-xs font-normal text-muted uppercase ml-1 bg-gray-200 px-1 rounded">
+                            {hist.tipo}
+                          </span>
+                        </p>
+                        <p className="text-muted text-xs mt-0.5">
+                          {hist.link_ou_local}
+                        </p>
+                        <p className="text-[10px] text-gray-400 mt-1">
+                          Status: {hist.status}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
             {/* ÁREA DE PENDÊNCIA (Só aparece se selecionar aguardando_docs) */}
             {statusKey === "aguardando_docs" && (
@@ -1294,7 +1756,7 @@ export const DetalhesCaso = () => {
             )}
 
             <select
-              className="input disabled:opacity-70 disabled:cursor-not-allowed"
+              className="input disabled:opacity-70 disabled:cursor-not-allowed border-2 border-primary/20 focus:border-primary focus:ring-4 focus:ring-primary/10 font-medium text-primary-900"
               onChange={(e) => handleStatusChange(e.target.value)}
               value={statusKey}
               // TRAVA: Desabilita se estiver atualizando OU se já estiver finalizado/encaminhado
@@ -1309,8 +1771,18 @@ export const DetalhesCaso = () => {
                 </option>
               )}
 
-              {/* 2. Mostra as opções normais (Recebido, Em Análise...) */}
-              {statusOptions.map((option) => (
+              {/* 2. Opção atual (se automática/não listada nas manuais) */}
+              {statusKey !== "encaminhado_solar" &&
+                !manualStatusOptions.find((o) => o.value === statusKey) && (
+                  <option value={statusKey} disabled>
+                    {statusKey.charAt(0).toUpperCase() +
+                      statusKey.slice(1).replace(/_/g, " ")}{" "}
+                    (Atual)
+                  </option>
+                )}
+
+              {/* 3. Opções manuais permitidas */}
+              {manualStatusOptions.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>
@@ -1393,21 +1865,6 @@ export const DetalhesCaso = () => {
                 className="bg-surface border border-soft p-6 rounded-xl space-y-4"
               >
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* INPUT NÚMERO SOLAR */}
-                  <div>
-                    <label className="block text-sm font-medium text-muted mb-1">
-                      Número de Atendimento
-                    </label>
-                    <input
-                      type="text"
-                      value={numSolar}
-                      onChange={(e) => setNumSolar(e.target.value)}
-                      placeholder="Ex: 123456"
-                      className="w-full bg-app border border-soft rounded-lg p-3 text-muted focus:ring-2 focus:ring-primary outline-none"
-                      required
-                    />
-                  </div>
-
                   {/* INPUT NÚMERO PROCESSO */}
                   <div>
                     <label className="block text-sm font-medium text-muted mb-1">
@@ -1464,6 +1921,40 @@ export const DetalhesCaso = () => {
           </div>
         </section>
       </div>
+
+      {/* MODAL DE MOTIVO DE ARQUIVAMENTO */}
+      {archiveModalOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 px-4 animate-fade-in">
+          <div className="bg-surface border border-soft p-6 rounded-2xl shadow-xl max-w-md w-full space-y-4">
+            <div className="flex items-center gap-3 text-amber-500">
+              <Archive size={24} />
+              <h3 className="text-xl font-bold text-main">Arquivar Caso</h3>
+            </div>
+            
+            <p className="text-muted text-sm">
+              O caso será movido para o "Arquivo Morto" e sairá da lista principal. 
+              Justifique esta ação:
+            </p>
+
+            <textarea
+              className="input min-h-[100px] resize-none"
+              placeholder="Ex: Dados inconsistentes, assistido desistiu, duplicidade..."
+              value={archiveReason}
+              onChange={(e) => setArchiveReason(e.target.value)}
+              autoFocus
+            />
+
+            <div className="flex gap-3 pt-2">
+              <button onClick={() => setArchiveModalOpen(false)} className="btn btn-ghost flex-1 border border-soft">
+                Cancelar
+              </button>
+              <button onClick={confirmArchive} className="btn btn-secondary flex-1 bg-amber-500 hover:bg-amber-600 text-white border-amber-500">
+                Confirmar Arquivamento
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
